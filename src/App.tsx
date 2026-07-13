@@ -10,7 +10,8 @@ import { PopupContainer } from '@/components/PopupContainer'
 import { ConfigPanel } from '@/features/config/ConfigPanel'
 import { PromptModal } from '@/features/prompt/PromptModal'
 import { HibernatePanel } from '@/features/hibernate/HibernatePanel'
-import { computeMove, shouldMove, randomDirection } from '@/features/popup/movement'
+import { shouldMove, randomDirection, tickPopups } from '@/features/popup/movement'
+import { logMovementEvent } from '@/features/popup/debug'
 import { Container, Title, Text, Anchor } from '@mantine/core'
 
 let audioIdCounter = 1
@@ -159,12 +160,15 @@ export default function App() {
             hypnoOpacity: cfg.subliminalsAlpha,
           }).then((popupId) => {
             const dir = randomDirection()
+            const moving = shouldMove(cfg.movingChance)
+            console.log('[spawn]', { popupId, moving, movingChance: cfg.movingChance, x, y, w, h })
             usePopupStore.getState().addPopup({
               id: popupId, type: isVideo ? 'video' : 'image',
               x, y, width: w, height: h,
-              moving: shouldMove(cfg.movingChance),
+              moving,
               dx: dir.dx, dy: dir.dy,
             })
+            logMovementEvent({ ts: Date.now(), type: 'spawn', popupId, moving, x, y, dx: dir.dx, dy: dir.dy })
           }).catch((err) => {
             console.error('createPopup failed', err)
           })
@@ -197,22 +201,23 @@ export default function App() {
       const cfg = useConfigStore.getState()
       const bounds = screenRef.current
       const popups = usePopupStore.getState().popups
-      for (const popup of popups) {
-        if (!popup.moving) continue
-
-        const result = computeMove(popup, cfg.movingSpeed, bounds)
-
-        if (result.x !== popup.x || result.y !== popup.y || result.dx !== popup.dx || result.dy !== popup.dy) {
-          electronAPI.movePopup(popup.id, result.x, result.y)
-          usePopupStore.getState().updatePopup(popup.id, {
-            x: result.x, y: result.y, dx: result.dx, dy: result.dy,
-          })
-        }
+      const movingCount = popups.filter((p) => p.moving).length
+      const updates = tickPopups(popups, cfg.movingSpeed, bounds)
+      if (popups.length > 0) {
+        console.log('[movement:tick]', { total: popups.length, movingCount, speed: cfg.movingSpeed, bounds, updateCount: updates.size })
+      }
+      for (const [id, update] of updates) {
+        electronAPI.movePopup(id, Math.round(update.x), Math.round(update.y)).catch(() => {})
+        usePopupStore.getState().updatePopup(id, { ...update, x: Math.round(update.x), y: Math.round(update.y) })
+        console.log('[movement:move]', { id, x: Math.round(update.x), y: Math.round(update.y), dx: update.dx, dy: update.dy })
+        logMovementEvent({ ts: Date.now(), type: 'move', popupId: id, x: Math.round(update.x), y: Math.round(update.y), dx: update.dx, dy: update.dy })
       }
     }
 
+    console.log('[movement] effect started', { running, electronAPI: !!electronAPI })
     moveTimerRef.current = setInterval(moveTick, 50)
     return () => {
+      console.log('[movement] effect cleanup')
       if (moveTimerRef.current) {
         clearInterval(moveTimerRef.current)
         moveTimerRef.current = null

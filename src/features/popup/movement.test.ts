@@ -1,10 +1,17 @@
 import { describe, it, expect } from 'vitest'
-import { computeMove, shouldMove, randomDirection } from './movement'
-import type { MovingPopup, ScreenBounds } from './movement'
+import { computeMove, shouldMove, randomDirection, tickPopups } from './movement'
+import type { MovingPopup, TickablePopup, ScreenBounds } from './movement'
 
 function makePopup(overrides: Partial<MovingPopup> = {}): MovingPopup {
   return {
     id: 1, x: 500, y: 400, width: 300, height: 200,
+    dx: 1, dy: 0, ...overrides,
+  }
+}
+
+function makeTickPopup(overrides: Partial<TickablePopup> = {}): TickablePopup {
+  return {
+    id: 1, moving: true, x: 500, y: 400, width: 300, height: 200,
     dx: 1, dy: 0, ...overrides,
   }
 }
@@ -117,82 +124,110 @@ describe('randomDirection', () => {
   })
 })
 
-describe('batch movement — only moving popups move', () => {
+describe('tickPopups', () => {
   const screen: ScreenBounds = { width: 1920, height: 1080 }
 
-  it('does not move popups where moving is false', () => {
-    const popups: MovingPopup[] = [
-      makePopup({ id: 1, x: 100, y: 100, dx: 1, dy: 0 }),
-      makePopup({ id: 2, x: 200, y: 200, dx: -1, dy: 1 }),
-      makePopup({ id: 3, x: 300, y: 300, dx: 0, dy: -1 }),
-    ]
-    const movingFlags = [true, false, false]
-
-    const results = popups.map((popup, i) => {
-      if (!movingFlags[i]) return { ...popup }
-      return computeMove(popup, 10, screen)
-    })
-
-    expect(results[0].x).not.toBe(popups[0].x)
-    expect(results[1].x).toBe(popups[1].x)
-    expect(results[1].y).toBe(popups[1].y)
-    expect(results[2].x).toBe(popups[2].x)
-    expect(results[2].y).toBe(popups[2].y)
+  it('returns empty map when no popups', () => {
+    const updates = tickPopups([], 10, screen)
+    expect(updates.size).toBe(0)
   })
 
-  it('shouldMove gates which popups are assigned moving=true at creation', () => {
-    const popups = Array.from({ length: 20 }, (_, i) => ({
-      ...makePopup({ id: i }),
-    }))
+  it('skips popups where moving is false', () => {
+    const popups = [
+      makeTickPopup({ id: 1, moving: false, x: 100, y: 100, dx: 1, dy: 0 }),
+      makeTickPopup({ id: 2, moving: false, x: 200, y: 200, dx: -1, dy: 1 }),
+      makeTickPopup({ id: 3, moving: false, x: 300, y: 300, dx: 0, dy: -1 }),
+    ]
+    const updates = tickPopups(popups, 10, screen)
+    expect(updates.size).toBe(0)
+  })
 
-    let callIndex = 0
-    const deterministicRandom = () => {
-      const values = [0.1, 0.9, 0.3, 0.8, 0.5, 0.2, 0.7, 0.6, 0.4, 0.15,
-        0.95, 0.05, 0.85, 0.35, 0.65, 0.25, 0.75, 0.45, 0.55, 0.01]
-      return values[callIndex++ % values.length]
-    }
-
-    const results = popups.map(() => shouldMove(50, deterministicRandom))
-
-    const movingCount = results.filter(Boolean).length
-    const stationaryCount = results.filter((r) => !r).length
-
-    expect(movingCount).toBeGreaterThan(0)
-    expect(stationaryCount).toBeGreaterThan(0)
+  it('moves popups where moving is true', () => {
+    const popups = [
+      makeTickPopup({ id: 1, moving: true, x: 500, y: 400, dx: 1, dy: 0 }),
+    ]
+    const updates = tickPopups(popups, 10, screen)
+    expect(updates.size).toBe(1)
+    const u = updates.get(1)!
+    expect(u.x).toBe(510)
+    expect(u.y).toBe(400)
   })
 
   it('full tick simulation: only moving popups change position', () => {
-    const popups: MovingPopup[] = [
-      makePopup({ id: 1, x: 500, y: 400, dx: 1, dy: 0 }),
-      makePopup({ id: 2, x: 500, y: 400, dx: 1, dy: 0 }),
-      makePopup({ id: 3, x: 500, y: 400, dx: 1, dy: 0 }),
+    const popups = [
+      makeTickPopup({ id: 1, moving: true, x: 500, y: 400, dx: 1, dy: 0 }),
+      makeTickPopup({ id: 2, moving: false, x: 500, y: 400, dx: 1, dy: 0 }),
+      makeTickPopup({ id: 3, moving: true, x: 500, y: 400, dx: 1, dy: 0 }),
     ]
-    const movingFlags = [true, false, true]
 
-    const speed = 10
-    const updated = popups.map((popup, i) => {
-      if (!movingFlags[i]) return { ...popup }
-      const result = computeMove(popup, speed, screen)
-      return { ...popup, ...result }
-    })
+    const updates = tickPopups(popups, 10, screen)
 
-    expect(updated[0].x).toBe(510)
-    expect(updated[1].x).toBe(500)
-    expect(updated[2].x).toBe(510)
+    expect(updates.size).toBe(2)
+    expect(updates.has(1)).toBe(true)
+    expect(updates.has(2)).toBe(false)
+    expect(updates.has(3)).toBe(true)
+    expect(updates.get(1)!.x).toBe(510)
+    expect(updates.get(3)!.x).toBe(510)
   })
 
   it('moving popup bounces and continues in new direction on next tick', () => {
     const speed = 20
-    let popup = makePopup({ x: 5, y: 500, dx: -1, dy: 0 })
+    let popups: TickablePopup[] = [
+      makeTickPopup({ x: 5, y: 500, dx: -1, dy: 0 }),
+    ]
 
-    const tick1 = computeMove(popup, speed, screen)
-    popup = { ...popup, ...tick1 }
-    expect(popup.x).toBe(0)
-    expect(popup.dx).toBe(1)
+    const tick1 = tickPopups(popups, speed, screen)
+    const u1 = tick1.get(1)!
+    popups = [{ ...popups[0], ...u1 }]
+    expect(popups[0].x).toBe(0)
+    expect(popups[0].dx).toBe(1)
 
-    const tick2 = computeMove(popup, speed, screen)
-    popup = { ...popup, ...tick2 }
-    expect(popup.x).toBe(20)
-    expect(popup.dx).toBe(1)
+    const tick2 = tickPopups(popups, speed, screen)
+    const u2 = tick2.get(1)!
+    popups = [{ ...popups[0], ...u2 }]
+    expect(popups[0].x).toBe(20)
+    expect(popups[0].dx).toBe(1)
+  })
+
+  it('speed=0 produces no updates', () => {
+    const popups = [
+      makeTickPopup({ id: 1, moving: true, x: 500, y: 400, dx: 1, dy: 0 }),
+    ]
+    const updates = tickPopups(popups, 0, screen)
+    expect(updates.size).toBe(0)
+  })
+
+  it('all moving popups get updates at 100% chance', () => {
+    const popups = Array.from({ length: 20 }, (_, i) =>
+      makeTickPopup({ id: i, moving: true, x: 500 + i * 10, y: 400, dx: 1, dy: 0 }),
+    )
+
+    const updates = tickPopups(popups, 5, screen)
+
+    expect(updates.size).toBe(20)
+    for (const popup of popups) {
+      const u = updates.get(popup.id)
+      expect(u).toBeDefined()
+      expect(u!.x).not.toBe(popup.x)
+    }
+  })
+
+  it('multi-tick simulation: popups accumulate position changes', () => {
+    const speed = 5
+    let popups: TickablePopup[] = [
+      makeTickPopup({ id: 1, moving: true, x: 500, y: 400, dx: 1, dy: 0 }),
+    ]
+
+    for (let tick = 0; tick < 10; tick++) {
+      const updates = tickPopups(popups, speed, screen)
+      popups = popups.map((p) => {
+        const u = updates.get(p.id)
+        return u ? { ...p, ...u } : p
+      })
+    }
+
+    expect(popups[0].x).toBe(500 + 10 * speed)
+    expect(popups[0].y).toBe(400)
+    expect(popups[0].dx).toBe(1)
   })
 })
