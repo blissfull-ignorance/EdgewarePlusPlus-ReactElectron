@@ -79,6 +79,12 @@ body.clickthrough { pointer-events: none; }
     vid.muted = false;
     vid.playsInline = true;
     vid.style.cssText = media.style.cssText;
+    vid.addEventListener('error', function() {
+      var fb = document.createElement('div');
+      fb.style.cssText = 'width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,0.3);font-size:12px;font-family:sans-serif;';
+      fb.textContent = 'unsupported format';
+      vid.replaceWith(fb);
+    });
     media.replaceWith(vid);
   } else {
     media.src = 'file://' + encodeURI(mediaPath);
@@ -95,6 +101,9 @@ body.clickthrough { pointer-events: none; }
     el.src = 'file://' + encodeURI(hypnoMediaPath);
     el.style.display = 'block';
     el.style.opacity = hypnoOpacity;
+    if (isVid) {
+      el.addEventListener('error', function() { this.style.display = 'none'; });
+    }
   }
 
   document.body.addEventListener('click', function onClick() {

@@ -4,7 +4,7 @@ import os from 'os'
 import AdmZip from 'adm-zip'
 
 const IMAGE_EXTS = new Set(['.png', '.jpg', '.jpeg', '.gif', '.bmp', '.webp'])
-const VIDEO_EXTS = new Set(['.mp4', '.webm', '.avi', '.mov', '.mkv', '.flv'])
+const VIDEO_EXTS = new Set(['.mp4', '.webm', '.mov'])
 const AUDIO_EXTS = new Set(['.mp3', '.wav', '.ogg', '.flac', '.m4a', '.aac'])
 const HYPN_EXTS = new Set(['.gif', '.mp4', '.webm'])
 
