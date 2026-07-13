@@ -10,6 +10,7 @@ import { PopupContainer } from '@/components/PopupContainer'
 import { ConfigPanel } from '@/features/config/ConfigPanel'
 import { PromptModal } from '@/features/prompt/PromptModal'
 import { HibernatePanel } from '@/features/hibernate/HibernatePanel'
+import { computeMove, shouldMove } from '@/features/popup/movement'
 import { Container, Title, Text, Anchor } from '@mantine/core'
 
 let audioIdCounter = 1
@@ -131,7 +132,7 @@ export default function App() {
 
       if (isAudio) {
         const id = audioIdCounter++
-        usePopupStore.getState().addPopup({ id, type: 'audio', mediaPath: path })
+        usePopupStore.getState().addPopup({ id, type: 'audio', mediaPath: path, x: 0, y: 0, width: 0, height: 0 })
       } else {
         const scale = cfg.popupScale || 1
         const w = Math.round(randomInt(200, 400) * scale)
@@ -157,7 +158,7 @@ export default function App() {
               : undefined,
             hypnoOpacity: cfg.subliminalsAlpha,
           }).then((popupId) => {
-            usePopupStore.getState().addPopup({ id: popupId, type: isVideo ? 'video' : 'image' })
+            usePopupStore.getState().addPopup({ id: popupId, type: isVideo ? 'video' : 'image', x, y, width: w, height: h })
           }).catch((err) => {
             console.error('createPopup failed', err)
           })
@@ -170,6 +171,46 @@ export default function App() {
       if (spawnTimerRef.current) {
         clearInterval(spawnTimerRef.current)
         spawnTimerRef.current = null
+      }
+    }
+  }, [running, electronAPI])
+
+  // Popup movement loop
+  const moveTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
+
+  useEffect(() => {
+    if (!running || !electronAPI) {
+      if (moveTimerRef.current) {
+        clearInterval(moveTimerRef.current)
+        moveTimerRef.current = null
+      }
+      return
+    }
+
+    const moveTick = () => {
+      const cfg = useConfigStore.getState()
+      if (cfg.movingChance <= 0) return
+
+      const bounds = screenRef.current
+      const popups = usePopupStore.getState().popups
+      for (const popup of popups) {
+        if (popup.type === 'audio') continue
+        if (!shouldMove(cfg.movingChance)) continue
+
+        const { x: newX, y: newY } = computeMove(popup, cfg.movingSpeed, bounds)
+
+        if (newX !== popup.x || newY !== popup.y) {
+          electronAPI.movePopup(popup.id, newX, newY)
+          usePopupStore.getState().updatePopupPosition(popup.id, newX, newY)
+        }
+      }
+    }
+
+    moveTimerRef.current = setInterval(moveTick, 500)
+    return () => {
+      if (moveTimerRef.current) {
+        clearInterval(moveTimerRef.current)
+        moveTimerRef.current = null
       }
     }
   }, [running, electronAPI])
