@@ -3,24 +3,37 @@ export interface ScreenBounds {
   height: number
 }
 
-export interface PopupRect {
+export interface MovingPopup {
+  id: number
   x: number
   y: number
   width: number
   height: number
+  dx: number
+  dy: number
 }
 
 export function computeMove(
-  popup: PopupRect,
+  popup: MovingPopup,
   speed: number,
   screen: ScreenBounds,
-  randomFn: () => number = Math.random,
-): { x: number; y: number } {
-  const dx = Math.floor(randomFn() * (speed * 2 + 1)) - speed
-  const dy = Math.floor(randomFn() * (speed * 2 + 1)) - speed
-  const x = Math.max(0, Math.min(screen.width - popup.width, popup.x + dx))
-  const y = Math.max(0, Math.min(screen.height - popup.height, popup.y + dy))
-  return { x, y }
+): { x: number; y: number; dx: number; dy: number } {
+  let { x, y, dx, dy } = popup
+  x += dx * speed
+  y += dy * speed
+
+  if (x < 0) { x = 0; dx = -dx }
+  else if (x > screen.width - popup.width) { x = screen.width - popup.width; dx = -dx }
+
+  if (y < 0) { y = 0; dy = -dy }
+  else if (y > screen.height - popup.height) { y = screen.height - popup.height; dy = -dy }
+
+  return { x, y, dx, dy }
+}
+
+export function randomDirection(randomFn: () => number = Math.random): { dx: number; dy: number } {
+  const angle = randomFn() * Math.PI * 2
+  return { dx: Math.cos(angle), dy: Math.sin(angle) }
 }
 
 export function shouldMove(chance: number, randomFn: () => number = Math.random): boolean {

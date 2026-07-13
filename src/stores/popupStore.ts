@@ -8,6 +8,9 @@ export interface ActivePopup {
   y: number
   width: number
   height: number
+  moving: boolean
+  dx: number
+  dy: number
 }
 
 export interface PopupState {
@@ -15,7 +18,7 @@ export interface PopupState {
   popupCount: number
   addPopup: (popup: ActivePopup) => void
   removePopup: (id: number) => void
-  updatePopupPosition: (id: number, x: number, y: number) => void
+  updatePopup: (id: number, update: Partial<Pick<ActivePopup, 'x' | 'y' | 'dx' | 'dy'>>) => void
   clearPopups: () => void
 }
 
@@ -30,8 +33,8 @@ export const usePopupStore = create<PopupState>((set) => ({
     popups: state.popups.filter((p) => p.id !== id),
     popupCount: Math.max(0, state.popupCount - 1),
   })),
-  updatePopupPosition: (id, x, y) => set((state) => ({
-    popups: state.popups.map((p) => p.id === id ? { ...p, x, y } : p),
+  updatePopup: (id, update) => set((state) => ({
+    popups: state.popups.map((p) => p.id === id ? { ...p, ...update } : p),
   })),
   clearPopups: () => set({ popups: [], popupCount: 0 }),
 }))
