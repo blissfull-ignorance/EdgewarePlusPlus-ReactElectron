@@ -99,14 +99,20 @@ export interface Config {
   repeatSchedule: boolean
   repeatType: string
   repeatTime: number
+  popupScale: number
 }
 
 export interface PopupOptions {
   mediaPath: string
+  type: 'image' | 'video' | 'audio'
   width: number
   height: number
   x: number
   y: number
   opacity: number
   clickthrough: boolean
+  clicksToClose: number
+  denialFilter?: string
+  hypnoMediaPath?: string
+  hypnoOpacity?: number
 }

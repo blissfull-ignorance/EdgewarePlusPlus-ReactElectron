@@ -17,7 +17,9 @@ export const useAppStore = create<AppState>((set) => ({
   running: false,
   showSplash: () => set({ splashComplete: false }),
   completeSplash: () => set({ splashComplete: true }),
-  triggerPanic: () => set({ inPanicMode: true }),
+  triggerPanic: () => {
+    set({ inPanicMode: true })
+  },
   clearPanic: () => set({ inPanicMode: false }),
   setRunning: (running) => set({ running }),
 }))

@@ -102,6 +102,7 @@ const defaults: Config = {
   repeatSchedule: false,
   repeatType: 'Hours',
   repeatTime: 0,
+  popupScale: 1,
 }
 
 export interface ConfigState extends Config {

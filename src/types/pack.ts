@@ -99,6 +99,7 @@ export interface Config {
   repeatSchedule: boolean
   repeatType: string
   repeatTime: number
+  popupScale: number
 }
 
 export interface PackInfo {

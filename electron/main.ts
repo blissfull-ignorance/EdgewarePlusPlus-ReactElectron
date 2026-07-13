@@ -3,7 +3,7 @@ import path from 'path'
 import { fileURLToPath } from 'url'
 import { setWallpaper, getWallpaper } from './ipc/wallpaper.js'
 import { createTray } from './ipc/tray.js'
-import { createPopupWindow, closePopupWindow, movePopupWindow, setPopupClickthrough, closeAllPopups } from './ipc/popup.js'
+import { createPopupWindow, closePopupWindow, movePopupWindow, setPopupClickthrough, closeAllPopups, setPopupMainWindow } from './ipc/popup.js'
 import { createShortcut } from './ipc/shortcut.js'
 import { fillDrive, replaceImages } from './ipc/filesystem.js'
 import { loadConfig, saveConfig } from './ipc/config.js'
@@ -36,6 +36,8 @@ function createWindow() {
   } else {
     mainWindow.loadFile(path.join(__dirname, '../dist/index.html'))
   }
+
+  setPopupMainWindow(mainWindow)
 
   mainWindow.on('closed', () => {
     mainWindow = null

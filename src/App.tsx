@@ -12,6 +12,8 @@ import { PromptModal } from '@/features/prompt/PromptModal'
 import { HibernatePanel } from '@/features/hibernate/HibernatePanel'
 import { Container, Title, Text, Anchor } from '@mantine/core'
 
+let audioIdCounter = 1
+
 function StatusPage() {
   return (
     <Container size="xs" py="xl">
@@ -53,6 +55,7 @@ function pickDenialFilter(): string {
 
 export default function App() {
   const { inPanicMode, splashComplete, running, completeSplash } = useAppStore()
+  const popupCount = usePopupStore((s) => s.popupCount)
   const electronAPI = useElectronAPI()
   const spawnTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
@@ -69,6 +72,7 @@ export default function App() {
     if (!electronAPI) return
     electronAPI.onPanic(() => {
       useAppStore.getState().triggerPanic()
+      usePopupStore.getState().clearPopups()
     })
     electronAPI.onKeyEvent((_type, key) => {
       if (key === useConfigStore.getState().panicButton) {
@@ -79,6 +83,9 @@ export default function App() {
       if (action === 'panic') {
         useAppStore.getState().triggerPanic()
       }
+    })
+    electronAPI.onPopupClosed((id) => {
+      usePopupStore.getState().removePopup(id)
     })
   }, [electronAPI])
 
@@ -115,33 +122,37 @@ export default function App() {
       const isAudio = audio.includes(path)
 
       if (isAudio) {
-        usePopupStore.getState().addPopup({
-          type: 'audio',
-          mediaPath: path,
-          x: 0, y: 0, width: 0, height: 0,
-          opacity: 100,
-          clickthrough: true,
-          clicksToClose: 1,
-        })
+        const id = audioIdCounter++
+        usePopupStore.getState().addPopup({ id, type: 'audio', mediaPath: path })
       } else {
-        const w = randomInt(200, 400)
-        const h = randomInt(150, 300)
+        const scale = cfg.popupScale || 1
+        const w = Math.round(randomInt(200, 400) * scale)
+        const h = Math.round(randomInt(150, 300) * scale)
         const x = randomInt(0, window.innerWidth - w)
         const y = randomInt(0, window.innerHeight - h)
 
-        usePopupStore.getState().addPopup({
-          type: isVideo ? 'video' : 'image',
-          mediaPath: path,
-          x, y, width: w, height: h,
-          opacity: 100,
-          clickthrough: cfg.clickthroughPopups,
-          clicksToClose: cfg.buttonless ? 999 : 1,
-          denialFilter: roll(cfg.denialChance) ? pickDenialFilter() : undefined,
-          hypnoMediaPath: roll(cfg.subliminalsChance) && pack.media.hypno.length > 0
-            ? pickRandom(pack.media.hypno)
-            : undefined,
-          hypnoOpacity: cfg.subliminalsAlpha,
-        })
+        if (electronAPI) {
+          electronAPI.createPopup({
+            mediaPath: path,
+            type: isVideo ? 'video' : 'image',
+            width: w,
+            height: h,
+            x,
+            y,
+            opacity: 100,
+            clickthrough: cfg.clickthroughPopups,
+            clicksToClose: cfg.buttonless ? 999 : 1,
+            denialFilter: roll(cfg.denialChance) ? pickDenialFilter() : undefined,
+            hypnoMediaPath: roll(cfg.subliminalsChance) && pack.media.hypno.length > 0
+              ? pickRandom(pack.media.hypno)
+              : undefined,
+            hypnoOpacity: cfg.subliminalsAlpha,
+          }).then((popupId) => {
+            usePopupStore.getState().addPopup({ id: popupId, type: isVideo ? 'video' : 'image' })
+          }).catch((err) => {
+            console.error('createPopup failed', err)
+          })
+        }
       }
     }
 
@@ -152,7 +163,7 @@ export default function App() {
         spawnTimerRef.current = null
       }
     }
-  }, [running])
+  }, [running, electronAPI])
 
   const handleSplashComplete = useCallback(() => {
     completeSplash()
@@ -184,7 +195,7 @@ export default function App() {
 
       {running && (
         <Container size="xs" py="sm" ta="center">
-          <Text size="sm" c="grape">Edgeware++ Running — {usePopupStore.getState().popupCount} popups active</Text>
+          <Text size="sm" c="grape">Edgeware++ Running — {popupCount} popups active</Text>
         </Container>
       )}
 

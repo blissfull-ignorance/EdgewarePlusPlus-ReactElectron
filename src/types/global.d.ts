@@ -2,12 +2,17 @@ import type { Config } from '@/types/pack'
 
 interface PopupOptions {
   mediaPath: string
+  type: 'image' | 'video' | 'audio'
   width: number
   height: number
   x: number
   y: number
   opacity: number
   clickthrough: boolean
+  clicksToClose: number
+  denialFilter?: string
+  hypnoMediaPath?: string
+  hypnoOpacity?: number
 }
 
 interface ElectronAPI {
@@ -26,6 +31,7 @@ interface ElectronAPI {
   replaceImages: (path: string, count: number) => Promise<void>
   sendPanic: () => Promise<void>
   onPanic: (cb: () => void) => void
+  onPopupClosed: (cb: (id: number) => void) => void
   onHibernateTimer: (cb: () => void) => void
   openDirectory: () => Promise<string | null>
   loadPack: (packDir: string) => Promise<unknown>

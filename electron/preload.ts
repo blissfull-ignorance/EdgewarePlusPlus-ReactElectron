@@ -31,6 +31,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   onHibernateTimer: (cb: () => void) => { ipcRenderer.on('hibernate:timer', () => cb()) },
 
+  onPopupClosed: (cb: (id: number) => void) => {
+    ipcRenderer.on('popup:closed', (_event, id) => cb(id))
+  },
+
   openDirectory: (): Promise<string | null> => ipcRenderer.invoke('dialog:openDirectory'),
 
   loadPack: (packDir: string): Promise<unknown> => ipcRenderer.invoke('pack:load', packDir),

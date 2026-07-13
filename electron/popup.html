@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self' file:; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' file:; media-src 'self' file:;">
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body { width: 100%; height: 100%; overflow: hidden; background: transparent; }
+body { display: flex; flex-direction: column; }
+#header {
+  height: 28px;
+  min-height: 28px;
+  background: rgba(20, 20, 35, 0.85);
+  -webkit-app-region: drag;
+  display: flex;
+  align-items: center;
+  padding: 0 8px;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.7);
+  user-select: none;
+  cursor: grab;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+#header:active { cursor: grabbing; }
+#header-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  pointer-events: none;
+}
+#media-container {
+  flex: 1;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+#media { width: 100%; height: 100%; object-fit: contain; user-select: none; -webkit-user-drag: none; }
+#hypno { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; object-fit: cover; }
+#counter { position: absolute; bottom: 4px; right: 4px; background: rgba(0,0,0,0.6); color: #fff; font-size: 11px; padding: 2px 6px; border-radius: 4px; font-family: sans-serif; display: none; }
+body.clickthrough #header { pointer-events: none; }
+body.clickthrough { pointer-events: none; }
+</style>
+</head>
+<body>
+<div id="header"><span id="header-title"></span></div>
+<div id="media-container">
+  <img id="media" alt="">
+  <video id="hypno" autoplay loop muted playsinline style="display:none"></video>
+  <img id="hypno-img" alt="" style="display:none">
+  <div id="counter">0/0</div>
+</div>
+<script>
+(function(){
+  const p = new URLSearchParams(location.search);
+  const mediaPath = p.get('mediaPath') || '';
+  const type = p.get('type') || 'image';
+  const opacity = Math.min(100, Math.max(0, parseFloat(p.get('opacity') || '100'))) / 100;
+  const denialFilter = p.get('denialFilter') || '';
+  const hypnoMediaPath = p.get('hypnoMediaPath') || '';
+  const hypnoOpacity = Math.min(100, Math.max(0, parseFloat(p.get('hypnoOpacity') || '20'))) / 100;
+  const clicksToClose = Math.max(1, parseInt(p.get('clicksToClose') || '1', 10));
+  const clickthrough = p.get('clickthrough') === 'true';
+
+  if (clickthrough) document.body.classList.add('clickthrough');
+
+  var fileName = mediaPath.split(/[\\/]/).pop() || 'Popup';
+  document.getElementById('header-title').textContent = fileName;
+
+  const media = document.getElementById('media');
+  if (type === 'video') {
+    const vid = document.createElement('video');
+    vid.id = 'media';
+    vid.src = 'file://' + encodeURI(mediaPath);
+    vid.autoplay = true;
+    vid.loop = true;
+    vid.muted = false;
+    vid.playsInline = true;
+    vid.style.cssText = media.style.cssText;
+    media.replaceWith(vid);
+  } else {
+    media.src = 'file://' + encodeURI(mediaPath);
+    media.draggable = false;
+  }
+
+  const m = document.getElementById('media');
+  m.style.opacity = opacity;
+  if (denialFilter) m.style.filter = denialFilter;
+
+  if (hypnoMediaPath) {
+    const isVid = /\.(mp4|webm|ogg|mov)$/i.test(hypnoMediaPath);
+    const el = isVid ? document.getElementById('hypno') : document.getElementById('hypno-img');
+    el.src = 'file://' + encodeURI(hypnoMediaPath);
+    el.style.display = 'block';
+    el.style.opacity = hypnoOpacity;
+  }
+
+  document.body.addEventListener('click', function onClick() {
+    if (clickthrough) return;
+    if (clicksToClose <= 1) { window.close(); return; }
+    const ctr = document.getElementById('counter');
+    let cc = parseInt(ctr.textContent.split('/')[0] || '0', 10);
+    cc++;
+    ctr.textContent = cc + '/' + clicksToClose;
+    ctr.style.display = 'block';
+    if (cc >= clicksToClose) window.close();
+  });
+})();
+</script>
+</body>
+</html>

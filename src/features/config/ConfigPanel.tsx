@@ -208,6 +208,13 @@ export function ConfigPanel() {
         {/* ── Popup Tweaks ── */}
         <Tabs.Panel value="popupTweaks">
           <Stack gap="md">
+            <div>
+              <Text size="sm" mb="xs">Popup Size Scale — {config.popupScale.toFixed(1)}x</Text>
+              <Slider value={config.popupScale} onChange={(v) => config.updateConfig({ popupScale: v })}
+                min={0.5} max={3} step={0.1}
+                marks={[{ value: 0.5, label: '0.5x' }, { value: 1, label: '1x' }, { value: 1.5, label: '1.5x' }, { value: 2, label: '2x' }, { value: 3, label: '3x' }]}
+              />
+            </div>
             <Switch label="Show Captions in Popups"
               checked={config.showCaptions}
               onChange={(e) => config.updateConfig({ showCaptions: e.currentTarget.checked })}
