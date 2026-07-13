@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, ipcMain } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain, screen } from 'electron'
 import path from 'path'
 import { fileURLToPath } from 'url'
 import { setWallpaper, getWallpaper } from './ipc/wallpaper.js'
@@ -117,6 +117,11 @@ function registerIpcHandlers() {
   ipcMain.handle('panic:trigger', async () => {
     closeAllPopups()
     mainWindow?.webContents.send('panic')
+  })
+
+  ipcMain.handle('screen:bounds', async () => {
+    const primary = screen.getPrimaryDisplay().bounds
+    return { x: primary.x, y: primary.y, width: primary.width, height: primary.height }
   })
 }
 

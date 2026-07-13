@@ -35,6 +35,7 @@ interface ElectronAPI {
   onHibernateTimer: (cb: () => void) => void
   openDirectory: () => Promise<string | null>
   loadPack: (packDir: string) => Promise<unknown>
+  getScreenBounds: () => Promise<{ x: number; y: number; width: number; height: number }>
 }
 
 declare global {

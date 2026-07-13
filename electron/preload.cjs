@@ -37,4 +37,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
   openDirectory: () => ipcRenderer.invoke('dialog:openDirectory'),
 
   loadPack: (packDir) => ipcRenderer.invoke('pack:load', packDir),
+
+  getScreenBounds: () => ipcRenderer.invoke('screen:bounds'),
 })

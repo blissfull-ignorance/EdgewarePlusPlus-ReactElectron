@@ -58,6 +58,14 @@ export default function App() {
   const popupCount = usePopupStore((s) => s.popupCount)
   const electronAPI = useElectronAPI()
   const spawnTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const screenRef = useRef({ width: 1920, height: 1080 })
+
+  useEffect(() => {
+    if (!electronAPI) return
+    electronAPI.getScreenBounds().then((bounds) => {
+      screenRef.current = { width: bounds.width, height: bounds.height }
+    }).catch(() => {})
+  }, [electronAPI])
 
   useEffect(() => {
     if (!electronAPI) return
@@ -128,8 +136,9 @@ export default function App() {
         const scale = cfg.popupScale || 1
         const w = Math.round(randomInt(200, 400) * scale)
         const h = Math.round(randomInt(150, 300) * scale)
-        const x = randomInt(0, window.innerWidth - w)
-        const y = randomInt(0, window.innerHeight - h)
+        const bounds = screenRef.current
+        const x = randomInt(0, Math.max(0, bounds.width - w))
+        const y = randomInt(0, Math.max(0, bounds.height - h))
 
         if (electronAPI) {
           electronAPI.createPopup({
