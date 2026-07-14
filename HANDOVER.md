@@ -2,7 +2,7 @@
 
 ## Current Status
 
-**Last Session:** Playwright tests fixed — selector precision, window detection timing, and Vitest exclusion resolved
+**Last Session:** Close button with pack-defined text added to popups
 
 **Date:** July 14, 2026
 
@@ -17,9 +17,9 @@
 - **Per-type limits** — separate `maxImages` and `maxVideos` caps (default 10 each)
 - **Hypno overlays** — .gif only, applied to static images (png/jpg/bmp/webp), not gifs or videos
 - **Denial filters** — CSS blur/saturate/brightness applied randomly based on `denialChance`
-- **Click-to-close** — multi-click counter when `buttonless` is off
+- **Click-to-close** — close button with pack-defined text (popupClose from index.json); buttonless mode allows body-click to close
 - **Config persistence** — load/save via IPC to `userData/config.json`
-- **Pack loading** — directory scanning, zip extraction, media categorization
+- **Pack loading** — directory scanning, zip extraction, media categorization, popupClose from index.json
 - **Keyboard shortcuts** — panic button via `globalShortcut`
 - **System tray** — context menu with Panic/Quit
 - **Wallpaper** — cross-platform (osascript/gsettings/user32.dll)
@@ -41,6 +41,7 @@
 ### Recent Commits
 
 ```
+feat: add close button with pack-defined text to popups
 fix: resolve Playwright/Vitest conflict and verify e2e tests
 89637b0 fix: sync preload.cjs with preload.ts to resolve renderer crash
 feat: wire shell.openExternal via IPC for web links
@@ -151,11 +152,10 @@ EdgewarePlusPlus/
 
 ### Next Session Priority Order
 
-1. **MEDIUM**: In the original project, clicking the image/gif/video didn't close the popup. Instead, there was a button in the lower right corner, which had a custom text defined in the pack files, which closed the popup on click.
-2. **LOW**: Go through all existing tests. Assess tests viability: Can the test realistically fail? Does the test work for finding issues at runtime? Can the test be improved?
-3. **LOW**: Compare the former edgeware python projects features and config options to the current state of the implementation: Are all features ported? Are all tests ported?
-4. **LOW**: Cross-platform verification (Windows, Linux)
-5. **LOW**: Tray icon assets (.icns, .ico, .png)
+1. **LOW**: Go through all existing tests. Assess tests viability: Can the test realistically fail? Does the test work for finding issues at runtime? Can the test be improved?
+2. **LOW**: Compare the former edgeware python projects features and config options to the current state of the implementation: Are all features ported? Are all tests ported?
+3. **LOW**: Cross-platform verification (Windows, Linux)
+4. **LOW**: Tray icon assets (.icns, .ico, .png)
 
 ### Important Notes
 

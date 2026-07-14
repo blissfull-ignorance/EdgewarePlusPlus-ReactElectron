@@ -56,8 +56,32 @@ body { display: flex; flex-direction: column; }
 /* Hypno overlay for static image files (gif subliminal) */
 #hypno-img { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; object-fit: cover; }
 
-/* Click counter badge (shown when clicksToClose > 1) */
+/* Click counter badge (shown when clicksToClose > 1 and buttonless is off) */
 #counter { position: absolute; bottom: 4px; right: 4px; background: rgba(0,0,0,0.6); color: #fff; font-size: 11px; padding: 2px 6px; border-radius: 4px; font-family: sans-serif; display: none; }
+
+/*
+ * Close button: positioned absolutely in the lower-right corner of the media container.
+ * Uses the pack-defined popupClose text. Hidden when buttonless or clickthrough is active.
+ * z-index 5003 ensures it sits above the hypno overlay (no z-index) and draggable header.
+ */
+#close-btn {
+  position: absolute;
+  bottom: 8px;
+  right: 8px;
+  z-index: 5003;
+  padding: 6px 14px;
+  border: none;
+  border-radius: 4px;
+  background: rgba(20, 20, 35, 0.85);
+  color: rgba(255, 255, 255, 0.9);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-size: 13px;
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.15s;
+}
+#close-btn:hover { background: rgba(40, 40, 60, 0.95); }
+#close-btn:active { background: rgba(60, 60, 80, 0.95); }
 
 /* Click-through mode: disable all pointer events on the entire window */
 body.clickthrough #header { pointer-events: none; }
@@ -74,6 +98,7 @@ body.clickthrough { pointer-events: none; }
   <video id="hypno" autoplay loop muted playsinline style="display:none"></video>
   <img id="hypno-img" alt="" style="display:none">
   <div id="counter">0/0</div>
+  <button id="close-btn" style="display:none"></button>
 </div>
 <script>
 /*
@@ -88,6 +113,8 @@ body.clickthrough { pointer-events: none; }
  *   - hypnoOpacity: 0–100 (mapped to 0.0–1.0)
  *   - clicksToClose: number of clicks needed to dismiss (1 = instant)
  *   - clickthrough: 'true' to make window click-through
+ *   - popupClose: text for the close button (from pack's index.json)
+ *   - buttonless: 'true' to hide close button and allow body-click to close
  *
  * REMOVABLE: The video error fallback div is only needed because Electron's
  * Chromium may not support all codecs. If VIDEO_EXTS is restricted to
@@ -103,6 +130,8 @@ body.clickthrough { pointer-events: none; }
   const hypnoOpacity = Math.min(100, Math.max(0, parseFloat(p.get('hypnoOpacity') || '20'))) / 100;
   const clicksToClose = Math.max(1, parseInt(p.get('clicksToClose') || '1', 10));
   const clickthrough = p.get('clickthrough') === 'true';
+  const buttonless = p.get('buttonless') === 'true';
+  const popupClose = p.get('popupClose') || 'Close';
 
   if (clickthrough) document.body.classList.add('clickthrough');
 
@@ -153,17 +182,49 @@ body.clickthrough { pointer-events: none; }
     }
   }
 
-  // Click-to-close handler with optional multi-click counter
-  document.body.addEventListener('click', function onClick() {
-    if (clickthrough) return;
-    if (clicksToClose <= 1) { window.close(); return; }
-    const ctr = document.getElementById('counter');
-    let cc = parseInt(ctr.textContent.split('/')[0] || '0', 10);
-    cc++;
-    ctr.textContent = cc + '/' + clicksToClose;
-    ctr.style.display = 'block';
-    if (cc >= clicksToClose) window.close();
-  });
+  // Close button + click handling
+  // DISCUSSION: buttonless mode hides the close button and allows body-click to close
+  // (matching the original Python behavior). Non-buttonless mode shows a close button
+  // with pack-defined text and disables body-click-to-close.
+  var closeBtn = document.getElementById('close-btn');
+  var ctr = document.getElementById('counter');
+  var remainingClicks = clicksToClose;
+
+  if (!clickthrough && !buttonless) {
+    // Show close button with pack-defined text
+    closeBtn.textContent = popupClose;
+    closeBtn.style.display = 'block';
+    if (clicksToClose > 1) {
+      closeBtn.textContent = popupClose + ' (1/' + clicksToClose + ')';
+    }
+    closeBtn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      remainingClicks--;
+      if (remainingClicks <= 0) {
+        window.close();
+        return;
+      }
+      closeBtn.textContent = popupClose + ' (' + (clicksToClose - remainingClicks + 1) + '/' + clicksToClose + ')';
+    });
+  } else if (!clickthrough && buttonless) {
+    // Buttonless: clicking anywhere on the body closes the popup
+    document.body.addEventListener('click', function() {
+      window.close();
+    });
+  }
+
+  // REMOVABLE: The counter badge is legacy from before the close button was added.
+  // It's only shown when clicksToClose > 1 AND buttonless is on (no close button).
+  // Consider removing if buttonless multi-click is not needed.
+  if (!clickthrough && buttonless && clicksToClose > 1) {
+    document.body.addEventListener('click', function onClick() {
+      var cc = parseInt(ctr.textContent.split('/')[0] || '0', 10);
+      cc++;
+      ctr.textContent = cc + '/' + clicksToClose;
+      ctr.style.display = 'block';
+      if (cc >= clicksToClose) window.close();
+    });
+  }
 })();
 </script>
 </body>

@@ -10,6 +10,8 @@ interface PopupOptions {
   opacity: number
   clickthrough: boolean
   clicksToClose: number
+  popupClose: string
+  buttonless: boolean
   denialFilter?: string
   hypnoMediaPath?: string
   hypnoOpacity?: number

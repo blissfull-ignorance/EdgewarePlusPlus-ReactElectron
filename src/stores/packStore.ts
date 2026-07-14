@@ -6,10 +6,14 @@ export interface PackState {
   loaded: boolean
   loading: boolean
   error: string | null
+  /** Runtime override for close button text (set by Lua scripting API). */
+  popupCloseOverride: string | null
   loadPack: (pack: Pack) => void
   setLoading: (loading: boolean) => void
   setError: (error: string | null) => void
   unloadPack: () => void
+  setPopupCloseOverride: (text: string) => void
+  getPopupCloseText: () => string
   getMedia: (type: 'image' | 'video' | 'audio' | 'hypno') => string[]
   getTexts: (type: 'caption' | 'denial' | 'prompt' | 'subliminal' | 'notification' | 'web') => string[]
 }
@@ -19,10 +23,16 @@ export const usePackStore = create<PackState>((set, get) => ({
   loaded: false,
   loading: false,
   error: null,
-  loadPack: (pack) => set({ pack, loaded: true, loading: false, error: null }),
+  popupCloseOverride: null,
+  loadPack: (pack) => set({ pack, loaded: true, loading: false, error: null, popupCloseOverride: null }),
   setLoading: (loading) => set({ loading }),
   setError: (error) => set({ error, loading: false }),
-  unloadPack: () => set({ pack: null, loaded: false, loading: false, error: null }),
+  unloadPack: () => set({ pack: null, loaded: false, loading: false, error: null, popupCloseOverride: null }),
+  setPopupCloseOverride: (text) => set({ popupCloseOverride: text }),
+  getPopupCloseText: () => {
+    const state = get()
+    return state.popupCloseOverride || state.pack?.popupClose || 'Close'
+  },
   getMedia: (type) => {
     const pack = get().pack
     const key = type === 'image' ? 'images' : type === 'video' ? 'videos' : type === 'audio' ? 'audio' : 'hypno'

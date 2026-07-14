@@ -10,6 +10,8 @@ interface VideoPopupProps {
   opacity: number
   clickthrough: boolean
   clicksToClose: number
+  popupClose: string
+  buttonless: boolean
   denialFilter?: string
   hypnoMediaPath?: string
   hypnoOpacity?: number
@@ -25,12 +27,14 @@ export function VideoPopup({
   opacity,
   clickthrough,
   clicksToClose,
+  popupClose,
+  buttonless,
   denialFilter,
   hypnoMediaPath,
   hypnoOpacity,
   onClose,
 }: VideoPopupProps) {
-  const [clickCount, setClickCount] = useState(0)
+  const [remainingClicks, setRemainingClicks] = useState(clicksToClose)
   const videoRef = useRef<HTMLVideoElement>(null)
 
   useEffect(() => {
@@ -40,18 +44,30 @@ export function VideoPopup({
     }
   }, [src])
 
-  const handleClick = useCallback(() => {
+  const handleButtonClick = useCallback(() => {
     if (clickthrough || !onClose) return
-    const next = clickCount + 1
-    setClickCount(next)
-    if (next >= clicksToClose) {
+    const next = remainingClicks - 1
+    setRemainingClicks(next)
+    if (next <= 0) {
       if (videoRef.current) {
         videoRef.current.pause()
         videoRef.current.src = ''
       }
       onClose()
     }
-  }, [clickthrough, clickCount, clicksToClose, onClose])
+  }, [clickthrough, remainingClicks, onClose])
+
+  const handleBodyClick = useCallback(() => {
+    if (clickthrough || !buttonless || !onClose) return
+    if (videoRef.current) {
+      videoRef.current.pause()
+      videoRef.current.src = ''
+    }
+    onClose()
+  }, [clickthrough, buttonless, onClose])
+
+  const showButton = !clickthrough && !buttonless
+  const showCounterBadge = clickthrough ? false : buttonless && clicksToClose > 1
 
   return (
     <div
@@ -64,10 +80,10 @@ export function VideoPopup({
         opacity: opacity / 100,
         pointerEvents: clickthrough ? 'none' : 'auto',
         zIndex: 5001,
-        cursor: clickthrough ? 'default' : 'pointer',
+        cursor: clickthrough ? 'default' : buttonless ? 'pointer' : 'default',
         overflow: 'hidden',
       }}
-      onClick={handleClick}
+      onClick={handleBodyClick}
     >
       <video
         ref={videoRef}
@@ -85,7 +101,31 @@ export function VideoPopup({
       {hypnoMediaPath && hypnoOpacity !== undefined && (
         <HypnoOverlay src={hypnoMediaPath} opacity={hypnoOpacity} />
       )}
-      {clicksToClose > 1 && !clickthrough && (
+      {showButton && (
+        <button
+          onClick={handleButtonClick}
+          style={{
+            position: 'absolute',
+            bottom: 8,
+            right: 8,
+            zIndex: 5003,
+            padding: '6px 14px',
+            border: 'none',
+            borderRadius: 4,
+            background: 'rgba(20, 20, 35, 0.85)',
+            color: 'rgba(255, 255, 255, 0.9)',
+            fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+            fontSize: 13,
+            cursor: 'pointer',
+            userSelect: 'none',
+          }}
+        >
+          {clicksToClose > 1
+            ? `${popupClose} (${clicksToClose - remainingClicks + 1}/${clicksToClose})`
+            : popupClose}
+        </button>
+      )}
+      {showCounterBadge && (
         <div
           style={{
             position: 'absolute',
@@ -98,7 +138,7 @@ export function VideoPopup({
             borderRadius: 4,
           }}
         >
-          {clickCount}/{clicksToClose}
+          {clicksToClose - remainingClicks + 1}/{clicksToClose}
         </div>
       )}
     </div>

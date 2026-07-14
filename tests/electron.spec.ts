@@ -100,6 +100,8 @@ test.describe('Popup windows', () => {
         opacity: 100,
         clickthrough: false,
         clicksToClose: 1,
+        popupClose: 'Close',
+        buttonless: false,
       })
     })
 
@@ -118,6 +120,67 @@ test.describe('Popup windows', () => {
     await expect.poll(() => electronApp.windows().length).toBe(1)
   })
 
+  test('close button appears with pack text and closes popup', async () => {
+    await expect(mainWindow.locator('text=Edgeware++ Configuration')).toBeVisible({ timeout: 15_000 })
+
+    const popupId: number = await mainWindow.evaluate(async () => {
+      return window.electronAPI!.createPopup({
+        mediaPath: '/dev/null',
+        type: 'image',
+        width: 300,
+        height: 200,
+        x: 100,
+        y: 100,
+        opacity: 100,
+        clickthrough: false,
+        clicksToClose: 1,
+        popupClose: 'Go away',
+        buttonless: false,
+      })
+    })
+
+    expect(popupId).toBeGreaterThan(0)
+    await expect.poll(() => electronApp.windows().length, 'popup window should appear').toBeGreaterThanOrEqual(2)
+
+    const allWindows = electronApp.windows()
+    const popupWindow = allWindows.find(w => w !== mainWindow)!
+
+    const closeBtn = popupWindow.locator('#close-btn')
+    await expect(closeBtn).toBeVisible({ timeout: 5_000 })
+    await expect(closeBtn).toHaveText('Go away')
+
+    await closeBtn.click()
+    await expect.poll(() => electronApp.windows().length).toBe(1)
+  })
+
+  test('buttonless mode hides close button', async () => {
+    await expect(mainWindow.locator('text=Edgeware++ Configuration')).toBeVisible({ timeout: 15_000 })
+
+    await mainWindow.evaluate(async () => {
+      return window.electronAPI!.createPopup({
+        mediaPath: '/dev/null',
+        type: 'image',
+        width: 300,
+        height: 200,
+        x: 100,
+        y: 100,
+        opacity: 100,
+        clickthrough: false,
+        clicksToClose: 999,
+        popupClose: 'Close',
+        buttonless: true,
+      })
+    })
+
+    await expect.poll(() => electronApp.windows().length, 'popup window should appear').toBeGreaterThanOrEqual(2)
+
+    const allWindows = electronApp.windows()
+    const popupWindow = allWindows.find(w => w !== mainWindow)!
+
+    const closeBtn = popupWindow.locator('#close-btn')
+    await expect(closeBtn).toBeHidden({ timeout: 5_000 })
+  })
+
   test('popup can be moved', async () => {
     await expect(mainWindow.locator('text=Edgeware++ Configuration')).toBeVisible({ timeout: 15_000 })
 
@@ -132,6 +195,8 @@ test.describe('Popup windows', () => {
         opacity: 100,
         clickthrough: false,
         clicksToClose: 1,
+        popupClose: 'Close',
+        buttonless: false,
       })
     })
 
@@ -160,6 +225,8 @@ test.describe('Popup windows', () => {
         opacity: 100,
         clickthrough: false,
         clicksToClose: 1,
+        popupClose: 'Close',
+        buttonless: false,
       })
       const id2 = await window.electronAPI!.createPopup({
         mediaPath: '/dev/null',
@@ -171,6 +238,8 @@ test.describe('Popup windows', () => {
         opacity: 100,
         clickthrough: false,
         clicksToClose: 1,
+        popupClose: 'Close',
+        buttonless: false,
       })
       return [id1, id2]
     })
@@ -203,6 +272,8 @@ test.describe('Panic mode', () => {
         opacity: 100,
         clickthrough: false,
         clicksToClose: 1,
+        popupClose: 'Close',
+        buttonless: false,
       })
       await window.electronAPI!.createPopup({
         mediaPath: '/dev/null',
@@ -214,6 +285,8 @@ test.describe('Panic mode', () => {
         opacity: 100,
         clickthrough: false,
         clicksToClose: 1,
+        popupClose: 'Close',
+        buttonless: false,
       })
     })
 

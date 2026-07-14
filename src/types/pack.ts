@@ -185,6 +185,8 @@ export interface Pack {
   info: PackInfo
   index: PackIndex
   corruption: CorruptionConfig
+  /** Close button text for image/video popups (from index.json default.popupClose). */
+  popupClose: string
   media: {
     images: string[]
     videos: string[]

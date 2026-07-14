@@ -130,6 +130,7 @@ export interface PackAsset {
 export interface ScannedPack {
   info: PackInfo
   index: PackIndex
+  popupClose: string
   media: {
     images: string[]
     videos: string[]
@@ -167,7 +168,9 @@ export function loadPackFromDirectory(packPath: string): ScannedPack {
   const script = readScript(path.join(packPath, 'script.lua'))
   const scriptVersion = detectScriptVersion(script)
 
-  return { info, index, media, texts, script, scriptVersion }
+  const popupClose = loadPopupClose(index)
+
+  return { info, index, popupClose, media, texts, script, scriptVersion }
 }
 
 /** Extracts a .zip pack to a temp directory and returns the extraction path. */
@@ -212,6 +215,14 @@ function readScript(filePath: string): string | null {
   } catch {
     return null
   }
+}
+
+/** DISCUSSION: Reads popupClose from index.json default object. Falls back to "Close" if missing. */
+function loadPopupClose(index: PackIndex): string {
+  const def = index['default']
+  if (Array.isArray(def)) return 'Close'
+  const raw = (def as Record<string, unknown>)?.popupClose
+  return typeof raw === 'string' ? raw : 'Close'
 }
 
 function detectScriptVersion(script: string | null): 'v0' | 'v1' | null {

@@ -4,6 +4,7 @@ import { useCorruptionStore } from './corruptionStore'
 import { useMoodStore } from './moodStore'
 import { useAppStore } from './appStore'
 import { usePromptStore } from './promptStore'
+import { usePackStore } from './packStore'
 
 export interface ScriptState {
   running: boolean
@@ -103,6 +104,14 @@ export function attachScriptListeners(): void {
   api.onScriptOpenWeb((info) => {
     if (info.url) {
       window.open(info.url, '_blank')
+    }
+  })
+
+  // DISCUSSION: set_popup_close_text is a Lua scripting API that overrides the
+  // close button text at runtime. The override persists until pack change or unload.
+  api.onScriptSetPopupCloseText((info) => {
+    if (info.text) {
+      usePackStore.getState().setPopupCloseOverride(info.text)
     }
   })
 }

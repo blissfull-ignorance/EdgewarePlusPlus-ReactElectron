@@ -112,6 +112,10 @@ export interface PopupOptions {
   opacity: number
   clickthrough: boolean
   clicksToClose: number
+  /** Text for the close button (from pack's index.json popupClose field). */
+  popupClose: string
+  /** If true, hide the close button and allow body-click to close. */
+  buttonless: boolean
   denialFilter?: string
   hypnoMediaPath?: string
   hypnoOpacity?: number

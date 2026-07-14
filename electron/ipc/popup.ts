@@ -30,6 +30,8 @@ export function createPopupWindow(opts: {
   opacity: number
   clickthrough: boolean
   clicksToClose: number
+  popupClose: string
+  buttonless: boolean
   denialFilter?: string
   hypnoMediaPath?: string
   hypnoOpacity?: number
@@ -45,6 +47,8 @@ export function createPopupWindow(opts: {
     opacity: String(opts.opacity),
     clickthrough: String(opts.clickthrough),
     clicksToClose: String(opts.clicksToClose),
+    popupClose: opts.popupClose || 'Close',
+    buttonless: String(opts.buttonless),
   })
   if (opts.denialFilter) params.set('denialFilter', opts.denialFilter)
   if (opts.hypnoMediaPath) params.set('hypnoMediaPath', opts.hypnoMediaPath)
