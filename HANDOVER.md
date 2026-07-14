@@ -2,185 +2,156 @@
 
 ## Current Status
 
-**Last Session:** Phase 1 (Core UI Shell) — React entry, splash, config panel, popup overlays
+**Last Session:** Documentation update + hypno overlay rules + maxImages/maxVideos split
 
-**Date:** July 7, 2026 (Session 2)
+**Date:** July 14, 2026
 
-### Completed Tasks
+**Branch:** `macos-cross-platform`
 
-#### ✅ Project Scaffolding (Phase 0.1)
-- Created project directory structure matching REACT-APP.md spec
-- Set up `electron/`, `src/` directories with proper subdirectories
-- Initialized `package.json` with all required dependencies
+### What's Working
 
-#### ✅ Dependencies (Phase 0.2)
-- Installed: React 19, Mantine 7, Zustand 5, Fengari, Electron 33, Vite 6
-- Dev dependencies: TypeScript, ESLint, Electron Builder
-- Note: 10 high severity vulnerabilities detected (npm audit)
+- **Popup BrowserWindows** — borderless, transparent, always-on-top, resizable
+- **Draggable headers** — 28px `-webkit-app-region: drag` bar on each popup
+- **Popup scale** — `popupScale` config (0.5x–3x) with slider in Config Panel
+- **Persistent movement** — directional vectors with bounce, 50ms tick, Math.round for IPC safety
+- **Per-type limits** — separate `maxImages` and `maxVideos` caps (default 10 each)
+- **Hypno overlays** — .gif only, applied to static images (png/jpg/bmp/webp), not gifs or videos
+- **Denial filters** — CSS blur/saturate/brightness applied randomly based on `denialChance`
+- **Click-to-close** — multi-click counter when `buttonless` is off
+- **Config persistence** — load/save via IPC to `userData/config.json`
+- **Pack loading** — directory scanning, zip extraction, media categorization
+- **Keyboard shortcuts** — panic button via `globalShortcut`
+- **System tray** — context menu with Panic/Quit
+- **Wallpaper** — cross-platform (osascript/gsettings/user32.dll)
+- **Splash screen** — fade animation on startup
+- **Config Panel** — full settings UI with tabs (General, Popups, System, Theme, Pack, Hibernate)
+- **Prompt modal** — Mantine modal with Levenshtein distance validation
+- **Hibernate panel** — hibernate activation with type selection
+- **54 Vitest tests** — movement (37) + hypno (17), all passing
 
-#### ✅ Configuration Files
-- `tsconfig.json` — TypeScript configuration with path aliases (updated to include `.d.ts`)
-- `vite.config.ts` — Vite configuration
-- `vite.config.electron.ts` — Electron builder configuration
-- `eslint.config.js` — ESLint flat config (migrated from .eslintrc.json for v10 compat)
-- `.gitignore` — Excludes node_modules, dist, config files
+### Known Issues
 
-#### ✅ Store Architecture (Zustand)
-All store files created in `src/stores/`:
-- `configStore.ts` — Configuration state management
-- `popupStore.ts` — Popup state and management
-- `corruptionStore.ts` — Corruption level and mood tracking
-- `packStore.ts` — Pack loading and media management (fixed `get()` parameter)
-- `hibernateStore.ts` — Hibernate mode state
-- `promptStore.ts` — Prompt interaction state
-- `appStore.ts` — Application-level state (splash, panic)
-- `moodStore.ts` — Available/active moods
-- `themeStore.ts` — Theme variables and corruption effects (FIXED — was broken circular export)
+1. **Config type drift** — `electron/ipc/config.ts:ConfigData` is missing `maxImages` field (only has `maxVideos`). The renderer configStore has it, but the main process config type doesn't. Needs syncing.
 
-#### ✅ Type Definitions
-- `src/types/pack.ts` — Pack interface definitions
-- `src/types/popup.ts` — Popup interface definitions
-- `src/types/global.d.ts` — `window.electronAPI` type declarations
-- `src/types/fengari.d.ts` — Fengari module type declarations
+2. **Fengari not wired** — Engine files exist and compile (`electron/scripting/`), but are not connected to the React renderer yet. Lua scripts execute but can't trigger React state changes.
 
-#### ✅ Electron Main Process (Phase 3)
-- `electron/main.ts` — Electron main process with window/tray creation (wired IPC handlers to actual implementations, fixed import issues)
+3. **Tray icon missing** — No icon assets in repo, shows default Electron icon.
 
-#### ✅ Preload & IPC Bridge
-- `electron/preload.ts` — IPC bridge API exposed to renderer with proper type imports
-- `electron/types.ts` — TypeScript type definitions for IPC
+4. **No Playwright tests** — Only Vitest unit/integration tests. No browser-level integration tests.
 
-#### ✅ IPC Handlers (Phase 3.2-3.7) — All fixed to compile cleanly
-- `electron/ipc/wallpaper.ts` — Cross-platform wallpaper setting (fixed async return types)
-- `electron/ipc/tray.ts` — System tray management (fixed `mainWindow` parameter, `nativeImage` type)
-- `electron/ipc/keyboard.ts` — Global shortcuts registration
-- `electron/ipc/filesystem.ts` — Drive filling and image replacement (fixed unused var)
-- `electron/ipc/popup.ts` — BrowserWindow popup management (added missing `path` import)
-- `electron/ipc/shortcut.ts` — Desktop shortcut creation (fixed API usage)
+5. **Config Panel missing controls** — Some config fields (e.g., `maxAudio`, `videoVolume`, `notificationChance`) have no UI controls yet.
 
-#### ✅ Fengari Lua Scripting Engine (Phase 5.5) — All files fixed to compile
-- `electron/scripting/engine.ts` — Lua state lifecycle management
-- `electron/scripting/callbacks.ts` — Callback bridge between Lua and JS
-- `electron/scripting/api_v0.ts` — Legacy v0 API bridge (fixed import paths, unused imports)
-- `electron/scripting/api_v1.ts` — Modern v1 API bridge (fixed import paths, unused vars)
-- `electron/scripting/api_basic.ts` — Basic functions (print)
+### Recent Commits
 
-#### ✅ Phase 1 — Core UI Shell (NEW — this session)
-- `src/main.tsx` — React entry point with MantineProvider + HashRouter
-- `src/App.tsx` — Main app with splash→config flow, routing, panic mode, IPC binding
-- `src/theme.ts` — Mantine theme configuration with corruption CSS variables
-- `src/components/SplashScreen.tsx` — Startup splash animation (fade out)
-- `src/components/PopupContainer.tsx` — In-app overlay renderer (routes to correct popup type)
-- `src/features/config/ConfigPanel.tsx` — Full settings UI with tabs (General, Popups, System, Theme, Pack, Hibernate), all controls mapped to Mantine components
-- `src/features/popup/ImagePopup.tsx` — Static/GIF image popup with multi-click support
-- `src/features/popup/VideoPopup.tsx` — HTML5 video popup with auto-play, loop, multi-click
-- `src/features/popup/AudioPopup.tsx` — HTML5 audio popup with auto-play, auto-close on end
-- `src/features/popup/SubliminalPopup.tsx` — Low-opacity timed text overlay (clickthrough)
-- `src/features/prompt/PromptModal.tsx` — Mantine modal prompt with Levenshtein distance validation
-- `src/features/hibernate/HibernatePanel.tsx` — Hibernate activation panel with type selection
-- `src/hooks/useElectronAPI.ts` — Typed access to `window.electronAPI`
-- `index.html` — Entry HTML with CSP headers for file:// media access
+```
+c594a48 docs: add comprehensive comments with markers to all code files
+5b6a031 docs: update ARCHITECTURE.md with current feature state
+54fb42b feat: split maxVideos into maxImages + maxVideos
+3b932db fix: only gif hypno overlays on static images, not gifs or videos
+1e552c7 fix: round popup coordinates to integers for Electron IPC
+dd7306d refactor: directional movement with per-popup moving flag and bounce
+d7684ef feat: implement moving popups with screen-bounded random drift
+cdb7b4e fix: use actual screen bounds for popup positioning
+f9477ae fix: restrict video formats to Chromium-supported codecs
+83dd187 feat: add draggable headers, popup scale slider, and resizable windows
+37b2381 config parity: align with original Edgeware++ config options
+```
 
-### Incomplete / Remaining Work
+### What's NOT Done
 
-#### ⏳ Popup Positioning Algorithm (Phase 2)
-- `computePosition()` function placing popups on screen avoiding overlaps (NOT STARTED)
-- Popup size randomization from pack config (NOT STARTED)
+- **Notifications** — `electron.Notification` API not wired
+- **Discord presence** — `discord-rpc` not integrated
+- **Mitosis mode** — config exists but no spawn-on-close logic
+- **Web open** — `shell.openExternal()` not wired
+- **Lua scripting → React** — Fengari engine compiles but no IPC bridge to renderer
+- **Playwright tests** — No browser integration tests
+- **Cross-platform verification** — Only tested on macOS
+- **Tray icon assets** — No .icns/.ico/.png icons in repo
 
-#### ⏳ Pack System (Phase 4)
-- Pack loading implementation (NOT STARTED)
-- `index.json` parsing (NOT STARTED)
-- Media file loading via IPC (NOT STARTED)
-- Corruption config parsing (NOT STARTED)
+### Build Commands
 
-#### ⏳ Feature Implementation (Phase 5)
-- Notifications (NOT STARTED)
-- Discord presence (NOT STARTED)
-- Mitosis mode logic (NOT STARTED)
-- Web open functionality (NOT STARTED)
-- Moving popups (NOT STARTED)
-- Lowkey mode (NOT STARTED)
-- Startup splash custom image/video (NOT STARTED)
-
-#### ⏳ Electron Main Process Enhancements
-- `config:load` / `config:save` — Read/write `config.json` (TODO stubs remain)
-- `drive:replace` — Source images array needs populating from pack
-- Panic shortcut registration from config (globalShortcut not wired yet)
-- Tray icon assets (missing from repo)
-
-#### ⏳ Fengari ↔ React Bridge (Phase 5.5)
-- Lua callbacks need to invoke React state changes via IPC
-- `electron/scripting/` engine needs to be initialized on pack load
-- Media file URL handling with `file://` protocol registration
-
-#### ⏳ Testing & QA (Phase 6)
-- Vitest setup for store logic (NOT STARTED)
-- Playwright integration tests (NOT STARTED)
-- Cross-platform verification matrix (NOT STARTED)
-- Bundle testing with electron-builder (NOT STARTED)
-
-### Known Issues & Decisions
-
-1. **Popup Strategy**: In-app overlays implemented in `src/components/PopupContainer.tsx` and per-popup-type components. BrowserWindow approach also ready in `electron/ipc/popup.ts` for future use.
-
-2. **Fengari Integration**: Lua bridge compiles cleanly but needs:
-   - IPC callbacks to React state (connect engine to renderer)
-   - Media file URL handling (file:// protocol registration)
-   - Lua state lifecycle tied to pack load/unload
-
-3. **Theme System**: MantineProvider integrated with custom theme in `src/theme.ts`. Corruption CSS variables in `themeStore.ts` ready for dynamic injection.
-
-4. **Missing Assets**: No tray icon assets created yet
-
-5. **Config Persistence**: `config:load`/`config:save` IPC handlers in `electron/main.ts` are stubs that return `{}` — need to implement file I/O
-
-6. **Lint Config**: Migrated from `.eslintrc.json` to `eslint.config.js` (flat config) for ESLint v10 compatibility. The old `.eslintrc.json` is no longer used but kept for reference.
-
-### Next Session Priority Order
-
-1. **CRITICAL**: Implement config persistence (`config:load` / `config:save` in main process)
-2. **CRITICAL**: Implement pack loading system with IPC (scan directory, parse `index.json`)
-3. **HIGH**: Popup positioning algorithm (grid-based overlap avoidance)
-4. **HIGH**: Wire panic shortcut from config (globalShortcut)
-5. **MEDIUM**: Hook up Fengari callbacks to React state via IPC
-6. **MEDIUM**: Implement remaining features (notifications, moving popups, mitigation)
-7. **LOW**: Testing (Vitest for stores, Playwright for integration)
-
-### Quick Reference
-
-**Build Commands:**
 ```bash
+npm run check            # TypeScript type checking (tsc --noEmit)
+npm run lint             # ESLint
+npm run test             # Vitest (54 tests)
 npm run dev              # Vite dev server
 npm run electron:dev     # Dev with Electron
 npm run build            # Build React app
 npm run electron:build   # Build Electron app
-npm run lint             # Run ESLint (flat config)
-npm run check            # TypeScript check (tsc --noEmit)
 ```
 
-**Project Structure:**
+### Project Structure
+
 ```
 EdgewarePlusPlus/
-├── electron/              # Electron main/preload code
-│   ├── main.ts
-│   ├── preload.ts
-│   ├── ipc/              # IPC handlers (✓ all compile)
-│   └── scripting/        # Fengari Lua engine (✓ all compile)
-├── src/                  # React app (✓ Phase 1 complete)
-│   ├── stores/           # Zustand stores (✓ all 9 stores)
-│   ├── types/            # TypeScript types (✓ pack, popup, global, fengari)
-│   ├── components/       # UI components (✓ SplashScreen, PopupContainer)
-│   ├── features/         # Feature components (✓ config, popups, prompt, hibernate)
-│   ├── hooks/            # Custom hooks (✓ useElectronAPI)
-│   ├── App.tsx           # Main component (✓ routing, panic, IPC binding)
-│   ├── main.tsx          # React entry (✓ MantineProvider + HashRouter)
-│   └── theme.ts          # Mantine theme (✓ corruption CSS vars, denial filters)
-├── index.html            # Vite entry (✓ with CSP headers)
-├── eslint.config.js      # ESLint flat config (v10 compatible)
-├── package.json          # Dependencies
-├── tsconfig.json         # TS config
-└── vite.config.ts        # Vite config
+├── electron/              # Electron main process
+│   ├── main.ts            # Entry point, IPC handler registration
+│   ├── preload.ts         # contextBridge API
+│   ├── popup.html         # Popup window HTML/CSS/JS
+│   ├── ipc/               # IPC handlers
+│   │   ├── config.ts      # Config load/save (MISSING maxImages field)
+│   │   ├── pack.ts        # Pack scanning, categorizeByExt, zip extraction
+│   │   ├── popup.ts       # BrowserWindow creation, movement
+│   │   ├── keyboard.ts    # Global shortcuts
+│   │   ├── tray.ts        # System tray
+│   │   ├── wallpaper.ts   # Cross-platform wallpaper
+│   │   ├── filesystem.ts  # Drive fill, image replace
+│   │   └── shortcut.ts    # Desktop shortcuts
+│   └── scripting/         # Fengari Lua VM (NOT WIRED TO RENDERER)
+│       ├── engine.ts      # Lua state lifecycle
+│       ├── api_v1.ts      # edgeware_v1 module
+│       ├── api_v0.ts      # edgeware_v0 module
+│       ├── api_basic.ts   # print() override
+│       └── callbacks.ts   # Lua function reference management
+├── src/                   # React app (renderer)
+│   ├── App.tsx            # Main component: spawn tick, movement effect, routing
+│   ├── main.tsx           # React entry (MantineProvider + HashRouter)
+│   ├── theme.ts           # Mantine theme config
+│   ├── stores/            # Zustand stores (10 stores)
+│   │   ├── configStore.ts # All config defaults + updateConfig()
+│   │   ├── popupStore.ts  # Active popups + addPopup/updatePopup/removePopup
+│   │   ├── packStore.ts   # Loaded pack + getMedia()
+│   │   ├── appStore.ts    # Splash, panic, running state
+│   │   └── ...            # corruptionStore, hibernateStore, moodStore, etc.
+│   ├── features/
+│   │   ├── config/ConfigPanel.tsx   # Full settings UI (tabs: General, Popups, System, Theme, Pack, Hibernate)
+│   │   ├── popup/
+│   │   │   ├── movement.ts          # Pure functions: computeMove, tickPopups, shouldMove, randomDirection
+│   │   │   ├── debug.ts             # Movement event logger
+│   │   │   ├── ImagePopup.tsx        # Image popup component
+│   │   │   ├── VideoPopup.tsx        # Video popup component
+│   │   │   ├── AudioPopup.tsx        # Audio popup component
+│   │   │   ├── HypnoOverlay.tsx      # Hypno overlay component
+│   │   │   ├── SubliminalPopup.tsx   # Subliminal text overlay
+│   │   │   └── *.test.ts            # 54 tests across 5 files
+│   │   ├── prompt/PromptModal.tsx    # Mantine modal with Levenshtein
+│   │   └── hibernate/HibernatePanel.tsx
+│   ├── components/
+│   │   ├── SplashScreen.tsx          # Startup splash animation
+│   │   └── PopupContainer.tsx        # In-app popup dispatch
+│   ├── hooks/useElectronAPI.ts       # Typed access to window.electronAPI
+│   └── types/
+│       ├── pack.ts          # Config, Pack, PackInfo, CorruptionConfig types
+│       ├── popup.ts         # Popup types
+│       ├── global.d.ts      # window.electronAPI type declarations
+│       └── fengari.d.ts     # Fengari module declarations
+├── ARCHITECTURE.md         # System architecture (up to date)
+├── REACT-APP.md            # Migration plan (up to date)
+├── AGENTS.md               # Agent instructions (up to date)
+└── HANDOVER.md             # This file
 ```
+
+### Next Session Priority Order
+
+1. **FIX**: Sync `electron/ipc/config.ts:ConfigData` with `src/types/pack.ts:Config` — add `maxImages` field and any other missing fields
+2. **HIGH**: Wire Fengari scripting engine to React renderer via IPC
+3. **HIGH**: Add missing ConfigPanel controls (videoVolume, notificationChance, maxAudio, etc.)
+4. **MEDIUM**: Notifications via Electron API
+5. **MEDIUM**: Discord presence via discord-rpc
+6. **MEDIUM**: Mitosis mode logic (spawn popup when count hits 0)
+7. **LOW**: Playwright integration tests
+8. **LOW**: Cross-platform verification (Windows, Linux)
+9. **LOW**: Tray icon assets (.icns, .ico, .png)
 
 ### Important Notes
 
@@ -188,19 +159,10 @@ EdgewarePlusPlus/
 - Fengari runs in Electron main process (Node.js), not renderer
 - IPC is the bridge between Electron main and renderer
 - Media playback uses native HTML5 `<video>` and `<audio>` elements
-- Theme corruption affects CSS variables injected into Mantine theme
-- `tsc --noEmit` and `eslint` both pass with zero errors
-- `electron/ipc/` handlers are wired to `main.ts` but `config:load/save` remain stubs
+- `tsc --noEmit`, `eslint`, and `vitest` all pass with zero errors
 - React app uses HashRouter for Electron file:// compatibility
-
-### Files to Review Before Next Session
-
-1. `REACT-APP.md` — Complete migration plan (1245 lines)
-2. `src/App.tsx` — Main React component entry and flow
-3. `src/features/config/ConfigPanel.tsx` — Settings UI implementation
-4. `src/components/PopupContainer.tsx` — In-app overlay popup dispatch
-5. `electron/ipc/filesystem.ts` — Config read/write basis
-6. `electron/main.ts` — IPC handler wiring (config stubs need implementing)
+- `Math.round()` is critical for popup coordinates — Electron IPC throws on floats
+- `HYPN_EXTS` contains only `.gif` — mp4/webm are videos, not hypno overlays
 
 ---
 

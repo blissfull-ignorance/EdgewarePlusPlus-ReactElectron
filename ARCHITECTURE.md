@@ -145,6 +145,108 @@ App.tsx movement effect (setInterval 50ms) ─────┘
 
 `App.tsx` also has always-on `console.log` diagnostics tagged `[movement]`, `[movement:tick]`, `[movement:move]`, `[spawn]`, and `[spawn:hypno]`.
 
-### Known Issue
+---
 
-Runtime movement does not work despite all pure-logic and store-integration tests passing. Diagnostic logging has been added to trace the issue. The `useElectronAPI()` hook is NOT reactive (returns `window.electronAPI ?? null` without React state), so the movement effect dependency on `electronAPI` may not re-trigger correctly. Investigation ongoing.
+## Config Persistence
+
+Config is stored as JSON on disk via Electron IPC:
+
+- **Load:** `App.tsx` calls `electronAPI.loadConfig()` on mount → `electron/ipc/config.ts:loadConfig()` reads from `app.getPath('userData')/config.json`
+- **Save:** ConfigPanel calls `electronAPI.saveConfig(cfg)` → `electron/ipc/config.ts:saveConfig()` writes JSON to disk
+- **Merge:** On load, saved config is spread over defaults (`{ ...defaults, ...saved }`) so new config fields are automatically supported
+
+### Key Files
+
+| File | Role |
+|------|------|
+| `electron/ipc/config.ts` | `loadConfig()`, `saveConfig()`, `getDefaultConfig()` — file I/O to `userData/config.json` |
+| `electron/main.ts` | Registers `config:load` and `config:save` IPC handlers |
+| `src/stores/configStore.ts` | Zustand store with all config defaults and `updateConfig()` |
+| `src/App.tsx` | Calls `loadConfig()` on mount, merges into configStore |
+
+---
+
+## Pack System (Electron Implementation)
+
+Packs are loaded from the filesystem by the main process. The renderer receives the scanned pack via IPC.
+
+### Loading Flow
+
+```
+User selects packPath in ConfigPanel
+  → electronAPI.loadPack(packPath)  ──IPC──►  electron/ipc/pack.ts
+  │
+  ├─ If .zip: extractPackZip() → scan extracted directory
+  ├─ scanDirRecursive(packPath) → list all files
+  ├─ categorizeByExt(files) → { images, videos, audio, hypno }
+  ├─ readTextFile() for captions.txt, denials.txt, prompts.txt, etc.
+  ├─ loadInfo(info.json) → PackInfo
+  ├─ loadIndex(index.json) → PackIndex
+  └─ return ScannedPack to renderer
+       │
+       └─ packStore.loadPack(scannedPack) ──► Zustand store
+```
+
+### Media Categorization Rules
+
+| Extension Set | Files | Arrays |
+|---------------|-------|--------|
+| `IMAGE_EXTS` | .png, .jpg, .jpeg, .gif, .bmp, .webp | `images[]` |
+| `VIDEO_EXTS` | .mp4, .webm, .mov | `videos[]` |
+| `AUDIO_EXTS` | .mp3, .wav, .ogg, .flac, .m4a, .aac | `audio[]` |
+| `HYPN_EXTS` | .gif ONLY | `hypno[]` (also in `images[]`) |
+
+A `.gif` file appears in both `images` and `hypno` arrays. The spawn tick uses `images` for display selection and `hypno` for overlay selection independently.
+
+### Key Files
+
+| File | Role |
+|------|------|
+| `electron/ipc/pack.ts` | Pack scanner: `scanDirRecursive`, `categorizeByExt`, `loadPackFromDirectory`, `extractPackZip` |
+| `electron/ipc/popup.ts` | Creates popup BrowserWindows, moves them via `setPosition()` |
+| `src/stores/packStore.ts` | Zustand store: `pack`, `loadPack()`, `unloadPack()`, `getMedia()` |
+
+---
+
+## Popup Window System
+
+Each popup is a standalone Electron BrowserWindow (not an in-app overlay).
+
+### Window Properties
+
+- `frame: false` — borderless
+- `transparent: true` — allows transparent backgrounds
+- `alwaysOnTop: true` — popups stay above other windows
+- `resizable: true` — user can resize
+- `hasShadow: false` — no window shadow
+- 28px draggable header bar via `-webkit-app-region: drag` in `electron/popup.html`
+
+### Popup Lifecycle
+
+1. **Spawn:** `App.tsx` tick → `electronAPI.createPopup(opts)` → `electron/ipc/popup.ts:createPopupWindow()` → new BrowserWindow with `popup.html?params`
+2. **Move:** `App.tsx` movement effect → `electronAPI.movePopup(id, x, y)` → `BrowserWindow.setPosition(x, y)`
+3. **Close:** User clicks popup → `window.close()` → `onPopupClosed` IPC event → `popupStore.removePopup(id)`
+
+### Key Files
+
+| File | Role |
+|------|------|
+| `electron/popup.html` | Popup window HTML/CSS/JS — header bar, media display, hypno overlay, click counter |
+| `electron/ipc/popup.ts` | Main process: `createPopupWindow()`, `movePopupWindow()`, IPC handlers |
+| `electron/preload.ts` | Exposes `createPopup`, `movePopup`, `closePopup` via `ipcRenderer.invoke` |
+
+---
+
+## Test Architecture
+
+54 tests across 5 test files, all passing:
+
+| Test File | Tests | What It Tests |
+|-----------|-------|--------------|
+| `movement.test.ts` | 23 | Unit: `computeMove`, `shouldMove`, `randomDirection`, `tickPopups` |
+| `movement.runtime.test.ts` | 6 | Integration: real Zustand stores, addPopup → tickPopups → updatePopup |
+| `movement.flow.test.ts` | 8 | E2E: config → spawn → tick loop → store updates (mirrors App.tsx) |
+| `hypno.test.ts` | 8 | Pack categorization: gif→hypno, mp4/webm→not hypno |
+| `hypno.runtime.test.ts` | 9 | Spawn decision: canHaveHypno, subliminalsChance/Alpha gating |
+
+Run with: `npm run test` (Vitest)

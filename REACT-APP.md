@@ -1,5 +1,34 @@
 # React + Mantine + Vite + Electron — Migration Plan
 
+## Current Status (July 14, 2026)
+
+| Phase | Status | Notes |
+|-------|--------|-------|
+| Phase 0 — Scaffold | ✅ Complete | Project structure, deps, configs |
+| Phase 1 — Core UI Shell | ✅ Complete | Config panel, splash, routing, panic mode |
+| Phase 2 — Media & Popups | ✅ Complete | BrowserWindow popups, movement, scaling, denial filters |
+| Phase 3 — OS Integration | ✅ Complete | Config persistence, keyboard, tray, wallpaper, shortcuts |
+| Phase 4 — Pack System | ✅ Complete | Pack loading, media categorization, zip extraction |
+| Phase 5 — Feature Porting | 🟡 Partial | Prompts, hibernate, hypno overlays done. Notifications, Discord, mitosis, web open NOT started |
+| Phase 5.5 — Scripting Engine | 🟡 Partial | Fengari bridge files exist and compile, but NOT wired to React yet |
+| Phase 6 — Testing | 🟡 Partial | 54 Vitest tests for movement + hypno. No Playwright/integration tests yet |
+
+**Key accomplishments since last handover:**
+- Popup BrowserWindow system with draggable 28px headers
+- Persistent directional movement with bounce (50ms tick, Math.round for IPC safety)
+- `popupScale` config (0.5x–3x) with slider in Config Panel
+- Split `maxImages`/`maxVideos` per-type popup limits
+- Hypno overlay restricted to .gif files on static images only (not gifs, not videos)
+- Config persistence via Electron IPC to `userData/config.json`
+- Pack loader with `categorizeByExt()` and zip extraction
+- 54 passing Vitest tests across 5 test files
+- Comprehensive code documentation with FUTUREWORK/DISCUSSION/REMOVABLE/FIXME markers
+
+**Known issues:**
+- `config.ts` in electron/ipc is missing `maxImages` field (only has `maxVideos`)
+- Fengari scripting engine not connected to renderer yet
+- No tray icon assets in repo
+
 ## Architecture Overview
 
 ```
@@ -145,301 +174,196 @@ All settings saved to `config.json` via IPC (`electron/ipc/filesystem.ts`).
 
 ---
 
-## Phase 2 — Media & Popup System
+## Phase 2 — Media & Popup System ✅ COMPLETE
 
 ### 2.1 Image popup
 
-Replace mpv with native HTML elements:
-
-```tsx
-// Static image
-<img src={`file://${media.path}`} style={{ filter: denialFilter }} />
-
-// Animated GIF
-<img src={`file://${media.path}`} style={{ filter: denialFilter }} />
-
-// Hypno overlay
-<canvas ref={hypnoCanvas} />  // draw spiral + composite with opacity
-```
-
-- Denial filters → CSS `filter: blur()`, `filter: url(#pixelate)` (SVG filter)
-- Image resize → canvas or CSS `object-fit`
-- Multi-click → React state `clicksToClose` on the popup component
-
-### 2.2 Video popup
-
-```tsx
-<video
-  src={`file://${media.path}`}
-  autoPlay
-  loop        // ← native, no mpv property needed
-  muted={false}
-  volume={settings.videoVolume / 100}
-/>
-```
-
-- No mpv embedding — `<video>` handles everything natively in Chromium
-- `loop` attribute = infinite loop (solves the GIF-loop bug forever)
-- Hardware acceleration is free (Chromium's built-in decoder)
-- Volume/fade: `<video>.volume` property, wrapped in `requestAnimationFrame`
-- Denial filters: same CSS approach as images
-
-### 2.3 Audio-only popup
-
-```tsx
-<audio
-  src={`file://${media.path}`}
-  autoPlay
-  onEnded={handleEnded}
-/>
-```
-
-- No `afplay` subprocess needed — `<audio>` works natively
-- Volume/fade: same as video
-- Concurrent limit: Zustand store tracks `activeAudioPlayers`
-
-### 2.4 Popup positioning
-
-The original computes geometry from monitor bounds and existing popup overlaps.
-In Electron:
+**Implemented as BrowserWindow** (not in-app overlay). Each popup is a standalone Electron window loading `electron/popup.html`:
 
 ```ts
-// main process — create a BrowserWindow per popup
+// electron/ipc/popup.ts — createPopupWindow()
 const popupWin = new BrowserWindow({
   width, height, x, y,
   frame: false,          // borderless
   transparent: true,
   alwaysOnTop: true,
-  webPreferences: {
-    preload: POPUP_PRELOAD,
-  },
+  resizable: true,
+  hasShadow: false,
+  webPreferences: { preload: POPUP_PRELOAD },
 })
-popupWin.loadURL(POPUP_URL + `?media=${encodeURIComponent(path)}&opacity=...`)
+popupWin.loadURL(`popup.html?mediaPath=...&type=image&opacity=...&clicksToClose=...`)
 ```
 
-Key differences from the original:
-- Each popup is a genuine **OS window** (not a tkinter Toplevel) → works on all three platforms
-- Window position is set at creation → no `geometry()` string parsing
-- Borderless + transparent → `frame: false, transparent: true`
-- Clickthrough → `win.setIgnoreMouseEvents(true)` (IPC from renderer)
-- Moving popups → `setInterval` that calls `win.setBounds()` via IPC
-- The popup content is a lightweight React component with just the media element
+- Static images: `<img>` element with `file://` protocol URL
+- Animated GIFs: Same `<img>` element (browsers handle GIF natively)
+- Hypno overlay: Separate `<img id="hypno-img">` positioned absolute over the media, only for static images (png/jpg/bmp/webp), never for gifs or videos
+- Denial filters: CSS `filter: blur()`, `saturate()`, `brightness()` applied via `denialFilter` query param
+- Click counter: `<div id="counter">` shown when `clicksToClose > 1`
+- Draggable header: 28px `-webkit-app-region: drag` bar at top of popup
 
-**But:** Each BrowserWindow is a full Chromium process (~30-50 MB).  With `maxVideos: 50`, this could use 1.5-2.5 GB of RAM.  Mitigations:
+### 2.2 Video popup
 
-1. Cap total popup BrowserWindows at a lower number (e.g. 10-15) — the original's own limits serve as a guide
-2. Share a pool of pre-created popup windows
-3. Alternatively, use in-app overlays (`position: fixed` divs) within the main window — zero extra RAM per popup, but popups are limited to the main window's screen bounds
+**Implemented as BrowserWindow** with `<video>` element replacing the `<img>` in popup.html:
 
-**Recommendation:** Start with in-app overlays (simpler, zero extra processes).  Port to per-popup BrowserWindows later if needed.
+```tsx
+// In popup.html script block
+const vid = document.createElement('video')
+vid.src = 'file://' + encodeURI(mediaPath)
+vid.autoplay = true
+vid.loop = true
+vid.muted = false
+vid.playsInline = true
+```
 
-### 2.5 Popup positioning algorithm (in-app overlay version)
+- No mpv embedding — `<video>` handles everything natively in Chromium
+- `VIDEO_EXTS` restricted to `.mp4`, `.webm`, `.mov` (Chromium-supported codecs)
+- Error fallback: shows "unsupported format" text if video fails to load
+
+### 2.3 Audio-only popup
+
+Audio popups are tracked in the Zustand store but have no visual BrowserWindow. They're represented as store entries with `type: 'audio'`.
+
+### 2.4 Popup positioning
+
+**Implemented via Electron IPC:**
 
 ```ts
-// renderer process — same algorithm as original but in TypeScript
-function computePosition(
-  existingPopups: PopupState[],
-  monitor: Rect,
-  width: number,
-  height: number,
-): { x: number; y: number } {
-  // Same grid + weight logic, but reading rects from Zustand store
-  // instead of tkinter .geometry()
-}
+// App.tsx — spawn tick
+const bounds = screenRef.current  // from electronAPI.getScreenBounds()
+const x = randomInt(0, Math.max(0, bounds.width - w))
+const y = randomInt(0, Math.max(0, bounds.height - h))
 ```
 
-Each popup is a `position: fixed` div appended to `document.body`.  The store tracks their rects.
+- Screen bounds fetched via `electronAPI.getScreenBounds()` IPC on mount
+- Random position within screen bounds (accounting for popup dimensions)
+- `popupScale` multiplier applied to popup width/height
+
+### 2.5 Popup movement
+
+**Implemented as persistent directional vectors with bounce:**
+
+```ts
+// src/features/popup/movement.ts — pure functions
+computeMove(popup, speed, screen) → { x, y, dx, dy }
+// Bounces at screen edges, reverses direction vector
+// Returns Math.round() coordinates for Electron IPC safety
+
+tickPopups(popups, speed, screen) → Map<id, PositionUpdate>
+// Iterates all popups, computes new positions, returns only changed ones
+```
+
+- Each popup gets `{ dx, dy }` unit vector at spawn time
+- `moving` flag set once via `shouldMove(cfg.movingChance)`
+- 50ms tick interval (20 ticks/sec) in `App.tsx` movement effect
+- `electronAPI.movePopup(id, x, y)` IPC call per moving popup
 
 ---
 
-## Phase 3 — OS Integration (Electron Main)
+## Phase 3 — OS Integration (Electron Main) ✅ COMPLETE
 
 ### 3.1 IPC Bridge
 
+**Implemented in `electron/preload.ts`:**
+
 ```ts
-// electron/preload.ts
 contextBridge.exposeInMainWorld('electronAPI', {
-  // Config
-  loadConfig: (): Promise<Config> => ipcRenderer.invoke('config:load'),
-  saveConfig: (config: Config): Promise<void> => ipcRenderer.invoke('config:save'),
-
-  // Keyboard
-  onKeyEvent: (cb: (type: string, key: string) => void) => {
-    ipcRenderer.on('keyboard:event', (_, type, key) => cb(type, key))
-  },
-
-  // Wallpaper
-  setWallpaper: (path: string): Promise<void> => ipcRenderer.invoke('wallpaper:set', path),
-  getWallpaper: (): Promise<string> => ipcRenderer.invoke('wallpaper:get'),
-
-  // Tray
-  onTrayAction: (cb: (action: string) => void) => {
-    ipcRenderer.on('tray:action', (_, action) => cb(action))
-  },
-
-  // Popup windows (for per-popup BrowserWindow approach)
-  createPopup: (opts: PopupOptions): Promise<number> => ipcRenderer.invoke('popup:create', opts),
-  closePopup: (id: number): Promise<void> => ipcRenderer.invoke('popup:close', id),
-  movePopup: (id: number, x: number, y: number): Promise<void> => ipcRenderer.invoke('popup:move', id),
-  setPopupClickthrough: (id: number, enabled: boolean): Promise<void> => ipcRenderer.invoke('popup:clickthrough', id),
-
-  // Desktop icons
-  createShortcut: (name: string, target: string, icon: string): Promise<void> => ipcRenderer.invoke('shortcut:create', ...),
-
-  // Drive fill
-  fillDrive: (path: string, size: number): Promise<void> => ipcRenderer.invoke('drive:fill', path, size),
-  replaceImages: (path: string, count: number): Promise<void> => ipcRenderer.invoke('drive:replace', path, count),
-
-  // Panic
-  sendPanic: (): Promise<void> => ipcRenderer.invoke('panic:trigger'),
-  onPanic: (cb: () => void) => { ipcRenderer.on('panic', () => cb()) },
-
-  // Hibernate
-  onHibernateTimer: (cb: () => void) => { ipcRenderer.on('hibernate:timer', () => cb()) },
+  loadConfig: () => ipcRenderer.invoke('config:load'),
+  saveConfig: (cfg) => ipcRenderer.invoke('config:save', cfg),
+  loadPack: (path) => ipcRenderer.invoke('pack:load', path),
+  getScreenBounds: () => ipcRenderer.invoke('screen:bounds'),
+  createPopup: (opts) => ipcRenderer.invoke('popup:create', opts),
+  closePopup: (id) => ipcRenderer.invoke('popup:close', id),
+  movePopup: (id, x, y) => ipcRenderer.invoke('popup:move', id, x, y),
+  setWallpaper: (path) => ipcRenderer.invoke('wallpaper:set', path),
+  onPanic: (cb) => ipcRenderer.on('panic', () => cb()),
+  onPopupClosed: (cb) => ipcRenderer.on('popup:closed', (_, id) => cb(id)),
+  // ... keyboard, tray, hibernate handlers
 })
 ```
 
 ### 3.2 Keyboard hooks
 
-```ts
-// electron/ipc/keyboard.ts
-import { globalShortcut } from 'electron'
+**Implemented in `electron/ipc/keyboard.ts`:**
 
-export function registerPanicShortcut(accelerator: string, callback: () => void) {
-  globalShortcut.register(accelerator, callback)
-}
-
-// For pynput-style key monitoring (alt detection, etc.):
-// Use IO Hook via a native Node addon (global-key-listener on npm)
-// or ioHook (node-iohook) — both work on Win/Linux/Mac.
-```
-
-`globalShortcut` only registers accelerators (combinations like `CmdOrCtrl+Shift+E`).
-For arbitrary key monitoring (the original's pynput listener that detects alt held),
-use a native addon:
-
-| Package | Win | Mac | Linux | Notes |
-|---------|-----|-----|-------|-------|
-| `node-global-key-listener` | ✓ | ✓ | ✓ | Pure JS via native binding |
-| `iohook` | ✓ | ✓ | ✓ | C-based, well-tested |
+- Global shortcuts registered via `electron.globalShortcut`
+- Panic button from config (`panicButton` key, default 'e')
+- `onKeyEvent` IPC event for key press/release monitoring
 
 ### 3.3 System tray
 
-```ts
-// electron/ipc/tray.ts
-import { Tray, Menu, nativeImage } from 'electron'
+**Implemented in `electron/ipc/tray.ts`:**
 
-let tray: Tray | null = null
-
-export function createTray(iconPath: string) {
-  tray = new Tray(nativeImage.createFromPath(iconPath))
-  const contextMenu = Menu.buildFromTemplate([
-    { label: 'Panic', click: () => mainWindow.webContents.send('panic') },
-    { label: 'Quit', role: 'quit' },
-  ])
-  tray.setContextMenu(contextMenu)
-  tray.setToolTip('Edgeware++')
-}
-```
-
-Unlike pystray/rumps on macOS, Electron's `Tray` works correctly without a
-`.app` bundle — it creates an `NSStatusItem` through the Electron framework
-which is already a proper bundle.
+- `Tray` with context menu (Panic, Quit)
+- `onTrayAction` IPC event for tray menu interactions
+- Tray icon asset still missing from repo (shows default icon)
 
 ### 3.4 Wallpaper
 
-```ts
-// electron/ipc/wallpaper.ts
-import { execFile } from 'child_process'
+**Implemented in `electron/ipc/wallpaper.ts`:**
 
-export function setWallpaper(path: string): Promise<void> {
-  switch (process.platform) {
-    case 'win32':
-      return execFile('rundll32.exe', ['user32.dll', 'SystemParametersInfo', ...])
-    case 'darwin':
-      return execFile('osascript', ['-e', `tell app "finder" to set desktop picture to POSIX file "${path}"`])
-    case 'linux':
-      return execFile('gsettings', ['set', 'org.gnome.desktop.background', 'picture-uri', `file://${path}`])
-  }
-}
-```
+- Cross-platform: `osascript` (macOS), `user32.dll` (Windows), `gsettings` (Linux)
+- `setWallpaper()` via IPC
 
-### 3.5 Desktop shortcuts
+### 3.5 Config persistence
 
-```ts
-// electron/ipc/shortcut.ts
-// Win: create .lnk via shell module
-// Mac: create .app via osascript or copy template
-// Linux: create .desktop file
-```
+**Implemented in `electron/ipc/config.ts`:**
 
-Electron's `app.setLoginItemSettings()` handles autostart on all three platforms.
+- `loadConfig()` reads from `app.getPath('userData')/config.json`
+- `saveConfig()` writes JSON to disk
+- Default config merged with saved config on load
 
-### 3.6 Drive fill
+### 3.6 Desktop shortcuts
 
-The original `fill_drive` writes random data to a directory.  Port to Node.js `fs`
-with `fs.writeFile` / `fs.mkdir`.  `replace_images` walks a directory and replaces
-image files with copies from the pack.
+**Implemented in `electron/ipc/shortcut.ts`:**
 
-### 3.7 Panic
+- Cross-platform shortcut creation
+- `.lnk` (Windows), `.app` (macOS), `.desktop` (Linux)
 
-```ts
-// electron/ipc/panic.ts
-export function triggerPanic(mainWindow: BrowserWindow) {
-  // 1. Set wallpaper to panic image
-  setWallpaper(panicImagePath)
-  // 2. Close all popup windows
-  closeAllPopups()
-  // 3. Stop all audio
-  stopAllAudio()
-  // 4. Destroy all popup BrowserWindows
-  // 5. Send event to renderer
-  mainWindow.webContents.send('panic')
-}
-```
+### 3.7 Drive fill
 
-Renderer reacts by: hiding all overlays, stopping media playback, showing
-panic confirmation dialog.
+**Implemented in `electron/ipc/filesystem.ts`:**
+
+- `fillDrive()` — writes random data to directory
+- `replaceImages()` — replaces images in directory with pack copies
 
 ---
 
-## Phase 4 — Pack System
+## Phase 4 — Pack System ✅ COMPLETE
 
 ### 4.1 Pack loading
 
-The original reads `index.json`, `info.json`, `config.json`, corruption levels,
-and media directories.  Port to TypeScript with the same structure:
+**Implemented in `electron/ipc/pack.ts`:**
 
 ```ts
-// src/features/pack/pack.ts
-export interface Pack {
-  info: PackInfo
-  index: PackIndex
-  corruption: CorruptionConfig
-  media: {
-    images: MediaFile[]
-    videos: MediaFile[]
-    audio: MediaFile[]
-    hypno: MediaFile[]
-  }
-  texts: {
-    captions: string[]
-    denials: string[]
-    prompts: string[]
-    subliminals: string[]
-    notifications: string[]
-    web: string[]
-  }
-  script: string | null       // raw script.lua content, read via IPC
-  scriptVersion: 'v0' | 'v1' | null  // detected at load time
+// Scans pack directory, categorizes media by extension
+export function loadPackFromDirectory(packPath: string): ScannedPack {
+  const allFiles = scanDirRecursive(packPath)
+  const media = categorizeByExt(allFiles)
+  // Returns { info, index, media, texts, script, scriptVersion }
 }
 ```
 
-Media files are loaded via IPC (`fs.readdir` + filter by extension).
-Images/videos are displayed via `file://` protocol URLs (register
-`protocol.registerFileProtocol` in Electron main).
+- `scanDirRecursive()` — walks directory tree, returns all file paths
+- `categorizeByExt()` — sorts files into images/videos/audio/hypno arrays
+- `loadInfo()` — reads `info.json` for pack metadata
+- `loadIndex()` — reads `index.json` for mood mappings
+- `extractPackZip()` — extracts `.zip` packs to temp directory
+- `readTextFile()` — reads captions.txt, denials.txt, prompts.txt, etc.
 
-### 4.2 Script version detection
+### 4.2 Media categorization
+
+**Implemented extension sets:**
+
+| Set | Extensions | Array |
+|-----|-----------|-------|
+| `IMAGE_EXTS` | .png, .jpg, .jpeg, .gif, .bmp, .webp | `images[]` |
+| `VIDEO_EXTS` | .mp4, .webm, .mov | `videos[]` |
+| `AUDIO_EXTS` | .mp3, .wav, .ogg, .flac, .m4a, .aac | `audio[]` |
+| `HYPN_EXTS` | .gif ONLY | `hypno[]` (also in `images[]`) |
+
+### 4.3 Script version detection
+
+**Implemented:**
 
 ```ts
 function detectScriptVersion(script: string): 'v0' | 'v1' | null {
@@ -448,17 +372,6 @@ function detectScriptVersion(script: string): 'v0' | 'v1' | null {
   return null
 }
 ```
-
-The raw `script.lua` content is stored in the pack object. No preprocessing needed — fengari parses it at runtime.
-
-### 4.3 Corruption system
-
-Corruption levels, mood sets, and triggers are pure data transforms — port
-directly.  Corruption effects:
-
-- Theme changes → Zustand store updates CSS variables → Mantine re-renders
-- Wallpaper cycle → IPC to main process → `setWallpaper()`
-- Popup modifications → conditional props on popup components
 
 ---
 
@@ -1184,31 +1097,25 @@ On macOS, Electron is already a proper `.app` bundle — no pystray/rumps issues
 
 ---
 
-## Migration Strategy
+## Migration Strategy — Current Status
 
-### Recommended order
+### Completed
 
 ```
-Phase 0 (scaffold)
-  → Phase 1 (config UI — immediately usable for testing)
-  → Phase 4 (pack loading — needed by everything else)
-  → Phase 2 (popups — the core feature)
-  → Phase 3 (OS integration — keyboard, tray, wallpaper)
-  → Phase 5 (remaining features — hibernate, prompts, etc.)
-  → Phase 5.5 (fengari scripting engine — ~400 lines of bridge code)
-  → Phase 6 (testing, polish, release)
+Phase 0 (scaffold)          ✅
+  → Phase 1 (config UI)     ✅
+  → Phase 4 (pack loading)  ✅
+  → Phase 2 (popups)        ✅ — BrowserWindow approach with movement
+  → Phase 3 (OS integration)✅ — Config persistence, keyboard, tray, wallpaper
 ```
 
-Note on Phase 5.5 timing: Unlike a from-scratch interpreter port which would be the most expensive phase, the fengari bridge is a relatively straightforward ~400 lines. It can be started in parallel with Phase 5 if desired.
+### Remaining
 
-### Incremental testing approach
-
-1. After Phase 0+1: app launches, shows config panel, user can toggle settings (no media needed)
-2. After Phase 4: app loads a pack, user can browse media files in a gallery
-3. After Phase 2: popups appear and cycle through media — core loop works
-4. After Phase 3: keyboard shortcuts and system tray function
-5. After Phase 5: feature-complete, can replace the original for non-script packs
-6. After Phase 5.5: scripting packs work — fully replaces the original
+```
+Phase 5 (remaining features) — Notifications, Discord, mitosis, web open
+Phase 5.5 (fengari scripting) — Engine files exist, need React wiring
+Phase 6 (testing) — Need Playwright integration tests, cross-platform verification
+```
 
 ### What is lost / fundamentally different
 
@@ -1219,12 +1126,11 @@ Note on Phase 5.5 timing: Unlike a from-scratch interpreter port which would be 
 | pystray | SIGTRAP on macOS | Electron Tray (works) |
 | pyglet audio | Background thread | `<audio>` tag |
 | afplay subprocess | macOS workaround | Not needed |
-| tkinter Toplevel per popup | OS window | BrowserWindow (or in-app overlay) |
+| tkinter Toplevel per popup | OS window | BrowserWindow with popup.html |
 | mpv subprocess | Broken on macOS | Not needed |
 | `winfo_id()` for embedding | macOS-only pointer | Not needed |
 | Python multiprocessing | Keyboard listener fork | Node.js worker thread |
-| Lua interpreter | 931 lines custom Python interpreter | Fengari (full Lua 5.3 VM) + 400-line TS bridge |
-| Lua↔Edgeware bridging | Python `modules.py` with Tkinter callbacks | TypeScript bridge pushing JS functions into fengari state, using IPC for decoupled architecture |
+| Lua interpreter | 931 lines custom Python | Fengari (full Lua 5.3 VM) + 400-line TS bridge |
 
 ### What is better
 
@@ -1241,5 +1147,8 @@ Note on Phase 5.5 timing: Unlike a from-scratch interpreter port which would be 
 - **React DevTools** — debug popup state, component tree
 - **Auto-updates** — `electron-updater` for seamless version updates
 - **Installers** — `.dmg` / `.exe` / `.AppImage` with one config file
-- **Full Lua 5.3 scripting** — fengari supports tables, closures, metatables natively (strict superset of the original custom interpreter)
-- **Sandboxed scripting** — we strip dangerous globals from the fengari state (original had no sandboxing)
+- **Full Lua 5.3 scripting** — fengari supports tables, closures, metatables natively
+- **Sandboxed scripting** — we strip dangerous globals from the fengari state
+- **Persistent directional movement** — popups bounce off screen edges
+- **Per-type popup limits** — separate `maxImages` and `maxVideos` caps
+- **Hypno overlay system** — gif-only overlays on static images, configurable opacity
