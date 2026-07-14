@@ -7,6 +7,7 @@ import type { TickablePopup, ScreenBounds } from './movement'
 
 const screen: ScreenBounds = { width: 1920, height: 1080 }
 
+/** Reset all stores to clean state between tests. */
 function resetAll() {
   usePopupStore.getState().clearPopups()
   useAppStore.getState().clearPanic()
@@ -24,6 +25,7 @@ function resetAll() {
   })
 }
 
+/** Simulates a single spawn tick: reads config, decides moving flag, adds popup. */
 function simulateSpawnTick() {
   const cfg = useConfigStore.getState()
   const popup = usePopupStore.getState()
@@ -47,6 +49,7 @@ function simulateSpawnTick() {
   })
 }
 
+/** Simulates a single movement tick: reads store popups, applies tickPopups, writes back. */
 function simulateMoveTick() {
   const cfg = useConfigStore.getState()
   const popups = usePopupStore.getState().popups as TickablePopup[]
@@ -57,6 +60,11 @@ function simulateMoveTick() {
   return updates
 }
 
+/**
+ * End-to-end flow tests — verify the full pipeline from config → spawn → move tick.
+ * These catch integration issues where individual functions work in isolation
+ * but break when composed through the store layer.
+ */
 describe('full flow simulation — config → spawn → move tick', () => {
   beforeEach(() => {
     resetAll()
@@ -145,7 +153,7 @@ describe('full flow simulation — config → spawn → move tick', () => {
     expect(final.x).toBe(500)
   })
 
-  it('default config has movingChance=0, so spawn creates non-moving popups', () => {
+  it('explicitly set movingChance=100 produces moving popups', () => {
     const freshConfig = useConfigStore.getState()
     expect(freshConfig.movingChance).toBe(100)
 

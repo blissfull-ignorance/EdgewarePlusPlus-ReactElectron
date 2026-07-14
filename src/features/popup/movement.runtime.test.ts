@@ -5,10 +5,16 @@ import type { TickablePopup, ScreenBounds } from './movement'
 
 const screen: ScreenBounds = { width: 1920, height: 1080 }
 
+/** Reset popup store between tests to prevent state leakage. */
 function resetStores() {
   usePopupStore.getState().clearPopups()
 }
 
+/**
+ * Integration tests — verify movement math works correctly when combined
+ * with Zustand store add/update operations. These catch issues where the
+ * store's update logic doesn't correctly apply position deltas.
+ */
 describe('runtime movement — store integration', () => {
   beforeEach(() => {
     resetStores()

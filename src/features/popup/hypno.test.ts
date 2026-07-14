@@ -1,6 +1,13 @@
 import { describe, it, expect } from 'vitest'
 import { categorizeByExt } from '@electron/ipc/pack'
 
+/**
+ * Tests for media file categorization by extension.
+ *
+ * Key behavior: .gif files appear in BOTH images and hypno arrays, enabling
+ * hypno overlays on animated GIFs. All other extensions go to exactly one
+ * category. Unknown extensions (svg, txt, zip) are silently ignored.
+ */
 describe('categorizeByExt — hypno overlay classification', () => {
   it('gif files appear in both images and hypno', () => {
     const result = categorizeByExt(['/pack/images/spiral.gif', '/pack/images/test.GIF'])
@@ -62,5 +69,29 @@ describe('categorizeByExt — hypno overlay classification', () => {
     expect(result.videos).toHaveLength(0)
     expect(result.audio).toHaveLength(0)
     expect(result.hypno).toHaveLength(0)
+  })
+
+  it('svg files are not categorized into any media type', () => {
+    const result = categorizeByExt(['/pack/images/icon.svg'])
+    expect(result.images).toHaveLength(0)
+    expect(result.videos).toHaveLength(0)
+    expect(result.audio).toHaveLength(0)
+    expect(result.hypno).toHaveLength(0)
+  })
+
+  it('unknown extensions are ignored', () => {
+    const result = categorizeByExt(['/pack/data/readme.txt', '/pack/data/archive.zip'])
+    expect(result.images).toHaveLength(0)
+    expect(result.videos).toHaveLength(0)
+    expect(result.audio).toHaveLength(0)
+    expect(result.hypno).toHaveLength(0)
+  })
+
+  it('case-insensitive extension matching', () => {
+    const result = categorizeByExt(['/pack/img/PHOTO.PNG', '/pack/vid/CLIP.MP4', '/pack/hypno/SWIRL.GIF'])
+    expect(result.images).toContain('/pack/img/PHOTO.PNG')
+    expect(result.videos).toContain('/pack/vid/CLIP.MP4')
+    expect(result.hypno).toContain('/pack/hypno/SWIRL.GIF')
+    expect(result.hypno).toHaveLength(1)
   })
 })

@@ -41,63 +41,13 @@ function resetAll() {
   })
 }
 
-const STATIC_IMG_EXTS = new Set(['.png', '.jpg', '.jpeg', '.bmp', '.webp'])
-
-function extOf(filePath: string): string {
-  const i = filePath.lastIndexOf('.')
-  return i >= 0 ? filePath.slice(i).toLowerCase() : ''
-}
-
-function canHaveHypno(filePath: string): boolean {
-  const ext = extOf(filePath)
-  return STATIC_IMG_EXTS.has(ext)
-}
-
-describe('hypno overlay — spawn decision', () => {
+describe('packStore getMedia accessor', () => {
   beforeEach(() => {
     resetAll()
   })
 
-  it('subliminalsChance=0 → hypnoMediaPath should not be generated', () => {
-    const cfg = useConfigStore.getState()
-    const pack = makePack()
-    usePackStore.getState().loadPack(pack)
-    const hypnoPool = pack.media.hypno
-    const shouldOverlay = cfg.subliminalsChance > 0 && hypnoPool.length > 0
-    expect(shouldOverlay).toBe(false)
-  })
-
-  it('subliminalsChance=100 with hypno files → overlay eligible for static images', () => {
-    useConfigStore.getState().updateConfig({ subliminalsChance: 100 })
-    const cfg = useConfigStore.getState()
-    const pack = makePack()
-    usePackStore.getState().loadPack(pack)
-    const hypnoPool = pack.media.hypno
-    const shouldOverlay = cfg.subliminalsChance > 0 && hypnoPool.length > 0
-    expect(shouldOverlay).toBe(true)
-  })
-
-  it('subliminalsChance=100 but empty hypno pool → no overlay', () => {
-    useConfigStore.getState().updateConfig({ subliminalsChance: 100 })
-    const cfg = useConfigStore.getState()
-    const pack = makePack({ hypno: [] })
-    usePackStore.getState().loadPack(pack)
-    const hypnoPool = pack.media.hypno
-    const shouldOverlay = cfg.subliminalsChance > 0 && hypnoPool.length > 0
-    expect(shouldOverlay).toBe(false)
-  })
-
-  it('subliminalsAlpha controls opacity passed to popup', () => {
-    useConfigStore.getState().updateConfig({ subliminalsAlpha: 50 })
-    const cfg = useConfigStore.getState()
-    const opacity = Math.min(100, Math.max(0, cfg.subliminalsAlpha)) / 100
-    expect(opacity).toBe(0.5)
-  })
-
-  it('pack.media.hypno only contains gif after categorization', () => {
+  it('getMedia("hypno") returns hypno files from loaded pack', () => {
     const pack = makePack({
-      images: ['/pack/img/a.png', '/pack/img/b.gif', '/pack/img/c.jpg'],
-      videos: ['/pack/vid/d.mp4', '/pack/vid/e.webm'],
       hypno: ['/pack/hypno/swirl.gif'],
     })
     usePackStore.getState().loadPack(pack)
@@ -106,28 +56,117 @@ describe('hypno overlay — spawn decision', () => {
     expect(hypno).toHaveLength(1)
   })
 
-  it('getMedia("hypno") returns empty when pack has no gif files', () => {
+  it('getMedia("hypno") returns empty array when pack has no hypno files', () => {
     const pack = makePack({ hypno: [] })
     usePackStore.getState().loadPack(pack)
     const hypno = usePackStore.getState().getMedia('hypno')
     expect(hypno).toHaveLength(0)
   })
 
-  it('static images (png, jpg, bmp, webp) can have hypno overlay', () => {
-    expect(canHaveHypno('/pack/img/photo.png')).toBe(true)
-    expect(canHaveHypno('/pack/img/photo.jpg')).toBe(true)
-    expect(canHaveHypno('/pack/img/photo.jpeg')).toBe(true)
-    expect(canHaveHypno('/pack/img/photo.bmp')).toBe(true)
-    expect(canHaveHypno('/pack/img/photo.webp')).toBe(true)
+  it('getMedia("hypno") returns empty array when no pack is loaded', () => {
+    const hypno = usePackStore.getState().getMedia('hypno')
+    expect(hypno).toHaveLength(0)
   })
 
-  it('gifs cannot have hypno overlay', () => {
-    expect(canHaveHypno('/pack/img/animation.gif')).toBe(false)
+  it('getMedia returns correct type for each media category', () => {
+    const pack = makePack({
+      images: ['/pack/img/a.png'],
+      videos: ['/pack/vid/b.mp4'],
+      audio: ['/pack/audio/c.mp3'],
+      hypno: ['/pack/hypno/d.gif'],
+    })
+    usePackStore.getState().loadPack(pack)
+    expect(usePackStore.getState().getMedia('image')).toHaveLength(1)
+    expect(usePackStore.getState().getMedia('video')).toHaveLength(1)
+    expect(usePackStore.getState().getMedia('audio')).toHaveLength(1)
+    expect(usePackStore.getState().getMedia('hypno')).toHaveLength(1)
   })
 
-  it('videos cannot have hypno overlay', () => {
-    expect(canHaveHypno('/pack/vid/clip.mp4')).toBe(false)
-    expect(canHaveHypno('/pack/vid/clip.webm')).toBe(false)
-    expect(canHaveHypno('/pack/vid/clip.mov')).toBe(false)
+  it('getMedia returns empty after unloadPack', () => {
+    usePackStore.getState().loadPack(makePack())
+    expect(usePackStore.getState().getMedia('hypno')).toHaveLength(1)
+    usePackStore.getState().unloadPack()
+    expect(usePackStore.getState().getMedia('hypno')).toHaveLength(0)
+  })
+})
+
+describe('configStore hypno-related settings', () => {
+  beforeEach(() => {
+    resetAll()
+  })
+
+  it('subliminalsAlpha is stored and retrievable', () => {
+    useConfigStore.getState().updateConfig({ subliminalsAlpha: 50 })
+    expect(useConfigStore.getState().subliminalsAlpha).toBe(50)
+  })
+
+  it('subliminalsChance is stored and retrievable', () => {
+    useConfigStore.getState().updateConfig({ subliminalsChance: 75 })
+    expect(useConfigStore.getState().subliminalsChance).toBe(75)
+  })
+
+  it('config defaults match expected values', () => {
+    const cfg = useConfigStore.getState()
+    expect(cfg.subliminalsChance).toBe(0)
+    expect(cfg.subliminalsAlpha).toBe(20)
+  })
+})
+
+describe('popupStore lifecycle', () => {
+  beforeEach(() => {
+    resetAll()
+  })
+
+  it('addPopup increments count and appends popup', () => {
+    usePopupStore.getState().addPopup({
+      id: 1, type: 'image', x: 100, y: 100, width: 300, height: 200,
+      moving: false, dx: 0, dy: 0, mitosisSpawned: false,
+    })
+    const state = usePopupStore.getState()
+    expect(state.popups).toHaveLength(1)
+    expect(state.popupCount).toBe(1)
+  })
+
+  it('removePopup decrements count and removes popup', () => {
+    usePopupStore.getState().addPopup({
+      id: 1, type: 'image', x: 100, y: 100, width: 300, height: 200,
+      moving: false, dx: 0, dy: 0, mitosisSpawned: false,
+    })
+    usePopupStore.getState().removePopup(1)
+    const state = usePopupStore.getState()
+    expect(state.popups).toHaveLength(0)
+    expect(state.popupCount).toBe(0)
+  })
+
+  it('removePopup with non-existent id does not break', () => {
+    usePopupStore.getState().removePopup(999)
+    expect(usePopupStore.getState().popups).toHaveLength(0)
+  })
+
+  it('clearPopups resets both popups array and count', () => {
+    usePopupStore.getState().addPopup({
+      id: 1, type: 'image', x: 100, y: 100, width: 300, height: 200,
+      moving: true, dx: 1, dy: 0, mitosisSpawned: false,
+    })
+    usePopupStore.getState().addPopup({
+      id: 2, type: 'video', x: 200, y: 200, width: 400, height: 300,
+      moving: false, dx: 0, dy: 0, mitosisSpawned: false,
+    })
+    usePopupStore.getState().clearPopups()
+    const state = usePopupStore.getState()
+    expect(state.popups).toHaveLength(0)
+    expect(state.popupCount).toBe(0)
+  })
+
+  it('updatePopup only modifies specified fields', () => {
+    usePopupStore.getState().addPopup({
+      id: 1, type: 'image', x: 100, y: 200, width: 300, height: 200,
+      moving: true, dx: 1, dy: 0, mitosisSpawned: false,
+    })
+    usePopupStore.getState().updatePopup(1, { x: 500 })
+    const popup = usePopupStore.getState().popups[0]
+    expect(popup.x).toBe(500)
+    expect(popup.y).toBe(200)
+    expect(popup.dx).toBe(1)
   })
 })

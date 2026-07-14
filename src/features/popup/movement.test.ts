@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { computeMove, shouldMove, randomDirection, tickPopups } from './movement'
 import type { MovingPopup, TickablePopup, ScreenBounds } from './movement'
 
+/** Factory for MovingPopup with sensible defaults. Override any field via spread. */
 function makePopup(overrides: Partial<MovingPopup> = {}): MovingPopup {
   return {
     id: 1, x: 500, y: 400, width: 300, height: 200,
@@ -9,6 +10,7 @@ function makePopup(overrides: Partial<MovingPopup> = {}): MovingPopup {
   }
 }
 
+/** Factory for TickablePopup with sensible defaults. Override any field via spread. */
 function makeTickPopup(overrides: Partial<TickablePopup> = {}): TickablePopup {
   return {
     id: 1, moving: true, x: 500, y: 400, width: 300, height: 200,
@@ -16,6 +18,7 @@ function makeTickPopup(overrides: Partial<TickablePopup> = {}): TickablePopup {
   }
 }
 
+/** Pure unit tests for movement math — no store or DOM dependencies. */
 describe('computeMove', () => {
   const screen: ScreenBounds = { width: 1920, height: 1080 }
 
@@ -83,8 +86,41 @@ describe('computeMove', () => {
     expect(result.x).toBe(510)
     expect(result.y).toBe(410)
   })
+
+  it('returns integer coordinates (Math.round for Electron IPC safety)', () => {
+    const popup = makePopup({ x: 500.3, y: 400.7, dx: 1, dy: 1 })
+    const result = computeMove(popup, 7, screen)
+    expect(Number.isInteger(result.x)).toBe(true)
+    expect(Number.isInteger(result.y)).toBe(true)
+  })
+
+  it('bounces off both axes at corner simultaneously', () => {
+    const popup = makePopup({ x: 5, y: 5, dx: -1, dy: -1 })
+    const result = computeMove(popup, 10, screen)
+    expect(result.x).toBe(0)
+    expect(result.y).toBe(0)
+    expect(result.dx).toBe(1)
+    expect(result.dy).toBe(1)
+  })
+
+  it('popup exactly at bottom-right corner stays clamped', () => {
+    const popup = makePopup({ x: screen.width - 300, y: screen.height - 200, dx: 1, dy: 1 })
+    const result = computeMove(popup, 5, screen)
+    expect(result.x).toBe(screen.width - 300)
+    expect(result.y).toBe(screen.height - 200)
+    expect(result.dx).toBe(-1)
+    expect(result.dy).toBe(-1)
+  })
+
+  it('speed=1 moves exactly 1 pixel', () => {
+    const popup = makePopup({ x: 500, y: 400, dx: 1, dy: 0 })
+    const result = computeMove(popup, 1, screen)
+    expect(result.x).toBe(501)
+    expect(result.y).toBe(400)
+  })
 })
 
+/** Tests probability threshold function with injectable randomness. */
 describe('shouldMove', () => {
   it('returns true when random is below threshold', () => {
     expect(shouldMove(50, () => 0.001)).toBe(true)
@@ -95,24 +131,21 @@ describe('shouldMove', () => {
   })
 
   it('always returns true at 100%', () => {
-    for (let i = 0; i < 100; i++) {
-      expect(shouldMove(100)).toBe(true)
-    }
+    expect(shouldMove(100, () => 0.999)).toBe(true)
   })
 
   it('always returns false at 0%', () => {
-    for (let i = 0; i < 100; i++) {
-      expect(shouldMove(0)).toBe(false)
-    }
+    expect(shouldMove(0, () => 0.001)).toBe(false)
   })
 })
 
+/** Tests direction vector generation from random angle. */
 describe('randomDirection', () => {
-  it('returns non-zero dx and dy', () => {
+  it('returns a unit vector (dx² + dy² ≈ 1)', () => {
     for (let i = 0; i < 50; i++) {
       const dir = randomDirection()
-      expect(dir.dx).not.toBe(0)
-      expect(dir.dy).not.toBe(0)
+      const magnitude = dir.dx * dir.dx + dir.dy * dir.dy
+      expect(magnitude).toBeCloseTo(1, 10)
     }
   })
 
@@ -124,6 +157,7 @@ describe('randomDirection', () => {
   })
 })
 
+/** Tests batch tick processing for multiple popups in a single frame. */
 describe('tickPopups', () => {
   const screen: ScreenBounds = { width: 1920, height: 1080 }
 

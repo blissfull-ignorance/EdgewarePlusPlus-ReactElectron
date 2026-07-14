@@ -1,27 +1,31 @@
-# Task: Verify Playwright Tests Pass
+# TASK — Test Assessment & Improvement
 
-**Priority:** HIGH — #1 on Next Session Priority Order
-
-**Problem:** Playwright tests in `tests/electron.spec.ts` are blocked because Vitest picks up the file (rejecting `test.beforeAll()`), and the tests require a running Electron + Vite dev server. Now that `preload.cjs` and `fengari-interop` are fixed, the tests should be runnable.
+## Goal
+Assess all existing Vitest tests for viability, runtime detection capability, and improvement opportunities.
 
 ## Steps
 
-1. **Run Playwright tests** — Execute `npm run test:e2e` and capture the full output (logs, errors, exit code).
+1. **Run existing tests** — `npm run test` to confirm all 54 tests pass
 
-2. **Diagnose failures** — If tests fail or crash, read `tests/electron.spec.ts` and `playwright.config.ts` to understand what the tests expect. Cross-reference with recent fixes (preload sync, fengari-interop) to identify remaining issues.
+2. **Review test files** — Read through all `*.test.ts` files in `src/features/popup/`
 
-3. **Fix Vitest pickup** — If Vitest still picks up `electron.spec.ts`, either rename the file to exclude it from Vitest (e.g. `electron.e2e.spec.ts`) or add a Vitest config exclusion for `tests/`.
+3. **Assess each test** — For each test, evaluate:
+   - Can the test realistically fail in production?
+   - Does it catch real runtime issues?
+   - Is the assertion meaningful?
 
-4. **Fix test failures** — Address any failing assertions, missing APIs, or Electron startup issues. Check that `EDGWARE_NO_DEVTOOLS` env var is correctly handled.
+4. **Improve weak tests** — Strengthen tests with better assertions or more realistic scenarios
 
-5. **Run full validation** — `npm run check` must pass with zero errors.
+5. **Remove dead tests** — Identify tests that can't meaningfully fail and remove them
 
-6. **Run lint** — `npm run lint` must pass with zero errors.
+6. **Add missing tests** — Identify untested critical paths and add new tests
 
-7. **Run Vitest** — `npm run test` must pass (54 tests).
+7. **Improve comments for documentation** — Add/update comments in test files for clarity
 
-8. **Improve comments** — Review all modified files, add or update `FUTUREWORK`/`DISCUSSION`/`REMOVABLE`/`FIXME` markers where appropriate for documentation.
+8. **Commit changes** — `git add -A && git commit -m "test: improve test viability and documentation"`
 
-9. **Commit changes** — Stage and commit with a descriptive conventional commit message (e.g. `fix: resolve Playwright/Vitest conflict and verify e2e tests`).
-
-10. **Update HANDOVER.md** — Update "Current Status", "Known Issues", and "Recent Commits" to reflect the completed work. Remove Playwright from "What's NOT Done" if fully resolved.
+9. **Update HANDOVER.md** — Update:
+   - "Last Session" line
+   - "What's Working" section
+   - "Recent Commits" section
+   - "Next Session Priority Order" with list of tests needing further improvement
