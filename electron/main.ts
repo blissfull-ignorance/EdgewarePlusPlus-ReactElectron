@@ -11,6 +11,7 @@ import { loadPackFromDirectory, extractPackZip, isZipFile } from './ipc/pack.js'
 import { setScriptingMainWindow, startScripting, stopScripting, executeLuaScript, executeLuaCode, getScriptingStatus } from './ipc/scripting.js'
 import { showNotification } from './ipc/notifications.js'
 import { initDiscord, updateDiscord, destroyDiscord } from './ipc/discord.js'
+import { openExternal } from './ipc/web.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -162,6 +163,10 @@ function registerIpcHandlers() {
 
   ipcMain.handle('discord:destroy', async () => {
     destroyDiscord()
+  })
+
+  ipcMain.handle('web:openExternal', async (_event, url: string) => {
+    await openExternal(url)
   })
 }
 

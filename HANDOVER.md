@@ -2,7 +2,7 @@
 
 ## Current Status
 
-**Last Session:** Mitosis mode logic
+**Last Session:** Web open (shell.openExternal)
 
 **Date:** July 14, 2026
 
@@ -32,6 +32,7 @@
 - **Notifications** — `electron.Notification` API wired via IPC, preload exposes `showNotification`, Lua `sendNotification` triggers native desktop notification
 - **Discord presence** — `discord-rpc` integrated via IPC, preload, Zustand store; updates on popup count/pack changes; respects `showDiscord` config toggle; destroys on panic/quit
 - **Mitosis mode** — spawn-on-close logic with `mitosisChance` (0–100%) and `mitosisStrength` (max popups per close); `mitosisSpawned` flag prevents infinite loops; config toggle + slider in Modes tab
+- **Web open** — `shell.openExternal()` wired via IPC (`web:openExternal`), preload exposes `openExternal(url)`, opens URLs in default browser
 
 ### Known Issues
 
@@ -42,6 +43,7 @@
 ### Recent Commits
 
 ```
+feat: wire shell.openExternal via IPC for web links
 fd71bb9 feat: implement mitosis mode spawn-on-close logic
 15fac0b feat: integrate Discord presence via discord-rpc
 e01b5fd feat: wire Fengari scripting engine to renderer via IPC
@@ -61,7 +63,6 @@ f9477ae fix: restrict video formats to Chromium-supported codecs
 
 ### What's NOT Done
 
-- **Web open** — `shell.openExternal()` not wired
 - **Playwright tests** — No browser integration tests
 - **Cross-platform verification** — Only tested on macOS
 - **Tray icon assets** — No .icns/.ico/.png icons in repo
@@ -96,7 +97,8 @@ EdgewarePlusPlus/
 │   │   ├── filesystem.ts  # Drive fill, image replace
 │   │   ├── shortcut.ts    # Desktop shortcuts
 │   │   ├── scripting.ts   # Fengari IPC bridge (script:start/stop/execute)
-│   │   └── discord.ts     # Discord RPC IPC (init/update/destroy)
+│   │   ├── discord.ts     # Discord RPC IPC (init/update/destroy)
+│   │   └── web.ts         # Web open IPC (shell.openExternal)
 │   └── scripting/         # Fengari Lua VM (wired to renderer via IPC)
 │       ├── engine.ts      # Lua state lifecycle
 │       ├── api_v1.ts      # edgeware_v1 module
@@ -145,10 +147,9 @@ EdgewarePlusPlus/
 
 ### Next Session Priority Order
 
-1. **LOW**: Web open — `shell.openExternal()` not wired
-2. **LOW**: Playwright integration tests
-3. **LOW**: Cross-platform verification (Windows, Linux)
-4. **LOW**: Tray icon assets (.icns, .ico, .png)
+1. **LOW**: Playwright integration tests
+2. **LOW**: Cross-platform verification (Windows, Linux)
+3. **LOW**: Tray icon assets (.icns, .ico, .png)
 
 ### Important Notes
 

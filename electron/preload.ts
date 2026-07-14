@@ -112,4 +112,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('discord:update', activity),
   destroyDiscord: (): Promise<void> =>
     ipcRenderer.invoke('discord:destroy'),
+
+  openExternal: (url: string): Promise<void> =>
+    ipcRenderer.invoke('web:openExternal', url),
 })

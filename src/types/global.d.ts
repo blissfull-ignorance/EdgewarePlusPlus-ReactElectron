@@ -74,6 +74,7 @@ interface ElectronAPI {
   initDiscord: () => Promise<{ success: boolean; error?: string }>
   updateDiscord: (activity: Record<string, unknown>) => Promise<{ success: boolean }>
   destroyDiscord: () => Promise<void>
+  openExternal: (url: string) => Promise<void>
 }
 
 declare global {
