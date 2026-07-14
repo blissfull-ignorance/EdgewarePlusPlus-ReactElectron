@@ -2,11 +2,18 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<!-- CSP: Only allow local file:// resources and inline scripts/styles. No remote access. -->
 <meta http-equiv="Content-Security-Policy" content="default-src 'self' file:; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' file:; media-src 'self' file:;">
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
 html, body { width: 100%; height: 100%; overflow: hidden; background: transparent; }
 body { display: flex; flex-direction: column; }
+
+/*
+ * Header bar: 28px draggable region for window movement.
+ * -webkit-app-region: drag makes the entire header a native drag handle.
+ * Content below the header remains clickable for popup interaction.
+ */
 #header {
   height: 28px;
   min-height: 28px;
@@ -29,6 +36,8 @@ body { display: flex; flex-direction: column; }
   white-space: nowrap;
   pointer-events: none;
 }
+
+/* Media container: holds the main image/video + hypno overlay + click counter */
 #media-container {
   flex: 1;
   overflow: hidden;
@@ -37,9 +46,20 @@ body { display: flex; flex-direction: column; }
   justify-content: center;
   position: relative;
 }
+
+/* Main media element (image or video replaced via JS) */
 #media { width: 100%; height: 100%; object-fit: contain; user-select: none; -webkit-user-drag: none; }
+
+/* Hypno overlay for video files (autoplay, muted, looped) */
 #hypno { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; object-fit: cover; }
+
+/* Hypno overlay for static image files (gif subliminal) */
+#hypno-img { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; object-fit: cover; }
+
+/* Click counter badge (shown when clicksToClose > 1) */
 #counter { position: absolute; bottom: 4px; right: 4px; background: rgba(0,0,0,0.6); color: #fff; font-size: 11px; padding: 2px 6px; border-radius: 4px; font-family: sans-serif; display: none; }
+
+/* Click-through mode: disable all pointer events on the entire window */
 body.clickthrough #header { pointer-events: none; }
 body.clickthrough { pointer-events: none; }
 </style>
@@ -48,11 +68,31 @@ body.clickthrough { pointer-events: none; }
 <div id="header"><span id="header-title"></span></div>
 <div id="media-container">
   <img id="media" alt="">
+  <!-- FUTUREWORK: Add <source> elements for better format detection instead of
+       relying on the browser's codec support. Currently mp4/webm/mov are the
+       only supported video formats (matched in VIDEO_EXTS in pack.ts). -->
   <video id="hypno" autoplay loop muted playsinline style="display:none"></video>
   <img id="hypno-img" alt="" style="display:none">
   <div id="counter">0/0</div>
 </div>
 <script>
+/*
+ * Popup window initialization script.
+ *
+ * Parameters are passed via URL query string from the main process:
+ *   - mediaPath: absolute path to the media file
+ *   - type: 'image' or 'video'
+ *   - opacity: 0–100 (mapped to 0.0–1.0)
+ *   - denialFilter: CSS filter string (e.g., "blur(3px) saturate(0%)")
+ *   - hypnoMediaPath: absolute path to hypno overlay file (optional)
+ *   - hypnoOpacity: 0–100 (mapped to 0.0–1.0)
+ *   - clicksToClose: number of clicks needed to dismiss (1 = instant)
+ *   - clickthrough: 'true' to make window click-through
+ *
+ * REMOVABLE: The video error fallback div is only needed because Electron's
+ * Chromium may not support all codecs. If VIDEO_EXTS is restricted to
+ * universally supported formats, this fallback could be simplified.
+ */
 (function(){
   const p = new URLSearchParams(location.search);
   const mediaPath = p.get('mediaPath') || '';
@@ -66,11 +106,13 @@ body.clickthrough { pointer-events: none; }
 
   if (clickthrough) document.body.classList.add('clickthrough');
 
+  // Display the filename in the header bar
   var fileName = mediaPath.split(/[\\/]/).pop() || 'Popup';
   document.getElementById('header-title').textContent = fileName;
 
   const media = document.getElementById('media');
   if (type === 'video') {
+    // Replace <img> with <video> element for video playback
     const vid = document.createElement('video');
     vid.id = 'media';
     vid.src = 'file://' + encodeURI(mediaPath);
@@ -91,10 +133,15 @@ body.clickthrough { pointer-events: none; }
     media.draggable = false;
   }
 
+  // Apply opacity and denial filter to the main media element
   const m = document.getElementById('media');
   m.style.opacity = opacity;
   if (denialFilter) m.style.filter = denialFilter;
 
+  // Hypno overlay: only shown if hypnoMediaPath is provided
+  // Currently only .gif files reach this point (HYPN_EXTS = {'.gif'} in pack.ts)
+  // The isVid check is kept as a safety net in case the main process sends
+  // a video file, but in practice hypnoMediaPath will always be a .gif.
   if (hypnoMediaPath) {
     const isVid = /\.(mp4|webm|ogg|mov)$/i.test(hypnoMediaPath);
     const el = isVid ? document.getElementById('hypno') : document.getElementById('hypno-img');
@@ -106,6 +153,7 @@ body.clickthrough { pointer-events: none; }
     }
   }
 
+  // Click-to-close handler with optional multi-click counter
   document.body.addEventListener('click', function onClick() {
     if (clickthrough) return;
     if (clicksToClose <= 1) { window.close(); return; }

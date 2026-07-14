@@ -1,3 +1,16 @@
+/**
+ * Popup store — tracks all active popup windows.
+ *
+ * Each popup is represented by an ActivePopup entry with position, size,
+ * and movement vector. The store is read by the movement tick loop and
+ * updated by both spawn and movement effects.
+ *
+ * DISCUSSION: popupCount is maintained as a separate counter for performance
+ * (avoids computing popups.length on every render). It could drift from
+ * popups.length if addPopup/removePopup are called in unexpected order.
+ * Consider deriving popupCount from popups.length instead.
+ */
+
 import { create } from 'zustand'
 
 export interface ActivePopup {
@@ -8,8 +21,11 @@ export interface ActivePopup {
   y: number
   width: number
   height: number
+  /** Whether this popup is currently moving (set once at spawn). */
   moving: boolean
+  /** Directional vector X (unit length, may be negative). Reversed on bounce. */
   dx: number
+  /** Directional vector Y (unit length, may be negative). Reversed on bounce. */
   dy: number
 }
 

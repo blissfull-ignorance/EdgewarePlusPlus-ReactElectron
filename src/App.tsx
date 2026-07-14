@@ -14,6 +14,9 @@ import { shouldMove, randomDirection, tickPopups } from '@/features/popup/moveme
 import { logMovementEvent } from '@/features/popup/debug'
 import { Container, Title, Text, Anchor } from '@mantine/core'
 
+// DISCUSSION: audioIdCounter is module-level, not reset on pack change. If packs
+// are swapped mid-session, audio IDs could collide with stale popup entries.
+// Consider resetting on pack load, but low risk since audio popups are ephemeral.
 let audioIdCounter = 1
 
 function StatusPage() {
@@ -30,6 +33,8 @@ function StatusPage() {
   )
 }
 
+// --- Utility helpers (pure, no side effects) ---
+
 function pickRandom<T>(arr: T[]): T {
   return arr[Math.floor(Math.random() * arr.length)]
 }
@@ -38,10 +43,15 @@ function randomInt(min: number, max: number): number {
   return Math.floor(Math.random() * (max - min + 1)) + min
 }
 
+/** Returns true with `percent` probability (0–100). */
 function roll(percent: number): boolean {
   return Math.random() * 100 < percent
 }
 
+// REMOVABLE: STATIC_IMG_EXTS + extOf are duplicated conceptually in pack.ts
+// (IMAGE_EXTS, HYPN_EXTS). Consider extracting a shared media-utils module if
+// more extension checks are needed. Currently acceptable since App.tsx only
+// needs a lightweight "is this a static image?" check without importing pack internals.
 const STATIC_IMG_EXTS = new Set(['.png', '.jpg', '.jpeg', '.bmp', '.webp'])
 
 function extOf(filePath: string): string {
@@ -49,6 +59,7 @@ function extOf(filePath: string): string {
   return i >= 0 ? filePath.slice(i).toLowerCase() : ''
 }
 
+/** Generates a random CSS filter for denial popups (blur, desaturation, etc.). */
 function pickDenialFilter(): string {
   const filters = [
     `blur(${randomInt(1, 5)}px)`,
@@ -67,8 +78,13 @@ export default function App() {
   const popupCount = usePopupStore((s) => s.popupCount)
   const electronAPI = useElectronAPI()
   const spawnTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  // DISCUSSION: screenRef defaults to 1920x1080 as a fallback. If the actual
+  // screen is smaller, popups could spawn off-screen. The getScreenBounds IPC
+  // call on mount should overwrite this quickly, but there's a brief window
+  // where the default is used.
   const screenRef = useRef({ width: 1920, height: 1080 })
 
+  // Fetch actual screen bounds from Electron on mount
   useEffect(() => {
     if (!electronAPI) return
     electronAPI.getScreenBounds().then((bounds) => {
@@ -76,6 +92,7 @@ export default function App() {
     }).catch(() => {})
   }, [electronAPI])
 
+  // Load persisted config from disk on mount
   useEffect(() => {
     if (!electronAPI) return
     electronAPI.loadConfig()
@@ -85,6 +102,7 @@ export default function App() {
       .catch((err) => console.error('config:load failed', err))
   }, [electronAPI])
 
+  // Register Electron IPC event listeners (panic, key, tray, popup closed)
   useEffect(() => {
     if (!electronAPI) return
     electronAPI.onPanic(() => {
@@ -106,7 +124,17 @@ export default function App() {
     })
   }, [electronAPI])
 
-  // Popup spawning loop
+  // --- Popup spawning loop ---
+  // Runs at configurable interval (cfg.delay). Each tick:
+  //   1. Picks a random media file from the loaded pack
+  //   2. Checks per-type limits (maxImages, maxVideos)
+  //   3. Decides hypno overlay eligibility (static images only)
+  //   4. Creates a BrowserWindow via IPC and registers the popup in the store
+  //
+  // FUTUREWORK: The spawn tick re-reads cfg.delay only when `running` changes,
+  // not on every tick. If the user changes delay while running, the old interval
+  // persists until next start/stop. Consider clearing and resetting the timer
+  // when cfg.delay changes.
   useEffect(() => {
     if (!running) {
       if (spawnTimerRef.current) {
@@ -129,6 +157,7 @@ export default function App() {
       const videos = pack.media.videos
       const audio = pack.media.audio
 
+      // If no images/videos exist, fall back to audio-only spawning
       const hasNonAudio = images.length + videos.length > 0
       if (!hasNonAudio && audio.length === 0) return
 
@@ -137,14 +166,18 @@ export default function App() {
       const isAudio = audio.includes(path)
 
       if (isAudio) {
+        // Audio popups have no visual representation, just a store entry
         const id = audioIdCounter++
         usePopupStore.getState().addPopup({ id, type: 'audio', mediaPath: path, x: 0, y: 0, width: 0, height: 0, moving: false, dx: 0, dy: 0 })
       } else {
+        // Enforce per-type popup limits
         const popups = usePopupStore.getState().popups
         const currentImages = popups.filter((p) => p.type === 'image').length
         const currentVideos = popups.filter((p) => p.type === 'video').length
         if (isVideo && currentVideos >= cfg.maxVideos) return
         if (!isVideo && currentImages >= cfg.maxImages) return
+
+        // Scale popup dimensions by user-configured popupScale
         const scale = cfg.popupScale || 1
         const w = Math.round(randomInt(200, 400) * scale)
         const h = Math.round(randomInt(150, 300) * scale)
@@ -153,6 +186,7 @@ export default function App() {
         const y = randomInt(0, Math.max(0, bounds.height - h))
 
         if (electronAPI) {
+          // Hypno overlay: only applied to static images (not gifs, not videos)
           const mediaExt = extOf(path)
           const isStaticImage = STATIC_IMG_EXTS.has(mediaExt)
           const hypnoMediaPath = isStaticImage && roll(cfg.subliminalsChance) && pack.media.hypno.length > 0
@@ -179,6 +213,7 @@ export default function App() {
             hypnoMediaPath,
             hypnoOpacity: cfg.subliminalsAlpha,
           }).then((popupId) => {
+            // Assign movement parameters: direction is random, moving is probabilistic
             const dir = randomDirection()
             const moving = shouldMove(cfg.movingChance)
             console.log('[spawn]', { popupId, moving, movingChance: cfg.movingChance, x, y, w, h })
@@ -205,7 +240,15 @@ export default function App() {
     }
   }, [running, electronAPI])
 
-  // Popup movement loop
+  // --- Popup movement loop ---
+  // Runs at fixed 50ms interval (20 ticks/sec). Each tick:
+  //   1. Reads current popup positions and config from stores
+  //   2. Calls tickPopups() to compute new positions with bounce
+  //   3. Sends movePopup IPC calls with Math.round() coordinates
+  //   4. Updates store positions for next tick
+  //
+  // FUTUREWORK: Movement speed slider could update the interval instead of
+  // being read per-tick. Current approach is simpler and sufficient.
   const moveTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   useEffect(() => {
@@ -227,6 +270,7 @@ export default function App() {
         console.log('[movement:tick]', { total: popups.length, movingCount, speed: cfg.movingSpeed, bounds, updateCount: updates.size })
       }
       for (const [id, update] of updates) {
+        // Math.round() is critical: Electron IPC throws on float coordinates
         electronAPI.movePopup(id, Math.round(update.x), Math.round(update.y)).catch(() => {})
         usePopupStore.getState().updatePopup(id, { ...update, x: Math.round(update.x), y: Math.round(update.y) })
         console.log('[movement:move]', { id, x: Math.round(update.x), y: Math.round(update.y), dx: update.dx, dy: update.dy })

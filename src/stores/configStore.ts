@@ -1,3 +1,29 @@
+/**
+ * Config store — holds all user-configurable settings.
+ *
+ * Defaults are defined in the `defaults` object. On startup, Electron loads
+ * the persisted config from disk and calls updateConfig() to merge saved values
+ * over the defaults. Only non-default values are persisted to disk.
+ *
+ * Key popup-related settings:
+ *   - delay: spawn interval in ms
+ *   - maxImages: max concurrent image popups
+ *   - maxVideos: max concurrent video popups
+ *   - maxAudio: max concurrent audio popups
+ *   - popupScale: multiplier for popup dimensions (0.5x–3x)
+ *   - movingChance: probability (0–100) that a popup spawns with movement
+ *   - movingSpeed: pixels per tick (50ms) for moving popups
+ *   - subliminalsChance: probability that a static image gets a hypno overlay
+ *   - subliminalsAlpha: opacity for hypno overlay (0–100, mapped to 0.0–1.0)
+ *   - denialChance: probability that a popup gets a visual denial filter
+ *   - buttonless: if true, clicksToClose = 999 (clicks don't dismiss)
+ *   - clickthroughPopups: if true, popups are click-through (transparent to input)
+ *
+ * FUTUREWORK: Consider splitting this monolithic config into sub-stores
+ * (popupConfig, corruptionConfig, scheduleConfig) to reduce re-render scope
+ * when unrelated settings change.
+ */
+
 import { create } from 'zustand'
 import type { Config } from '@/types/pack'
 

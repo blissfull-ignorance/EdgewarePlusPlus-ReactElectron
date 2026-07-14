@@ -1,11 +1,44 @@
+/**
+ * Pack loader — scans pack directories and categorizes media files.
+ *
+ * This module runs in the Electron main process. It reads the filesystem
+ * directly (no IPC needed since it's already on the main side).
+ *
+ * Media categorization rules:
+ *   - IMAGE_EXTS: .png, .jpg, .jpeg, .gif, .bmp, .webp → images array
+ *   - VIDEO_EXTS: .mp4, .webm, .mov → videos array
+ *   - AUDIO_EXTS: .mp3, .wav, .ogg, .flac, .m4a, .aac → audio array
+ *   - HYPN_EXTS: .gif ONLY → hypno array (also in images array)
+ *
+ * IMPORTANT: HYPN_EXTS was reduced from {mp4, webm, gif} to {gif} because
+ * mp4/webm files should not be treated as hypno overlays — they are videos
+ * with sound. Only gif files are silent looping animations suitable for
+ * subliminal overlay on static images.
+ *
+ * FUTUREWORK: Add support for pack.json manifest files (index.json is already
+ * supported but underutilized). Packs could declare their own media categories
+ * and custom extensions.
+ *
+ * REMOVABLE: The `index.json` loading (loadIndex) is currently unused by the
+ * spawn system — it's loaded but never referenced in the tick loop. Consider
+ * removing if the index system is not needed.
+ */
+
 import fs from 'fs'
 import path from 'path'
 import os from 'os'
 import AdmZip from 'adm-zip'
 
+/** Extensions recognized as static images (including gifs, which can also be hypno). */
 const IMAGE_EXTS = new Set(['.png', '.jpg', '.jpeg', '.gif', '.bmp', '.webp'])
+
+/** Extensions recognized as video files (mp4/webm/mov only — ffmpeg-compatible). */
 const VIDEO_EXTS = new Set(['.mp4', '.webm', '.mov'])
+
+/** Extensions recognized as audio files. */
 const AUDIO_EXTS = new Set(['.mp3', '.wav', '.ogg', '.flac', '.m4a', '.aac'])
+
+/** Extensions recognized as hypno overlays. ONLY gif — silent looping animation. */
 const HYPN_EXTS = new Set(['.gif'])
 
 function scanDirRecursive(dir: string): string[] {
@@ -22,11 +55,21 @@ function scanDirRecursive(dir: string): string[] {
       }
     }
   } catch {
-    // ignore
+    // ignore permission errors and broken symlinks
   }
   return results
 }
 
+/**
+ * Categorizes files into media buckets by extension.
+ *
+ * A single file can appear in multiple arrays (e.g., a .gif appears in both
+ * `images` and `hypno`). This is intentional — the spawn tick uses `images`
+ * for display and `hypno` for overlay selection independently.
+ *
+ * The `hypno` check is OUTSIDE the if/else chain so that gif files (which
+ * match IMAGE_EXTS) are correctly added to both `images` and `hypno`.
+ */
 export function categorizeByExt(files: string[]): {
   images: string[]
   videos: string[]
@@ -47,6 +90,7 @@ export function categorizeByExt(files: string[]): {
     } else if (AUDIO_EXTS.has(ext)) {
       audio.push(f)
     }
+    // Hypno check is separate: gif files go to both images and hypno
     if (HYPN_EXTS.has(ext)) {
       hypno.push(f)
     }
@@ -104,6 +148,7 @@ export interface ScannedPack {
   scriptVersion: 'v0' | 'v1' | null
 }
 
+/** Loads and categorizes all media/text/script files from a pack directory. */
 export function loadPackFromDirectory(packPath: string): ScannedPack {
   const info: PackInfo = loadInfo(path.join(packPath, 'info.json'))
   const index: PackIndex = loadIndex(path.join(packPath, 'index.json'))
@@ -125,6 +170,7 @@ export function loadPackFromDirectory(packPath: string): ScannedPack {
   return { info, index, media, texts, script, scriptVersion }
 }
 
+/** Extracts a .zip pack to a temp directory and returns the extraction path. */
 export function extractPackZip(zipPath: string): string {
   const zip = new AdmZip(zipPath)
   const extractDir = path.join(

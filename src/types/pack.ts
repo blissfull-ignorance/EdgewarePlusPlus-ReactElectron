@@ -1,5 +1,58 @@
+/**
+ * Type definitions for the Pack system and configuration.
+ *
+ * This file defines the shared types used by both the renderer (React) and
+ * the main process (Electron IPC). These types are imported by both sides.
+ *
+ * Key type relationships:
+ *   Config → stored in configStore (renderer) and persisted to disk (main)
+ *   Pack → loaded by pack.ts (main), stored in packStore (renderer)
+ *   Pack.media.hypno → used by spawn tick for overlay selection
+ *
+ * FUTUREWORK: Many Config fields are legacy from the Python version and are
+ * not yet wired to the React UI. Fields like `fill`, `replace`, `webMod`,
+ * `audioMod`, etc. are defined here but have no corresponding ConfigPanel
+ * controls. Consider pruning unused fields or marking them as deprecated.
+ */
+
 export interface Config {
+  // --- Spawn timing ---
+  /** Spawn interval in milliseconds. */
   delay: number
+
+  // --- Media limits ---
+  /** Max concurrent audio popups. */
+  maxAudio: number
+  /** Max concurrent image popups (static images + gifs). */
+  maxImages: number
+  /** Max concurrent video popups. */
+  maxVideos: number
+
+  // --- Popup appearance ---
+  /** Multiplier for popup dimensions (0.5x–3x). */
+  popupScale: number
+  /** If true, popups ignore mouse clicks (click-through). */
+  clickthroughPopups: boolean
+  /** If true, clicks don't dismiss popups (clicksToClose = 999). */
+  buttonless: boolean
+
+  // --- Movement ---
+  /** Probability (0–100) that a spawned popup starts moving. */
+  movingChance: number
+  /** Pixels per 50ms tick for moving popups. */
+  movingSpeed: number
+
+  // --- Hypno / Subliminals ---
+  /** Probability (0–100) that a static image gets a gif hypno overlay. */
+  subliminalsChance: number
+  /** Opacity for hypno overlay (0–100, mapped to CSS opacity 0.0–1.0). */
+  subliminalsAlpha: number
+
+  // --- Denial ---
+  /** Probability (0–100) that a popup gets a visual denial filter. */
+  denialChance: number
+
+  // --- Legacy fields (ported from Python, not all wired to UI yet) ---
   fill: boolean
   replace: boolean
   webMod: number
@@ -42,15 +95,9 @@ export interface Config {
   lkScaling: number
   lkToggle: boolean
   videoVolume: number
-  denialChance: number
   drivePath: string
-  maxAudio: number
-  maxImages: number
-  maxVideos: number
-  subliminalsChance: number
   safeMode: boolean
   toggleInternet: boolean
-  buttonless: boolean
   hibernateType: string
   hibernateLength: number
   fixWallpaper: boolean
@@ -72,12 +119,9 @@ export interface Config {
   corruptionThemeCycle: boolean
   corruptionPurityMode: boolean
   corruptionFullPerm: boolean
-  movingChance: number
-  movingSpeed: number
   capPopChance: number
   capPopOpacity: number
   capPopTimer: number
-  subliminalsAlpha: number
   messageOff: boolean
   notificationChance: number
   notificationImageChance: number
@@ -88,7 +132,6 @@ export interface Config {
   disabledMonitors: string[]
   mpvSubprocess: boolean
   audioVolume: number
-  clickthroughPopups: boolean
   fadeInDuration: number
   fadeOutDuration: number
   schedule: boolean
@@ -100,7 +143,6 @@ export interface Config {
   repeatSchedule: boolean
   repeatType: string
   repeatTime: number
-  popupScale: number
 }
 
 export interface PackInfo {
@@ -134,6 +176,10 @@ export interface CorruptionTrigger {
   action: 'advance' | 'set_level'
 }
 
+/**
+ * Full pack structure as loaded by the main process and passed to the renderer.
+ * Media arrays contain absolute file paths. Hypno contains only .gif files.
+ */
 export interface Pack {
   info: PackInfo
   index: PackIndex
@@ -142,6 +188,7 @@ export interface Pack {
     images: string[]
     videos: string[]
     audio: string[]
+    /** Only .gif files — used for subliminal overlays on static images. */
     hypno: string[]
   }
   texts: {
