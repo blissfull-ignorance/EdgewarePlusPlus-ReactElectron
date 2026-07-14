@@ -15,6 +15,17 @@ interface PopupOptions {
   hypnoOpacity?: number
 }
 
+interface ScriptSpawnInfo {
+  type: string
+  filename?: string
+  id: number
+}
+
+interface ScriptStatus {
+  running: boolean
+  error?: string
+}
+
 interface ElectronAPI {
   loadConfig: () => Promise<Config>
   saveConfig: (config: Config) => Promise<void>
@@ -36,6 +47,29 @@ interface ElectronAPI {
   openDirectory: () => Promise<string | null>
   loadPack: (packDir: string) => Promise<unknown>
   getScreenBounds: () => Promise<{ x: number; y: number; width: number; height: number }>
+  startScripting: () => Promise<ScriptStatus>
+  stopScripting: () => Promise<void>
+  executeScriptFile: (path: string) => Promise<ScriptStatus>
+  executeScriptCode: (code: string) => Promise<ScriptStatus>
+  getScriptingStatus: () => Promise<{ running: boolean }>
+  onScriptStatus: (cb: (status: ScriptStatus) => void) => void
+  onScriptSpawnPopup: (cb: (info: ScriptSpawnInfo) => void) => void
+  onScriptPrompt: (cb: (info: { text: string }) => void) => void
+  onScriptCorruptionProgress: (cb: () => void) => void
+  onScriptSetWallpaper: (cb: (info: { filename: string }) => void) => void
+  onScriptPanic: (cb: () => void) => void
+  onScriptClosePopups: (cb: () => void) => void
+  onScriptSetMoods: (cb: (info: { moods: string[] }) => void) => void
+  onScriptEnableMood: (cb: (info: { mood: string }) => void) => void
+  onScriptDisableMood: (cb: (info: { mood: string }) => void) => void
+  onScriptSetPopupCloseText: (cb: (info: { text: string }) => void) => void
+  onScriptSetPromptCommandText: (cb: (info: { text: string }) => void) => void
+  onScriptSetPromptSubmitText: (cb: (info: { text: string }) => void) => void
+  onScriptSetPromptMinLength: (cb: (info: { length: number }) => void) => void
+  onScriptSetPromptMaxLength: (cb: (info: { length: number }) => void) => void
+  onScriptOpenWeb: (cb: (info: { url: string }) => void) => void
+  onScriptOpenSubliminal: (cb: (info: { text: string }) => void) => void
+  onScriptNotification: (cb: (info: { text: string }) => void) => void
 }
 
 declare global {

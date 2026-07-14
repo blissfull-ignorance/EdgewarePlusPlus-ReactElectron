@@ -2,7 +2,7 @@
 
 ## Current Status
 
-**Last Session:** Fix ConfigType drift (sync maxImages + popupScale)
+**Last Session:** Wire Fengari scripting engine to renderer via IPC
 
 **Date:** July 14, 2026
 
@@ -28,12 +28,11 @@
 - **Prompt modal** — Mantine modal with Levenshtein distance validation
 - **Hibernate panel** — hibernate activation with type selection
 - **54 Vitest tests** — movement (37) + hypno (17), all passing
+- **Fengari scripting wired** — Lua VM lifecycle, IPC bridge (script:start/stop/execute), scriptStore dispatches Lua callbacks to popupStore, corruptionStore, moodStore, promptStore, and appStore
 
 ### Known Issues
 
-1. **Fengari not wired** — Engine files exist and compile (`electron/scripting/`), but are not connected to the React renderer yet. Lua scripts execute but can't trigger React state changes.
-
-2. **Tray icon missing** — No icon assets in repo, shows default Electron icon.
+1. **Tray icon missing** — No icon assets in repo, shows default Electron icon.
 
 3. **No Playwright tests** — Only Vitest unit/integration tests. No browser-level integration tests.
 
@@ -42,6 +41,7 @@
 ### Recent Commits
 
 ```
+feat: wire Fengari scripting engine to renderer via IPC
 7e0251b fix: sync ConfigData type with renderer Config (add maxImages, popupScale)
 c594a48 docs: add comprehensive comments with markers to all code files
 5b6a031 docs: update ARCHITECTURE.md with current feature state
@@ -62,7 +62,6 @@ f9477ae fix: restrict video formats to Chromium-supported codecs
 - **Discord presence** — `discord-rpc` not integrated
 - **Mitosis mode** — config exists but no spawn-on-close logic
 - **Web open** — `shell.openExternal()` not wired
-- **Lua scripting → React** — Fengari engine compiles but no IPC bridge to renderer
 - **Playwright tests** — No browser integration tests
 - **Cross-platform verification** — Only tested on macOS
 - **Tray icon assets** — No .icns/.ico/.png icons in repo
@@ -95,8 +94,9 @@ EdgewarePlusPlus/
 │   │   ├── tray.ts        # System tray
 │   │   ├── wallpaper.ts   # Cross-platform wallpaper
 │   │   ├── filesystem.ts  # Drive fill, image replace
-│   │   └── shortcut.ts    # Desktop shortcuts
-│   └── scripting/         # Fengari Lua VM (NOT WIRED TO RENDERER)
+│   │   ├── shortcut.ts    # Desktop shortcuts
+│   │   └── scripting.ts   # Fengari IPC bridge (script:start/stop/execute)
+│   └── scripting/         # Fengari Lua VM (wired to renderer via IPC)
 │       ├── engine.ts      # Lua state lifecycle
 │       ├── api_v1.ts      # edgeware_v1 module
 │       ├── api_v0.ts      # edgeware_v0 module
@@ -111,6 +111,7 @@ EdgewarePlusPlus/
 │   │   ├── popupStore.ts  # Active popups + addPopup/updatePopup/removePopup
 │   │   ├── packStore.ts   # Loaded pack + getMedia()
 │   │   ├── appStore.ts    # Splash, panic, running state
+│   │   ├── scriptStore.ts # Script engine state, Lua→renderer event listeners
 │   │   └── ...            # corruptionStore, hibernateStore, moodStore, etc.
 │   ├── features/
 │   │   ├── config/ConfigPanel.tsx   # Full settings UI (tabs: General, Popups, System, Theme, Pack, Hibernate)
@@ -142,14 +143,13 @@ EdgewarePlusPlus/
 
 ### Next Session Priority Order
 
-1. **HIGH**: Wire Fengari scripting engine to React renderer via IPC
-2. **HIGH**: Add missing ConfigPanel controls (videoVolume, notificationChance, maxAudio, etc.)
-3. **MEDIUM**: Notifications via Electron API
-4. **MEDIUM**: Discord presence via discord-rpc
-5. **MEDIUM**: Mitosis mode logic (spawn popup when count hits 0)
-6. **LOW**: Playwright integration tests
-7. **LOW**: Cross-platform verification (Windows, Linux)
-8. **LOW**: Tray icon assets (.icns, .ico, .png)
+1. **HIGH**: Add missing ConfigPanel controls (videoVolume, notificationChance, maxAudio, etc.)
+2. **MEDIUM**: Notifications via Electron API
+3. **MEDIUM**: Discord presence via discord-rpc
+4. **MEDIUM**: Mitosis mode logic (spawn popup when count hits 0)
+5. **LOW**: Playwright integration tests
+6. **LOW**: Cross-platform verification (Windows, Linux)
+7. **LOW**: Tray icon assets (.icns, .ico, .png)
 
 ### Important Notes
 

@@ -41,4 +41,65 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   getScreenBounds: (): Promise<{ x: number; y: number; width: number; height: number }> =>
     ipcRenderer.invoke('screen:bounds'),
+
+  startScripting: (): Promise<{ success: boolean; error?: string }> => ipcRenderer.invoke('script:start'),
+  stopScripting: (): Promise<void> => ipcRenderer.invoke('script:stop'),
+  executeScriptFile: (path: string): Promise<{ success: boolean; error?: string }> => ipcRenderer.invoke('script:execute-file', path),
+  executeScriptCode: (code: string): Promise<{ success: boolean; error?: string }> => ipcRenderer.invoke('script:execute-code', code),
+  getScriptingStatus: (): Promise<{ running: boolean }> => ipcRenderer.invoke('script:status'),
+
+  onScriptStatus: (cb: (status: { running: boolean; error?: string }) => void) => {
+    ipcRenderer.on('script:status', (_event, status) => cb(status))
+  },
+  onScriptSpawnPopup: (cb: (info: { type: string; filename?: string; id: number }) => void) => {
+    ipcRenderer.on('script:spawn-popup', (_event, info) => cb(info))
+  },
+  onScriptPrompt: (cb: (info: { text: string }) => void) => {
+    ipcRenderer.on('script:prompt', (_event, info) => cb(info))
+  },
+  onScriptCorruptionProgress: (cb: () => void) => {
+    ipcRenderer.on('script:corruption-progress', () => cb())
+  },
+  onScriptSetWallpaper: (cb: (info: { filename: string }) => void) => {
+    ipcRenderer.on('script:set-wallpaper', (_event, info) => cb(info))
+  },
+  onScriptPanic: (cb: () => void) => {
+    ipcRenderer.on('script:panic', () => cb())
+  },
+  onScriptClosePopups: (cb: () => void) => {
+    ipcRenderer.on('script:close-popups', () => cb())
+  },
+  onScriptSetMoods: (cb: (info: { moods: string[] }) => void) => {
+    ipcRenderer.on('script:set-moods', (_event, info) => cb(info))
+  },
+  onScriptEnableMood: (cb: (info: { mood: string }) => void) => {
+    ipcRenderer.on('script:enable-mood', (_event, info) => cb(info))
+  },
+  onScriptDisableMood: (cb: (info: { mood: string }) => void) => {
+    ipcRenderer.on('script:disable-mood', (_event, info) => cb(info))
+  },
+  onScriptSetPopupCloseText: (cb: (info: { text: string }) => void) => {
+    ipcRenderer.on('script:set-popup-close-text', (_event, info) => cb(info))
+  },
+  onScriptSetPromptCommandText: (cb: (info: { text: string }) => void) => {
+    ipcRenderer.on('script:set-prompt-command-text', (_event, info) => cb(info))
+  },
+  onScriptSetPromptSubmitText: (cb: (info: { text: string }) => void) => {
+    ipcRenderer.on('script:set-prompt-submit-text', (_event, info) => cb(info))
+  },
+  onScriptSetPromptMinLength: (cb: (info: { length: number }) => void) => {
+    ipcRenderer.on('script:set-prompt-min-length', (_event, info) => cb(info))
+  },
+  onScriptSetPromptMaxLength: (cb: (info: { length: number }) => void) => {
+    ipcRenderer.on('script:set-prompt-max-length', (_event, info) => cb(info))
+  },
+  onScriptOpenWeb: (cb: (info: { url: string }) => void) => {
+    ipcRenderer.on('script:open-web', (_event, info) => cb(info))
+  },
+  onScriptOpenSubliminal: (cb: (info: { text: string }) => void) => {
+    ipcRenderer.on('script:open-subliminal', (_event, info) => cb(info))
+  },
+  onScriptNotification: (cb: (info: { text: string }) => void) => {
+    ipcRenderer.on('script:notification', (_event, info) => cb(info))
+  },
 })

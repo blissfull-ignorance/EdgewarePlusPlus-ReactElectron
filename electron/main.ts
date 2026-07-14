@@ -8,6 +8,7 @@ import { createShortcut } from './ipc/shortcut.js'
 import { fillDrive, replaceImages } from './ipc/filesystem.js'
 import { loadConfig, saveConfig } from './ipc/config.js'
 import { loadPackFromDirectory, extractPackZip, isZipFile } from './ipc/pack.js'
+import { setScriptingMainWindow, startScripting, stopScripting, executeLuaScript, executeLuaCode, getScriptingStatus } from './ipc/scripting.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -38,6 +39,7 @@ function createWindow() {
   }
 
   setPopupMainWindow(mainWindow)
+  setScriptingMainWindow(mainWindow)
 
   mainWindow.on('closed', () => {
     mainWindow = null
@@ -122,6 +124,26 @@ function registerIpcHandlers() {
   ipcMain.handle('screen:bounds', async () => {
     const primary = screen.getPrimaryDisplay().bounds
     return { x: primary.x, y: primary.y, width: primary.width, height: primary.height }
+  })
+
+  ipcMain.handle('script:start', async () => {
+    return startScripting()
+  })
+
+  ipcMain.handle('script:stop', async () => {
+    stopScripting()
+  })
+
+  ipcMain.handle('script:execute-file', async (_event, scriptPath: string) => {
+    return executeLuaScript(scriptPath)
+  })
+
+  ipcMain.handle('script:execute-code', async (_event, code: string) => {
+    return executeLuaCode(code)
+  })
+
+  ipcMain.handle('script:status', async () => {
+    return getScriptingStatus()
   })
 }
 

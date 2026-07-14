@@ -5,6 +5,7 @@ import { useConfigStore } from '@/stores/configStore'
 import { usePackStore } from '@/stores/packStore'
 import { usePopupStore } from '@/stores/popupStore'
 import { useElectronAPI } from '@/hooks/useElectronAPI'
+import { attachScriptListeners } from '@/stores/scriptStore'
 import { SplashScreen } from '@/components/SplashScreen'
 import { PopupContainer } from '@/components/PopupContainer'
 import { ConfigPanel } from '@/features/config/ConfigPanel'
@@ -122,6 +123,7 @@ export default function App() {
     electronAPI.onPopupClosed((id) => {
       usePopupStore.getState().removePopup(id)
     })
+    attachScriptListeners()
   }, [electronAPI])
 
   // --- Popup spawning loop ---
