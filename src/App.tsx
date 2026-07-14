@@ -4,6 +4,7 @@ import { useAppStore } from '@/stores/appStore'
 import { useConfigStore } from '@/stores/configStore'
 import { usePackStore } from '@/stores/packStore'
 import { usePopupStore } from '@/stores/popupStore'
+import { useCorruptionStore } from '@/stores/corruptionStore'
 import { useDiscordStore } from '@/stores/discordStore'
 import { useElectronAPI } from '@/hooks/useElectronAPI'
 import { attachScriptListeners } from '@/stores/scriptStore'
@@ -414,6 +415,122 @@ export default function App() {
   useEffect(() => {
     return () => { useDiscordStore.getState().destroyPresence() }
   }, [])
+
+  // --- Corruption runtime ---
+  // Initializes corruption on startup and manages trigger-based level progression.
+  // Timed: recursive setTimeout advancing level at cfg.corruptionTime intervals.
+  // Popup: subscribes to popup store, advances after cfg.corruptionPopups closed.
+  // Launch: advances once on startup based on launch count (FUTUREWORK: persist count).
+  // Script: level advanced externally via ew.progress_corruption().
+  //
+  // FUTUREWORK: Add corruption danger check dialog when full-perm mode is enabled.
+  // FUTUREWORK: Persist launch count via Electron IPC to userData.
+  const corruptionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const corruptionUnsubRef = useRef<(() => void) | null>(null)
+
+  useEffect(() => {
+    if (!running) {
+      if (corruptionTimerRef.current) {
+        clearTimeout(corruptionTimerRef.current)
+        corruptionTimerRef.current = null
+      }
+      return
+    }
+
+    const cfg = useConfigStore.getState()
+    if (!cfg.corruptionMode) return
+
+    const pack = usePackStore.getState().pack
+    if (!pack || pack.corruptionLevels.length === 0) return
+
+    const cs = useCorruptionStore.getState()
+
+    // Initialize corruption levels from pack if not already done
+    if (!cs.initialized) {
+      useCorruptionStore.getState().setCorruptionLevels(pack.corruptionLevels)
+      useCorruptionStore.getState().setTriggerType(cfg.corruptionTrigger as 'Timed' | 'Popup' | 'Launch' | 'Script')
+      useCorruptionStore.getState().setFadeType(cfg.corruptionFadeType as 'Normal' | 'Abrupt' | 'Glitch' | 'Ramp')
+      useCorruptionStore.getState().setMaxLevel(pack.corruptionLevels.length)
+
+      if (cfg.corruptionPurityMode) {
+        useCorruptionStore.getState().setLevel(pack.corruptionLevels.length)
+      } else {
+        useCorruptionStore.getState().setLevel(1)
+      }
+
+      useCorruptionStore.getState().applyLevelEffects()
+    }
+
+    // Apply config overrides from corruption level
+    const corruptionOverrides = useCorruptionStore.getState().configOverrides
+    if (Object.keys(corruptionOverrides).length > 0) {
+      useConfigStore.getState().updateConfig(corruptionOverrides)
+    }
+
+    const trigger = cfg.corruptionTrigger
+
+    if (trigger === 'Timed') {
+      // Convert minutes to ms; Python uses corruption_time directly in ms after s_to_ms
+      const intervalMs = cfg.corruptionTime * 60 * 1000
+
+      useCorruptionStore.getState().setCorruptionTimeStart(Date.now())
+
+      const scheduleNext = () => {
+        corruptionTimerRef.current = setTimeout(() => {
+          const { inPanicMode: panicked } = useAppStore.getState()
+          if (panicked) return
+
+          useCorruptionStore.getState().advanceLevel()
+
+          // Apply config overrides after level advance
+          const newOverrides = useCorruptionStore.getState().configOverrides
+          if (Object.keys(newOverrides).length > 0) {
+            useConfigStore.getState().updateConfig(newOverrides)
+          }
+
+          useCorruptionStore.getState().setCorruptionTimeStart(Date.now())
+          scheduleNext()
+        }, intervalMs)
+      }
+
+      scheduleNext()
+    } else if (trigger === 'Popup') {
+      const unsub = usePopupStore.subscribe((state, prev) => {
+        // Only count when popupCount increases (popup spawned)
+        if (state.popupCount > prev.popupCount) {
+          const cs = useCorruptionStore.getState()
+          cs.incrementPopupCount()
+
+          if (cs.corruptionPopupCount >= cfg.corruptionPopups) {
+            cs.advanceLevel()
+            cs.resetPopupCount()
+
+            const newOverrides = useCorruptionStore.getState().configOverrides
+            if (Object.keys(newOverrides).length > 0) {
+              useConfigStore.getState().updateConfig(newOverrides)
+            }
+          }
+        }
+      })
+
+      corruptionUnsubRef.current = unsub
+    } else if (trigger === 'Launch') {
+      // FUTUREWORK: Read persistent launch count from Electron IPC.
+      // For now, apply initial level effects only.
+      useCorruptionStore.getState().applyLevelEffects()
+    }
+
+    return () => {
+      if (corruptionTimerRef.current) {
+        clearTimeout(corruptionTimerRef.current)
+        corruptionTimerRef.current = null
+      }
+      if (corruptionUnsubRef.current) {
+        corruptionUnsubRef.current()
+        corruptionUnsubRef.current = null
+      }
+    }
+  }, [running])
 
   const handleSplashComplete = useCallback(() => {
     completeSplash()

@@ -182,6 +182,13 @@ export interface CorruptionTrigger {
   action: 'advance' | 'set_level'
 }
 
+export interface CorruptionLevelData {
+  addedMoods: string[]
+  removedMoods: string[]
+  wallpaper: string | null
+  config: Record<string, string | number>
+}
+
 /**
  * Full pack structure as loaded by the main process and passed to the renderer.
  * Media arrays contain absolute file paths. Hypno contains only .gif files.
@@ -190,6 +197,8 @@ export interface Pack {
   info: PackInfo
   index: PackIndex
   corruption: CorruptionConfig
+  /** Corruption levels loaded from corruption.json (moods, wallpapers, config per level). */
+  corruptionLevels: CorruptionLevelData[]
   /** Close button text for image/video popups (from index.json default.popupClose). */
   popupClose: string
   media: {

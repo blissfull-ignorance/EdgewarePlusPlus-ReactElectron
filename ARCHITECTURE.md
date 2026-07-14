@@ -237,17 +237,65 @@ Each popup is a standalone Electron BrowserWindow (not an in-app overlay).
 
 ---
 
-## Test Architecture
+## Corruption Runtime
 
-54 tests across 5 test files, all passing:
+The corruption system progressively advances through pack-defined levels, affecting mood lists, config overrides, and (future) wallpaper cycling.
+
+### Data Flow
+
+```
+Pack corruption.json ──► electron/ipc/pack.ts (loadCorruption)
+                              │
+                              └─► corruptionStore.corruptionLevels
+                                    │
+App.tsx corruption effect (trigger-based) ──────┘
+  ├─ Timed: recursive setTimeout at cfg.corruptionTime intervals
+  ├─ Popup: subscribe to popupStore, count popups, advance at threshold
+  ├─ Launch: advance once on startup (FUTUREWORK: persist count)
+  └─ Script: advance via ew.progress_corruption() (already wired)
+      │
+      ├─ corruptionStore.advanceLevel() → nextCorruptionLevel()
+      ├─ corruptionStore.applyLevelEffects()
+      │   ├─ resolveActiveMoods() → moodStore
+      │   └─ getConfigOverrides() → configStore.updateConfig()
+      └─ FUTUREWORK: electronAPI.setWallpaper() for wallpaper cycle
+```
+
+### Key Files
+
+| File | Role |
+|------|------|
+| `src/features/corruption/corruption.ts` | Pure functions: level progression, mood computation, fade, config overrides, CORRUPTION_BLOCK |
+| `src/features/corruption/corruption.test.ts` | 44 unit tests for all pure functions |
+| `src/stores/corruptionStore.ts` | Zustand store: level, moods, configOverrides, trigger state, applyLevelEffects |
+| `src/App.tsx` | Corruption effect: trigger initialization, timed/popup/launch handlers |
+| `electron/ipc/pack.ts` | Loads corruption.json from pack, parses moods/wallpapers/config per level |
+| `src/features/config/ConfigPanel.tsx` | Corruption tab with trigger/fade selectors, level status display |
+| `src/types/pack.ts` | CorruptionLevelData type (addedMoods, removedMoods, wallpaper, config) |
+
+### Corruption Level Data (corruption.json)
+
+Packs define corruption levels via `corruption.json`:
+- `moods`: Per-level add/remove mood lists (applied cumulatively)
+- `wallpapers`: Per-level wallpaper paths (with `default` fallback)
+- `config`: Per-level config overrides (respecting CORRUPTION_BLOCK)
+
+### CORRUPTION_BLOCK
+
+Config keys that corruption full-permission mode cannot override: `packPath`, `themeNoConfig`, `showLoadingFlair`, `runOnSaveQuit`, `desktopIcons`, `safeMode`, `messageOff`, `globalPanicButton`, `presetsDanger`, `corruptionMode`, `corruptionFullPerm`, `corruptionDevMode`, `disabledMonitors`, `panicButton`, `panicDisabled`, `start_on_logon`, `toggleHibSkip`, `toggleMoodSet`, `toggleInternet`, `mpvSubprocess`.
+
+### Test Architecture
+
+147 tests across 6 test files, all passing:
 
 | Test File | Tests | What It Tests |
 |-----------|-------|--------------|
-| `movement.test.ts` | 23 | Unit: `computeMove`, `shouldMove`, `randomDirection`, `tickPopups` |
+| `movement.test.ts` | 35 | Unit: `computeMove`, `shouldMove`, `randomDirection`, `tickPopups` |
 | `movement.runtime.test.ts` | 6 | Integration: real Zustand stores, addPopup → tickPopups → updatePopup |
-| `movement.flow.test.ts` | 8 | E2E: config → spawn → tick loop → store updates (mirrors App.tsx) |
-| `hypno.test.ts` | 8 | Pack categorization: gif→hypno, mp4/webm→not hypno |
-| `hypno.runtime.test.ts` | 9 | Spawn decision: canHaveHypno, subliminalsChance/Alpha gating |
+| `movement.flow.test.ts` | 17 | E2E: config → spawn → tick loop → store updates (mirrors App.tsx) |
+| `hypno.test.ts` | 11 | Pack categorization: gif→hypno, mp4/webm→not hypno |
+| `hypno.runtime.test.ts` | 34 | Spawn decision: canHaveHypno, subliminalsChance/Alpha gating |
+| `corruption.test.ts` | 44 | Unit: level progression, mood computation, fade, config overrides, progress |
 
 Run with: `npm run test` (Vitest)
 

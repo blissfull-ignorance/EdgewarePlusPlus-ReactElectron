@@ -130,6 +130,18 @@ export interface PackAsset {
 export interface ScannedPack {
   info: PackInfo
   index: PackIndex
+  corruption: {
+    enabled: boolean
+    level: number
+    maxLevel: number
+    triggers: never[]
+  }
+  corruptionLevels: Array<{
+    addedMoods: string[]
+    removedMoods: string[]
+    wallpaper: string | null
+    config: Record<string, string | number>
+  }>
   popupClose: string
   media: {
     images: string[]
@@ -169,8 +181,15 @@ export function loadPackFromDirectory(packPath: string): ScannedPack {
   const scriptVersion = detectScriptVersion(script)
 
   const popupClose = loadPopupClose(index)
+  const corruptionLevels = loadCorruption(path.join(packPath, 'corruption.json'))
+  const corruption = {
+    enabled: corruptionLevels.length > 0,
+    level: 0,
+    maxLevel: corruptionLevels.length,
+    triggers: [] as never[],
+  }
 
-  return { info, index, popupClose, media, texts, script, scriptVersion }
+  return { info, index, corruption, corruptionLevels, popupClose, media, texts, script, scriptVersion }
 }
 
 /** Extracts a .zip pack to a temp directory and returns the extraction path. */
@@ -230,4 +249,45 @@ function detectScriptVersion(script: string | null): 'v0' | 'v1' | null {
   if (script.includes('require("edgeware_v1")')) return 'v1'
   if (script.includes('require("edgeware_v0")')) return 'v0'
   return null
+}
+
+interface CorruptionLevelRaw {
+  add?: string[]
+  remove?: string[]
+}
+
+interface CorruptionJson {
+  moods?: Record<string, CorruptionLevelRaw>
+  wallpapers?: Record<string, string>
+  config?: Record<string, Record<string, string | number>>
+}
+
+function loadCorruption(filePath: string): Array<{
+  addedMoods: string[]
+  removedMoods: string[]
+  wallpaper: string | null
+  config: Record<string, string | number>
+}> {
+  try {
+    if (!fs.existsSync(filePath)) return []
+    const raw: CorruptionJson = JSON.parse(fs.readFileSync(filePath, 'utf-8'))
+    if (!raw.moods) return []
+
+    const levelNumbers = Object.keys(raw.moods)
+      .map(Number)
+      .filter((n) => !isNaN(n))
+      .sort((a, b) => a - b)
+
+    return levelNumbers.map((num) => {
+      const moodData = raw.moods![String(num)] || {}
+      return {
+        addedMoods: Array.isArray(moodData.add) ? moodData.add : [],
+        removedMoods: Array.isArray(moodData.remove) ? moodData.remove : [],
+        wallpaper: raw.wallpapers?.[String(num)] || raw.wallpapers?.default || null,
+        config: raw.config?.[String(num)] || {},
+      }
+    })
+  } catch {
+    return []
+  }
 }

@@ -2,7 +2,7 @@
 
 ## Current Status
 
-**Last Session:** Feature & config parity audit — compared all 97 Python config options and all features against the TS implementation; created FEATURE_PARITY_AUDIT.md
+**Last Session:** Implement corruption runtime — level progression, timed/popup/launch triggers, mood cycling, config overrides, pack corruption.json loading
 
 **Date:** July 14, 2026
 
@@ -27,13 +27,14 @@
 - **Config Panel** — full settings UI with tabs (General, Popups, System, Theme, Pack, Hibernate)
 - **Prompt modal** — Mantine modal with Levenshtein distance validation
 - **Hibernate panel** — hibernate activation with type selection
-- **103 Vitest tests** — movement (35) + movement.runtime (6) + movement.flow (17) + hypno (11) + hypno.runtime (34), all passing
+- **147 Vitest tests** — movement (35) + movement.runtime (6) + movement.flow (17) + hypno (11) + hypno.runtime (34) + corruption (44), all passing
 - **Fengari scripting wired** — Lua VM lifecycle, IPC bridge (script:start/stop/execute), scriptStore dispatches Lua callbacks to popupStore, corruptionStore, moodStore, promptStore, and appStore
 - **Notifications** — `electron.Notification` API wired via IPC, preload exposes `showNotification`, Lua `sendNotification` triggers native desktop notification
 - **Discord presence** — `discord-rpc` integrated via IPC, preload, Zustand store; updates on popup count/pack changes; respects `showDiscord` config toggle; destroys on panic/quit
 - **Mitosis mode** — spawn-on-close logic with `mitosisChance` (0–100%) and `mitosisStrength` (max popups per close); `mitosisSpawned` flag prevents infinite loops; config toggle + slider in Modes tab
 - **Web open** — `shell.openExternal()` wired via IPC (`web:openExternal`), preload exposes `openExternal(url)`, opens URLs in default browser
 - **Feature parity audit** — All 97 Python config options verified present; 11 runtime gaps identified and documented in FEATURE_PARITY_AUDIT.md
+- **Corruption runtime** — Level progression with timed/popup/launch/script triggers; mood cycling via cumulative add/remove; config overrides per level (respecting CORRUPTION_BLOCK); pack corruption.json loading; ConfigPanel shows corruption level and override count; 44 unit tests
 
 ### Known Issues
 
@@ -42,6 +43,7 @@
 ### Recent Commits
 
 ```
+feat: implement corruption runtime with level progression, mood cycling, and config overrides
 docs: feature parity audit and comment improvements
 899eab0 test: add hypno decision logic, large popup edge cases, mitosis close flow, and stress tests
 test: improve test viability, remove 7 dead tests, add 18 new meaningful tests
@@ -68,7 +70,6 @@ f9477ae fix: restrict video formats to Chromium-supported codecs
 
 ### What's NOT Done
 
-- **Corruption runtime** — UI controls exist but no level progression, mood cycling, wallpaper/theme cycling, or config overrides (see FEATURE_PARITY_AUDIT.md §2.2)
 - **Hibernate runtime** — UI controls exist but no activity loop scheduling or type behaviors (Original/Spaced/Glitch/Ramp/Pump-Scare/Chaos)
 - **Panic lockout runtime** — Config exists but no timer, safeword validation dialog, or lockout state tracking
 - **Wallpaper rotation** — Config exists but no timer-based rotation logic
@@ -89,7 +90,7 @@ f9477ae fix: restrict video formats to Chromium-supported codecs
 ```bash
 npm run check            # TypeScript type checking (tsc --noEmit)
 npm run lint             # ESLint
-npm run test             # Vitest (103 tests)
+npm run test             # Vitest (147 tests)
 npm run test:e2e         # Playwright Electron integration tests (6 tests)
 npm run dev              # Vite dev server
 npm run electron:dev     # Dev with Electron
@@ -138,6 +139,9 @@ EdgewarePlusPlus/
 │   │   └── ...            # corruptionStore, hibernateStore, moodStore, etc.
 │   ├── features/
 │   │   ├── config/ConfigPanel.tsx   # Full settings UI (tabs: General, Popups, System, Theme, Pack, Hibernate)
+│   │   ├── corruption/
+│   │   │   ├── corruption.ts        # Pure functions: level progression, mood computation, fade, config overrides
+│   │   │   └── corruption.test.ts   # 44 unit tests for corruption pure functions
 │   │   ├── popup/
 │   │   │   ├── movement.ts          # Pure functions: computeMove, tickPopups, shouldMove, randomDirection
 │   │   │   ├── debug.ts             # Movement event logger
@@ -169,15 +173,19 @@ EdgewarePlusPlus/
 
 ### Next Session Priority Order
 
-1. **HIGH**: Implement corruption runtime (level progression, timed/popup/launch triggers, mood cycling, config overrides)
-2. **HIGH**: Implement hibernate runtime (activity loop scheduling, type behaviors, wallpaper reset)
-3. **MEDIUM**: Implement panic lockout runtime (timer, safeword validation, lockout state)
-4. **MEDIUM**: Implement wallpaper rotation (timer-based rotation with variance)
-5. **MEDIUM**: Implement popup overlap avoidance positioning
-6. **LOW**: Implement popup timeout (auto-close timer)
-7. **LOW**: Implement single mode weighted random spawn selection
-8. **LOW**: Cross-platform verification (Windows, Linux)
-9. **LOW**: Tray icon assets (.icns, .ico, .png)
+1. **HIGH**: Implement hibernate runtime (activity loop scheduling, type behaviors, wallpaper reset)
+2. **MEDIUM**: Implement panic lockout runtime (timer, safeword validation, lockout state)
+3. **MEDIUM**: Implement wallpaper rotation (timer-based rotation with variance)
+4. **MEDIUM**: Implement popup overlap avoidance positioning
+5. **LOW**: Implement popup timeout (auto-close timer)
+6. **LOW**: Implement single mode weighted random spawn selection
+7. **LOW**: Add mood-based media filtering (requires pack loader mood tagging)
+8. **LOW**: Add corruption danger check dialog (warns when full-perm enables dangerous settings)
+9. **LOW**: Add launch count persistence for corruption (via Electron IPC)
+10. **LOW**: Cross-platform verification (Windows, Linux)
+11. **LOW**: Tray icon assets (.icns, .ico, .png)
+10. **MEDIUM**: Based on FEATURE_PARITY_AUDIT.md, ARCHITECTURE.md and general project analysis, overhaul the README.md completely. Make sure the README.md explains a transition from the original project to the cross platform react project, include some reasoning behind it. Make sure to include the previous information and expand.
+
 
 ### Important Notes
 

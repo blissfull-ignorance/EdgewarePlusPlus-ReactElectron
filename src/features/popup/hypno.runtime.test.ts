@@ -13,6 +13,7 @@ function makePack(overrides: Partial<Pack['media']> = {}): Pack {
     info: { name: 'Test', version: '1.0', author: 'Test', description: '' },
     index: {},
     corruption: { enabled: false, level: 0, maxLevel: 0, triggers: [] },
+    corruptionLevels: [],
     popupClose: 'Close',
     media: {
       images: ['/pack/img/a.png', '/pack/img/b.gif'],

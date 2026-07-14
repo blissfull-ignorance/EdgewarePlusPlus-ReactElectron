@@ -5,6 +5,7 @@ import {
 } from '@mantine/core'
 import { useConfigStore } from '@/stores/configStore'
 import { useAppStore } from '@/stores/appStore'
+import { useCorruptionStore } from '@/stores/corruptionStore'
 import { usePackStore } from '@/stores/packStore'
 import { useElectronAPI } from '@/hooks/useElectronAPI'
 import type { Pack } from '@/types/pack'
@@ -56,6 +57,8 @@ export function ConfigPanel() {
   const config = useConfigStore()
   const { inPanicMode, clearPanic, triggerPanic, running, setRunning } = useAppStore()
   const packStore = usePackStore()
+  const corruptionOverrides = useCorruptionStore((s) => s.configOverrides)
+  const corruptionLevel = useCorruptionStore((s) => s.level)
   const electronAPI = useElectronAPI()
   const [browsing, setBrowsing] = useState(false)
 
@@ -446,6 +449,15 @@ export function ConfigPanel() {
             />
             {config.corruptionMode && (
               <>
+                {corruptionLevel > 0 && (
+                  <Alert color="grape" title={`Corruption Level ${corruptionLevel}`} variant="light">
+                    <Text size="sm">
+                      {Object.keys(corruptionOverrides).length > 0
+                        ? `Overriding ${Object.keys(corruptionOverrides).length} config value(s)`
+                        : 'No config overrides active'}
+                    </Text>
+                  </Alert>
+                )}
                 <Select label="Trigger Type" data={corruptionTriggerOptions} value={config.corruptionTrigger}
                   onChange={(v) => config.updateConfig({ corruptionTrigger: v || 'Timed' })}
                 />
