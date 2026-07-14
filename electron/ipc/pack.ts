@@ -6,7 +6,7 @@ import AdmZip from 'adm-zip'
 const IMAGE_EXTS = new Set(['.png', '.jpg', '.jpeg', '.gif', '.bmp', '.webp'])
 const VIDEO_EXTS = new Set(['.mp4', '.webm', '.mov'])
 const AUDIO_EXTS = new Set(['.mp3', '.wav', '.ogg', '.flac', '.m4a', '.aac'])
-const HYPN_EXTS = new Set(['.gif', '.mp4', '.webm'])
+const HYPN_EXTS = new Set(['.gif'])
 
 function scanDirRecursive(dir: string): string[] {
   const results: string[] = []
@@ -27,7 +27,7 @@ function scanDirRecursive(dir: string): string[] {
   return results
 }
 
-function categorizeByExt(files: string[]): {
+export function categorizeByExt(files: string[]): {
   images: string[]
   videos: string[]
   audio: string[]
@@ -42,13 +42,13 @@ function categorizeByExt(files: string[]): {
     const ext = path.extname(f).toLowerCase()
     if (IMAGE_EXTS.has(ext)) {
       images.push(f)
-      if (HYPN_EXTS.has(ext)) {
-        hypno.push(f)
-      }
     } else if (VIDEO_EXTS.has(ext)) {
       videos.push(f)
     } else if (AUDIO_EXTS.has(ext)) {
       audio.push(f)
+    }
+    if (HYPN_EXTS.has(ext)) {
+      hypno.push(f)
     }
   }
 

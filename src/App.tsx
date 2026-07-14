@@ -42,6 +42,13 @@ function roll(percent: number): boolean {
   return Math.random() * 100 < percent
 }
 
+const STATIC_IMG_EXTS = new Set(['.png', '.jpg', '.jpeg', '.bmp', '.webp'])
+
+function extOf(filePath: string): string {
+  const i = filePath.lastIndexOf('.')
+  return i >= 0 ? filePath.slice(i).toLowerCase() : ''
+}
+
 function pickDenialFilter(): string {
   const filters = [
     `blur(${randomInt(1, 5)}px)`,
@@ -143,6 +150,18 @@ export default function App() {
         const y = randomInt(0, Math.max(0, bounds.height - h))
 
         if (electronAPI) {
+          const mediaExt = extOf(path)
+          const isStaticImage = STATIC_IMG_EXTS.has(mediaExt)
+          const hypnoMediaPath = isStaticImage && roll(cfg.subliminalsChance) && pack.media.hypno.length > 0
+            ? pickRandom(pack.media.hypno)
+            : undefined
+          console.log('[spawn:hypno]', {
+            hypnoMediaPath: hypnoMediaPath || '(none)',
+            isStaticImage,
+            subliminalsChance: cfg.subliminalsChance,
+            hypnoPoolSize: pack.media.hypno.length,
+            opacity: cfg.subliminalsAlpha,
+          })
           electronAPI.createPopup({
             mediaPath: path,
             type: isVideo ? 'video' : 'image',
@@ -154,9 +173,7 @@ export default function App() {
             clickthrough: cfg.clickthroughPopups,
             clicksToClose: cfg.buttonless ? 999 : 1,
             denialFilter: roll(cfg.denialChance) ? pickDenialFilter() : undefined,
-            hypnoMediaPath: roll(cfg.subliminalsChance) && pack.media.hypno.length > 0
-              ? pickRandom(pack.media.hypno)
-              : undefined,
+            hypnoMediaPath,
             hypnoOpacity: cfg.subliminalsAlpha,
           }).then((popupId) => {
             const dir = randomDirection()
