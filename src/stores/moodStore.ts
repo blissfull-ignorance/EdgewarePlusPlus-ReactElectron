@@ -1,3 +1,11 @@
+/**
+ * Mood state store — tracks available and active moods for corruption mode.
+ *
+ * DISCUSSION: The Python version derives available moods dynamically from the
+ * pack's corruption levels. This store hardcodes a default list. Consider
+ * populating availableMoods from the loaded pack's corruption config.
+ */
+
 import { create } from 'zustand'
 
 export interface MoodState {

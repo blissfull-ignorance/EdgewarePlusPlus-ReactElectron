@@ -9,10 +9,15 @@
  *   Pack → loaded by pack.ts (main), stored in packStore (renderer)
  *   Pack.media.hypno → used by spawn tick for overlay selection
  *
- * FUTUREWORK: Many Config fields are legacy from the Python version and are
- * not yet wired to the React UI. Fields like `fill`, `replace`, `webMod`,
- * `audioMod`, etc. are defined here but have no corresponding ConfigPanel
- * controls. Consider pruning unused fields or marking them as deprecated.
+ * FUTUREWORK: Many Config fields are ported from the Python version and have
+ * UI controls but lack runtime implementation. Notable gaps:
+ *   - Corruption: no level progression, mood cycling, or config overrides
+ *   - Hibernate: no activity loop scheduling or type behaviors
+ *   - Wallpaper rotation: no timer logic
+ *   - Panic lockout: no safeword validation
+ *   - Single mode: no weighted random type selection
+ *   - Booru download: no download logic
+ * See FEATURE_PARITY_AUDIT.md for the full gap list.
  */
 
 export interface Config {

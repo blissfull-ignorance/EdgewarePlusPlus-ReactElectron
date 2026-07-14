@@ -1,3 +1,14 @@
+/**
+ * Corruption state store — tracks the current corruption level and active moods.
+ *
+ * FUTUREWORK: This store holds state only. The Python version has full runtime
+ * logic for corruption level progression (timed/popup/launch/script triggers),
+ * mood management, wallpaper cycling, theme cycling, and config overrides per
+ * level. None of that runtime logic is implemented yet. See:
+ *   - edgeware/src/features/corruption.py (timed, popup, launch, apply_corruption_level)
+ *   - FEATURE_PARITY_AUDIT.md §2.2 for the full gap list.
+ */
+
 import { create } from 'zustand'
 
 export interface CorruptionState {

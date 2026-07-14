@@ -2,7 +2,7 @@
 
 ## Current Status
 
-**Last Session:** Test improvement — added 38 new tests (hypno decision logic, large popup edge cases, mitosis close flow, stress tests)
+**Last Session:** Feature & config parity audit — compared all 97 Python config options and all features against the TS implementation; created FEATURE_PARITY_AUDIT.md
 
 **Date:** July 14, 2026
 
@@ -33,6 +33,7 @@
 - **Discord presence** — `discord-rpc` integrated via IPC, preload, Zustand store; updates on popup count/pack changes; respects `showDiscord` config toggle; destroys on panic/quit
 - **Mitosis mode** — spawn-on-close logic with `mitosisChance` (0–100%) and `mitosisStrength` (max popups per close); `mitosisSpawned` flag prevents infinite loops; config toggle + slider in Modes tab
 - **Web open** — `shell.openExternal()` wired via IPC (`web:openExternal`), preload exposes `openExternal(url)`, opens URLs in default browser
+- **Feature parity audit** — All 97 Python config options verified present; 11 runtime gaps identified and documented in FEATURE_PARITY_AUDIT.md
 
 ### Known Issues
 
@@ -41,6 +42,7 @@
 ### Recent Commits
 
 ```
+docs: feature parity audit and comment improvements
 899eab0 test: add hypno decision logic, large popup edge cases, mitosis close flow, and stress tests
 test: improve test viability, remove 7 dead tests, add 18 new meaningful tests
 feat: add close button with pack-defined text to popups
@@ -66,6 +68,19 @@ f9477ae fix: restrict video formats to Chromium-supported codecs
 
 ### What's NOT Done
 
+- **Corruption runtime** — UI controls exist but no level progression, mood cycling, wallpaper/theme cycling, or config overrides (see FEATURE_PARITY_AUDIT.md §2.2)
+- **Hibernate runtime** — UI controls exist but no activity loop scheduling or type behaviors (Original/Spaced/Glitch/Ramp/Pump-Scare/Chaos)
+- **Panic lockout runtime** — Config exists but no timer, safeword validation dialog, or lockout state tracking
+- **Wallpaper rotation** — Config exists but no timer-based rotation logic
+- **Popup overlap avoidance** — Python uses grid-based weighting; TS uses random positioning
+- **Lowkey corner positioning** — Config exists but no corner-based positioning logic
+- **Popup timeout (auto-close)** — Config exists but no auto-close timer on popups
+- **Single mode spawn logic** — Config exists but spawn tick doesn't use weighted random selection
+- **Booru download** — Config exists but no download logic wired
+- **Run at startup** — Config exists but no OS-level auto-start registration
+- **Media blacklist** — Not ported (Alt+click to blacklist media)
+- **Danger warnings** — Python shows danger dialogs for extreme/major settings
+- **Config validation** — Python validates against voluptuous schemas; TS has no runtime validation
 - **Cross-platform verification** — Only tested on macOS
 - **Tray icon assets** — No .icns/.ico/.png icons in repo
 
@@ -154,9 +169,15 @@ EdgewarePlusPlus/
 
 ### Next Session Priority Order
 
-1. **LOW**: Compare the former edgeware python projects features and config options to the current state of the implementation: Are all features ported? Are all tests ported?
-2. **LOW**: Cross-platform verification (Windows, Linux)
-3. **LOW**: Tray icon assets (.icns, .ico, .png)
+1. **HIGH**: Implement corruption runtime (level progression, timed/popup/launch triggers, mood cycling, config overrides)
+2. **HIGH**: Implement hibernate runtime (activity loop scheduling, type behaviors, wallpaper reset)
+3. **MEDIUM**: Implement panic lockout runtime (timer, safeword validation, lockout state)
+4. **MEDIUM**: Implement wallpaper rotation (timer-based rotation with variance)
+5. **MEDIUM**: Implement popup overlap avoidance positioning
+6. **LOW**: Implement popup timeout (auto-close timer)
+7. **LOW**: Implement single mode weighted random spawn selection
+8. **LOW**: Cross-platform verification (Windows, Linux)
+9. **LOW**: Tray icon assets (.icns, .ico, .png)
 
 ### Important Notes
 
