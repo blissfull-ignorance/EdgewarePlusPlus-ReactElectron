@@ -2,7 +2,7 @@
 
 ## Current Status
 
-**Last Session:** Documentation update + hypno overlay rules + maxImages/maxVideos split
+**Last Session:** Fix ConfigType drift (sync maxImages + popupScale)
 
 **Date:** July 14, 2026
 
@@ -31,19 +31,18 @@
 
 ### Known Issues
 
-1. **Config type drift** — `electron/ipc/config.ts:ConfigData` is missing `maxImages` field (only has `maxVideos`). The renderer configStore has it, but the main process config type doesn't. Needs syncing.
+1. **Fengari not wired** — Engine files exist and compile (`electron/scripting/`), but are not connected to the React renderer yet. Lua scripts execute but can't trigger React state changes.
 
-2. **Fengari not wired** — Engine files exist and compile (`electron/scripting/`), but are not connected to the React renderer yet. Lua scripts execute but can't trigger React state changes.
+2. **Tray icon missing** — No icon assets in repo, shows default Electron icon.
 
-3. **Tray icon missing** — No icon assets in repo, shows default Electron icon.
+3. **No Playwright tests** — Only Vitest unit/integration tests. No browser-level integration tests.
 
-4. **No Playwright tests** — Only Vitest unit/integration tests. No browser-level integration tests.
-
-5. **Config Panel missing controls** — Some config fields (e.g., `maxAudio`, `videoVolume`, `notificationChance`) have no UI controls yet.
+4. **Config Panel missing controls** — Some config fields (e.g., `maxAudio`, `videoVolume`, `notificationChance`) have no UI controls yet.
 
 ### Recent Commits
 
 ```
+7e0251b fix: sync ConfigData type with renderer Config (add maxImages, popupScale)
 c594a48 docs: add comprehensive comments with markers to all code files
 5b6a031 docs: update ARCHITECTURE.md with current feature state
 54fb42b feat: split maxVideos into maxImages + maxVideos
@@ -89,7 +88,7 @@ EdgewarePlusPlus/
 │   ├── preload.ts         # contextBridge API
 │   ├── popup.html         # Popup window HTML/CSS/JS
 │   ├── ipc/               # IPC handlers
-│   │   ├── config.ts      # Config load/save (MISSING maxImages field)
+│   │   ├── config.ts      # Config load/save
 │   │   ├── pack.ts        # Pack scanning, categorizeByExt, zip extraction
 │   │   ├── popup.ts       # BrowserWindow creation, movement
 │   │   ├── keyboard.ts    # Global shortcuts
@@ -143,15 +142,14 @@ EdgewarePlusPlus/
 
 ### Next Session Priority Order
 
-1. **FIX**: Sync `electron/ipc/config.ts:ConfigData` with `src/types/pack.ts:Config` — add `maxImages` field and any other missing fields
-2. **HIGH**: Wire Fengari scripting engine to React renderer via IPC
-3. **HIGH**: Add missing ConfigPanel controls (videoVolume, notificationChance, maxAudio, etc.)
-4. **MEDIUM**: Notifications via Electron API
-5. **MEDIUM**: Discord presence via discord-rpc
-6. **MEDIUM**: Mitosis mode logic (spawn popup when count hits 0)
-7. **LOW**: Playwright integration tests
-8. **LOW**: Cross-platform verification (Windows, Linux)
-9. **LOW**: Tray icon assets (.icns, .ico, .png)
+1. **HIGH**: Wire Fengari scripting engine to React renderer via IPC
+2. **HIGH**: Add missing ConfigPanel controls (videoVolume, notificationChance, maxAudio, etc.)
+3. **MEDIUM**: Notifications via Electron API
+4. **MEDIUM**: Discord presence via discord-rpc
+5. **MEDIUM**: Mitosis mode logic (spawn popup when count hits 0)
+6. **LOW**: Playwright integration tests
+7. **LOW**: Cross-platform verification (Windows, Linux)
+8. **LOW**: Tray icon assets (.icns, .ico, .png)
 
 ### Important Notes
 
