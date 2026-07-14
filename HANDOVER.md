@@ -2,7 +2,7 @@
 
 ## Current Status
 
-**Last Session:** Test assessment and improvement — removed 7 dead tests, added 18 new meaningful tests
+**Last Session:** Test improvement — added 38 new tests (hypno decision logic, large popup edge cases, mitosis close flow, stress tests)
 
 **Date:** July 14, 2026
 
@@ -27,7 +27,7 @@
 - **Config Panel** — full settings UI with tabs (General, Popups, System, Theme, Pack, Hibernate)
 - **Prompt modal** — Mantine modal with Levenshtein distance validation
 - **Hibernate panel** — hibernate activation with type selection
-- **65 Vitest tests** — movement (27) + movement.runtime (6) + movement.flow (8) + hypno (11) + hypno.runtime (13), all passing
+- **103 Vitest tests** — movement (35) + movement.runtime (6) + movement.flow (17) + hypno (11) + hypno.runtime (34), all passing
 - **Fengari scripting wired** — Lua VM lifecycle, IPC bridge (script:start/stop/execute), scriptStore dispatches Lua callbacks to popupStore, corruptionStore, moodStore, promptStore, and appStore
 - **Notifications** — `electron.Notification` API wired via IPC, preload exposes `showNotification`, Lua `sendNotification` triggers native desktop notification
 - **Discord presence** — `discord-rpc` integrated via IPC, preload, Zustand store; updates on popup count/pack changes; respects `showDiscord` config toggle; destroys on panic/quit
@@ -41,6 +41,7 @@
 ### Recent Commits
 
 ```
+899eab0 test: add hypno decision logic, large popup edge cases, mitosis close flow, and stress tests
 test: improve test viability, remove 7 dead tests, add 18 new meaningful tests
 feat: add close button with pack-defined text to popups
 fix: resolve Playwright/Vitest conflict and verify e2e tests
@@ -73,7 +74,7 @@ f9477ae fix: restrict video formats to Chromium-supported codecs
 ```bash
 npm run check            # TypeScript type checking (tsc --noEmit)
 npm run lint             # ESLint
-npm run test             # Vitest (65 tests)
+npm run test             # Vitest (103 tests)
 npm run test:e2e         # Playwright Electron integration tests (6 tests)
 npm run dev              # Vite dev server
 npm run electron:dev     # Dev with Electron
@@ -130,7 +131,7 @@ EdgewarePlusPlus/
 │   │   │   ├── AudioPopup.tsx        # Audio popup component
 │   │   │   ├── HypnoOverlay.tsx      # Hypno overlay component
 │   │   │   ├── SubliminalPopup.tsx   # Subliminal text overlay
-│   │   │   └── *.test.ts            # 65 tests across 5 files
+│   │   │   └── *.test.ts            # 103 tests across 5 files
 │   │   ├── prompt/PromptModal.tsx    # Mantine modal with Levenshtein
 │   │   └── hibernate/HibernatePanel.tsx
 │   ├── components/
@@ -153,14 +154,9 @@ EdgewarePlusPlus/
 
 ### Next Session Priority Order
 
-1. **LOW**: Tests needing further improvement:
-   - `hypno.runtime.test.ts`: Add tests for actual hypno overlay spawn decision logic in React components (currently only store accessors are tested, not the component-level decision)
-   - `movement.test.ts`: Add edge case tests for very large popup dimensions relative to screen size
-   - `movement.flow.test.ts`: Add test for popup removal mid-simulation (mitosis close flow)
-   - All test files: Consider adding stress tests for rapid add/remove cycles
-2. **LOW**: Compare the former edgeware python projects features and config options to the current state of the implementation: Are all features ported? Are all tests ported?
-3. **LOW**: Cross-platform verification (Windows, Linux)
-4. **LOW**: Tray icon assets (.icns, .ico, .png)
+1. **LOW**: Compare the former edgeware python projects features and config options to the current state of the implementation: Are all features ported? Are all tests ported?
+2. **LOW**: Cross-platform verification (Windows, Linux)
+3. **LOW**: Tray icon assets (.icns, .ico, .png)
 
 ### Important Notes
 
