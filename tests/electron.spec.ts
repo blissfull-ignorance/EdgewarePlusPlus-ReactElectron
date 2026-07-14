@@ -79,9 +79,9 @@ test.describe('App launch and splash', () => {
   test('config panel shows tabs', async () => {
     await expect(mainWindow.locator('text=Edgeware++ Configuration')).toBeVisible({ timeout: 15_000 })
 
-    await expect(mainWindow.locator('button:has-text("Start")')).toBeVisible()
-    await expect(mainWindow.locator('button:has-text("Popup Types")')).toBeVisible()
-    await expect(mainWindow.locator('button:has-text("Pack")')).toBeVisible()
+    await expect(mainWindow.getByRole('tab', { name: 'Start' })).toBeVisible()
+    await expect(mainWindow.getByRole('tab', { name: 'Popup Types' })).toBeVisible()
+    await expect(mainWindow.getByRole('tab', { name: 'Pack' })).toBeVisible()
   })
 })
 
@@ -105,9 +105,9 @@ test.describe('Popup windows', () => {
 
     expect(popupId).toBeGreaterThan(0)
 
-    const allWindows = electronApp.windows()
-    expect(allWindows.length).toBeGreaterThanOrEqual(2)
+    await expect.poll(() => electronApp.windows().length, 'popup window should appear').toBeGreaterThanOrEqual(2)
 
+    const allWindows = electronApp.windows()
     const popupWindow = allWindows.find(w => w !== mainWindow)!
     await expect(popupWindow.locator('#header-title')).toBeVisible({ timeout: 5_000 })
 
@@ -176,7 +176,7 @@ test.describe('Popup windows', () => {
     })
 
     expect(ids[0]).not.toBe(ids[1])
-    expect(electronApp.windows().length).toBe(3)
+    await expect.poll(() => electronApp.windows().length, 'two popup windows should appear').toBe(3)
 
     await mainWindow.evaluate(async (ids) => {
       for (const id of ids) {
@@ -217,7 +217,7 @@ test.describe('Panic mode', () => {
       })
     })
 
-    expect(electronApp.windows().length).toBe(3)
+    await expect.poll(() => electronApp.windows().length, 'two popup windows should appear before panic').toBe(3)
 
     await mainWindow.evaluate(async () => {
       await window.electronAPI!.sendPanic()

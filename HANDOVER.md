@@ -2,7 +2,7 @@
 
 ## Current Status
 
-**Last Session:** preload.cjs synced with preload.ts — renderer crash resolved
+**Last Session:** Playwright tests fixed — selector precision, window detection timing, and Vitest exclusion resolved
 
 **Date:** July 14, 2026
 
@@ -38,11 +38,10 @@
 
 1. **Tray icon missing** — No icon assets in repo, shows default Electron icon.
 
-2. **Playwright tests not runnable** — `tests/electron.spec.ts` uses Playwright Test but is picked up by Vitest (which rejects `test.beforeAll()`). Requires either a separate Playwright config that excludes it from Vitest, or renaming the test file. Also requires Electron + Vite dev server to be running.
-
 ### Recent Commits
 
 ```
+fix: resolve Playwright/Vitest conflict and verify e2e tests
 89637b0 fix: sync preload.cjs with preload.ts to resolve renderer crash
 feat: wire shell.openExternal via IPC for web links
 fd71bb9 feat: implement mitosis mode spawn-on-close logic
@@ -64,7 +63,6 @@ f9477ae fix: restrict video formats to Chromium-supported codecs
 
 ### What's NOT Done
 
-- **Playwright tests runnable** — Tests written but blocked by Playwright/Vitest conflict (electron.spec.ts picked up by Vitest)
 - **Cross-platform verification** — Only tested on macOS
 - **Tray icon assets** — No .icns/.ico/.png icons in repo
 
@@ -74,7 +72,7 @@ f9477ae fix: restrict video formats to Chromium-supported codecs
 npm run check            # TypeScript type checking (tsc --noEmit)
 npm run lint             # ESLint
 npm run test             # Vitest (54 tests)
-npm run test:e2e         # Playwright Electron integration tests (NOT RUNNABLE — see Known Issues)
+npm run test:e2e         # Playwright Electron integration tests (6 tests)
 npm run dev              # Vite dev server
 npm run electron:dev     # Dev with Electron
 npm run build            # Build React app
@@ -142,7 +140,7 @@ EdgewarePlusPlus/
 │       ├── popup.ts         # Popup types
 │       ├── global.d.ts      # window.electronAPI type declarations
 │       └── fengari.d.ts     # Fengari module declarations
-├── tests/                 # Playwright integration tests (NOT RUNNABLE — see Known Issues)
+├── tests/                 # Playwright integration tests
 │   └── electron.spec.ts   # 6 tests: splash/config, popup lifecycle, panic mode
 ├── playwright.config.ts   # Playwright configuration
 ├── ARCHITECTURE.md         # System architecture (up to date)
@@ -153,12 +151,11 @@ EdgewarePlusPlus/
 
 ### Next Session Priority Order
 
-1. **HIGH**: Verify Playwright tests pass — run `npm run test:e2e` and fix any remaining issues (preload.cjs and fengari-interop fixes are now in place).
-2. **MEDIUM**: In the original project, clicking the image/gif/video didn't close the popup. Instead, there was a button in the lower right corner, which had a custom text defined in the pack files, which closed the popup on click.
-3. **LOW**: Go through all existing tests. Assess tests viability: Can the test realistically fail? Does the test work for finding issues at runtime? Can the test be improved?
-4. **LOW**: Compare the former edgeware python projects features and config options to the current state of the implementation: Are all features ported? Are all tests ported?
-5. **LOW**: Cross-platform verification (Windows, Linux)
-6. **LOW**: Tray icon assets (.icns, .ico, .png)
+1. **MEDIUM**: In the original project, clicking the image/gif/video didn't close the popup. Instead, there was a button in the lower right corner, which had a custom text defined in the pack files, which closed the popup on click.
+2. **LOW**: Go through all existing tests. Assess tests viability: Can the test realistically fail? Does the test work for finding issues at runtime? Can the test be improved?
+3. **LOW**: Compare the former edgeware python projects features and config options to the current state of the implementation: Are all features ported? Are all tests ported?
+4. **LOW**: Cross-platform verification (Windows, Linux)
+5. **LOW**: Tray icon assets (.icns, .ico, .png)
 
 ### Important Notes
 
@@ -166,12 +163,14 @@ EdgewarePlusPlus/
 - Fengari runs in Electron main process (Node.js), not renderer
 - IPC is the bridge between Electron main and renderer
 - Media playback uses native HTML5 `<video>` and `<audio>` elements
-- `tsc --noEmit`, `eslint`, and `vitest` all pass with zero errors
+- `tsc --noEmit`, `eslint`, `vitest`, and `playwright` all pass with zero errors
 - React app uses HashRouter for Electron file:// compatibility
 - `Math.round()` is critical for popup coordinates — Electron IPC throws on floats
 - `HYPN_EXTS` contains only `.gif` — mp4/webm are videos, not hypno overlays
 - **`preload.cjs` is the actual file loaded by BrowserWindow** — `preload.ts` is the TS source but is NOT what runs. Keep them in sync or use a build step.
+- **Vitest excludes `tests/`** — `vite.config.ts` has `test.exclude: ['tests/**']` to prevent Vitest from picking up Playwright spec files that import `@playwright/test`.
 - **Playwright tests use Vite dev server** — `test:e2e` script compiles electron TS, starts Vite on port 5173, then launches Electron in dev mode. Production mode has the CJS/ESM fengari crash.
+- **Popup window detection timing** — After `createPopup` IPC resolves, Playwright needs polling time to detect the new BrowserWindow. Use `expect.poll(() => electronApp.windows().length)` instead of synchronous checks.
 - **`EDGWARE_NO_DEVTOOLS` env var** — When set, prevents Electron from opening DevTools in dev mode (used by Playwright tests to avoid DevTools window interfering with `firstWindow()`)
 
 ---

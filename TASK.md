@@ -1,35 +1,27 @@
-# TASK: Playwright Integration Tests
+# Task: Verify Playwright Tests Pass
 
-**Session:** 2026-07-14
-**Branch:** `macos-cross-platform`
+**Priority:** HIGH — #1 on Next Session Priority Order
 
-## Goal
+**Problem:** Playwright tests in `tests/electron.spec.ts` are blocked because Vitest picks up the file (rejecting `test.beforeAll()`), and the tests require a running Electron + Vite dev server. Now that `preload.cjs` and `fengari-interop` are fixed, the tests should be runnable.
 
-Add Playwright browser-level integration tests for the Electron app.
+## Steps
 
-## Status: PARTIAL — NOT RUNNABLE
+1. **Run Playwright tests** — Execute `npm run test:e2e` and capture the full output (logs, errors, exit code).
 
-Steps 1–5 completed. Step 6 (run tests) blocked by preload.cjs sync and fengari CJS/ESM issues. See HANDOVER.md.
+2. **Diagnose failures** — If tests fail or crash, read `tests/electron.spec.ts` and `playwright.config.ts` to understand what the tests expect. Cross-reference with recent fixes (preload sync, fengari-interop) to identify remaining issues.
 
-## Completed
+3. **Fix Vitest pickup** — If Vitest still picks up `electron.spec.ts`, either rename the file to exclude it from Vitest (e.g. `electron.e2e.spec.ts`) or add a Vitest config exclusion for `tests/`.
 
-1. ✅ Install Playwright and configure for Electron (`@playwright/test`)
-2. ✅ Create `tests/electron.spec.ts` with 6 test cases
-3. ✅ Create `playwright.config.ts`
-4. ✅ Add `test:e2e` and `test:e2e:ui` npm scripts
-5. ✅ Fix `EDGWARE_NO_DEVTOOLS` env var in `electron/main.ts`
-6. ✅ Fix `fengari-interop` CJS import in `electron/scripting/api_v1.ts` (partial)
-7. ✅ Update HANDOVER.md with blockers as high-priority tasks
-8. ✅ Update ARCHITECTURE.md with Playwright section
+4. **Fix test failures** — Address any failing assertions, missing APIs, or Electron startup issues. Check that `EDGWARE_NO_DEVTOOLS` env var is correctly handled.
 
-## Blocked
+5. **Run full validation** — `npm run check` must pass with zero errors.
 
-- **preload.cjs out of sync with preload.ts** — Renderer crashes calling missing APIs
-- **fengari-interop CJS/ESM** — Production builds crash; dev mode works
-- **App component throws** — `#root` stays empty due to missing preload APIs
+6. **Run lint** — `npm run lint` must pass with zero errors.
 
-## Next Steps (HANDOVER.md priority order)
+7. **Run Vitest** — `npm run test` must pass (54 tests).
 
-1. Fix preload.cjs to match preload.ts
-2. Fix fengari-interop import pattern
-3. Verify Playwright tests pass
+8. **Improve comments** — Review all modified files, add or update `FUTUREWORK`/`DISCUSSION`/`REMOVABLE`/`FIXME` markers where appropriate for documentation.
+
+9. **Commit changes** — Stage and commit with a descriptive conventional commit message (e.g. `fix: resolve Playwright/Vitest conflict and verify e2e tests`).
+
+10. **Update HANDOVER.md** — Update "Current Status", "Known Issues", and "Recent Commits" to reflect the completed work. Remove Playwright from "What's NOT Done" if fully resolved.
