@@ -6,6 +6,7 @@ import { registerEdgewareV0 } from '../scripting/api_v0.js'
 import { registerBasicV1 } from '../scripting/api_basic.js'
 import { CallbackStore } from '../scripting/callbacks.js'
 import type { EdgewareCallbacks } from '../scripting/callbacks.js'
+import { showNotification } from './notifications.js'
 
 let mainWindowRef: BrowserWindow | null = null
 let callbackStore: CallbackStore | null = null
@@ -88,6 +89,7 @@ function buildCallbacks(): EdgewareCallbacks {
     },
     sendNotification: (text?: string) => {
       sendToRenderer('script:notification', { text: text ?? '' })
+      showNotification('Edgeware++', text ?? '')
     },
     connectOnPopupOpen: (_callbackId: string) => {
       // FIXME: Popup open callback not yet wired

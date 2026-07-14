@@ -9,6 +9,7 @@ import { fillDrive, replaceImages } from './ipc/filesystem.js'
 import { loadConfig, saveConfig } from './ipc/config.js'
 import { loadPackFromDirectory, extractPackZip, isZipFile } from './ipc/pack.js'
 import { setScriptingMainWindow, startScripting, stopScripting, executeLuaScript, executeLuaCode, getScriptingStatus } from './ipc/scripting.js'
+import { showNotification } from './ipc/notifications.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -144,6 +145,10 @@ function registerIpcHandlers() {
 
   ipcMain.handle('script:status', async () => {
     return getScriptingStatus()
+  })
+
+  ipcMain.handle('notification:show', async (_event, title: string, body: string) => {
+    showNotification(title, body)
   })
 }
 

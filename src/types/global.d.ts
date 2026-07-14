@@ -70,6 +70,7 @@ interface ElectronAPI {
   onScriptOpenWeb: (cb: (info: { url: string }) => void) => void
   onScriptOpenSubliminal: (cb: (info: { text: string }) => void) => void
   onScriptNotification: (cb: (info: { text: string }) => void) => void
+  showNotification: (title: string, body: string) => Promise<void>
 }
 
 declare global {

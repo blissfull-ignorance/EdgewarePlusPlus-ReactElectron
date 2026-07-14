@@ -102,4 +102,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   onScriptNotification: (cb: (info: { text: string }) => void) => {
     ipcRenderer.on('script:notification', (_event, info) => cb(info))
   },
+
+  showNotification: (title: string, body: string): Promise<void> =>
+    ipcRenderer.invoke('notification:show', title, body),
 })
