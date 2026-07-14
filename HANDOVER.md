@@ -2,7 +2,7 @@
 
 ## Current Status
 
-**Last Session:** Add missing ConfigPanel controls (audioVolume, panicButton, wallpaperDat)
+**Last Session:** Wire desktop notifications via Electron Notification API
 
 **Date:** July 14, 2026
 
@@ -29,6 +29,7 @@
 - **Hibernate panel** — hibernate activation with type selection
 - **54 Vitest tests** — movement (37) + hypno (17), all passing
 - **Fengari scripting wired** — Lua VM lifecycle, IPC bridge (script:start/stop/execute), scriptStore dispatches Lua callbacks to popupStore, corruptionStore, moodStore, promptStore, and appStore
+- **Notifications** — `electron.Notification` API wired via IPC, preload exposes `showNotification`, Lua `sendNotification` triggers native desktop notification
 
 ### Known Issues
 
@@ -56,7 +57,6 @@ f9477ae fix: restrict video formats to Chromium-supported codecs
 
 ### What's NOT Done
 
-- **Notifications** — `electron.Notification` API not wired
 - **Discord presence** — `discord-rpc` not integrated
 - **Mitosis mode** — config exists but no spawn-on-close logic
 - **Web open** — `shell.openExternal()` not wired
@@ -141,12 +141,11 @@ EdgewarePlusPlus/
 
 ### Next Session Priority Order
 
-1. **MEDIUM**: Notifications via Electron API
-2. **MEDIUM**: Discord presence via discord-rpc
-3. **MEDIUM**: Mitosis mode logic (spawn popup when count hits 0)
-4. **LOW**: Playwright integration tests
-5. **LOW**: Cross-platform verification (Windows, Linux)
-6. **LOW**: Tray icon assets (.icns, .ico, .png)
+1. **MEDIUM**: Discord presence via discord-rpc
+2. **MEDIUM**: Mitosis mode logic (spawn popup when count hits 0)
+3. **LOW**: Playwright integration tests
+4. **LOW**: Cross-platform verification (Windows, Linux)
+5. **LOW**: Tray icon assets (.icns, .ico, .png)
 
 ### Important Notes
 
