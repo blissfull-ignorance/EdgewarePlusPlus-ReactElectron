@@ -2,6 +2,7 @@ node_modules
 dist
 dist-electron
 electron-dist
+test-results
 .DS_Store
 *.log
 local_settings.py
