@@ -18,6 +18,7 @@ describe('runtime movement — store integration', () => {
     usePopupStore.getState().addPopup({
       id: 1, type: 'image', x: 500, y: 400, width: 300, height: 200,
       moving: true, dx: 1, dy: 0,
+      mitosisSpawned: false,
     })
 
     const popups = usePopupStore.getState().popups as TickablePopup[]
@@ -39,6 +40,7 @@ describe('runtime movement — store integration', () => {
     usePopupStore.getState().addPopup({
       id: 1, type: 'image', x: 500, y: 400, width: 300, height: 200,
       moving: false, dx: 1, dy: 0,
+      mitosisSpawned: false,
     })
 
     const popups = usePopupStore.getState().popups as TickablePopup[]
@@ -54,6 +56,7 @@ describe('runtime movement — store integration', () => {
     usePopupStore.getState().addPopup({
       id: 1, type: 'image', x: 500, y: 400, width: 300, height: 200,
       moving: true, dx: 1, dy: 0,
+      mitosisSpawned: false,
     })
 
     for (let tick = 0; tick < 20; tick++) {
@@ -73,10 +76,12 @@ describe('runtime movement — store integration', () => {
     usePopupStore.getState().addPopup({
       id: 1, type: 'image', x: 500, y: 400, width: 300, height: 200,
       moving: true, dx: 1, dy: 0,
+      mitosisSpawned: false,
     })
     usePopupStore.getState().addPopup({
       id: 2, type: 'image', x: 500, y: 400, width: 300, height: 200,
       moving: false, dx: 1, dy: 0,
+      mitosisSpawned: false,
     })
 
     for (let tick = 0; tick < 10; tick++) {
@@ -98,6 +103,7 @@ describe('runtime movement — store integration', () => {
     usePopupStore.getState().addPopup({
       id: 1, type: 'image', x: screen.width - 300 - 2, y: 400, width: 300, height: 200,
       moving: true, dx: 1, dy: 0,
+      mitosisSpawned: false,
     })
 
     const popups = usePopupStore.getState().popups as TickablePopup[]
@@ -114,6 +120,7 @@ describe('runtime movement — store integration', () => {
     usePopupStore.getState().addPopup({
       id: 1, type: 'image', x: 500, y: 400, width: 300, height: 200,
       moving: true, dx: 1, dy: 0,
+      mitosisSpawned: false,
     })
 
     for (let tick = 0; tick < 100; tick++) {

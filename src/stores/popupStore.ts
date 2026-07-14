@@ -27,6 +27,8 @@ export interface ActivePopup {
   dx: number
   /** Directional vector Y (unit length, may be negative). Reversed on bounce. */
   dy: number
+  /** If true, this popup was spawned by mitosis and should not trigger further mitosis. */
+  mitosisSpawned: boolean
 }
 
 export interface PopupState {

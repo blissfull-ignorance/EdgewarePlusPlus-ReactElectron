@@ -50,6 +50,7 @@ const defaults: Config = {
   panicDisabled: false,
   promptMistakes: 3,
   mitosisMode: false,
+  mitosisChance: 50,
   webPopup: false,
   rotateWallpaper: false,
   wallpaperTimer: 30,

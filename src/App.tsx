@@ -21,6 +21,79 @@ import { Container, Title, Text, Anchor } from '@mantine/core'
 // Consider resetting on pack load, but low risk since audio popups are ephemeral.
 let audioIdCounter = 1
 
+// DISCUSSION: mitosisIdCounter is separate from audioIdCounter to avoid collisions.
+// Both are module-level and could drift if the session spans pack changes, but
+// the risk is negligible since popup IDs only need to be unique within a session.
+let mitosisIdCounter = 1
+
+function spawnMitosisPopup(
+  closedType: 'image' | 'video' | 'audio',
+  electronAPI: ReturnType<typeof useElectronAPI>,
+) {
+  const pack = usePackStore.getState().pack
+  if (!pack) return
+
+  const cfg = useConfigStore.getState()
+  const bounds = { width: 1920, height: 1080 }
+
+  if (closedType === 'audio') {
+    const audioPool = pack.media.audio
+    if (audioPool.length === 0) return
+    const mediaPath = pickRandom(audioPool)
+    const id = 100000 + mitosisIdCounter++
+    usePopupStore.getState().addPopup({
+      id, type: 'audio', mediaPath, x: 0, y: 0, width: 0, height: 0,
+      moving: false, dx: 0, dy: 0, mitosisSpawned: true,
+    })
+    return
+  }
+
+  const pool = closedType === 'video' ? pack.media.videos : pack.media.images
+  if (pool.length === 0) return
+  const mediaPath = pickRandom(pool)
+
+  const scale = cfg.popupScale || 1
+  const w = Math.round(randomInt(200, 400) * scale)
+  const h = Math.round(randomInt(150, 300) * scale)
+  const x = randomInt(0, Math.max(0, bounds.width - w))
+  const y = randomInt(0, Math.max(0, bounds.height - h))
+
+  if (electronAPI) {
+    const mediaExt = extOf(mediaPath)
+    const isStaticImage = STATIC_IMG_EXTS.has(mediaExt)
+    const hypnoMediaPath = isStaticImage && roll(cfg.subliminalsChance) && pack.media.hypno.length > 0
+      ? pickRandom(pack.media.hypno)
+      : undefined
+
+    electronAPI.createPopup({
+      mediaPath,
+      type: closedType,
+      width: w,
+      height: h,
+      x,
+      y,
+      opacity: 100,
+      clickthrough: cfg.clickthroughPopups,
+      clicksToClose: cfg.buttonless ? 999 : 1,
+      denialFilter: roll(cfg.denialChance) ? pickDenialFilter() : undefined,
+      hypnoMediaPath,
+      hypnoOpacity: cfg.subliminalsAlpha,
+    }).then((popupId) => {
+      const dir = randomDirection()
+      const moving = shouldMove(cfg.movingChance)
+      usePopupStore.getState().addPopup({
+        id: popupId, type: closedType,
+        x, y, width: w, height: h,
+        moving,
+        dx: dir.dx, dy: dir.dy,
+        mitosisSpawned: true,
+      })
+    }).catch((err) => {
+      console.error('mitosis:createPopup failed', err)
+    })
+  }
+}
+
 function StatusPage() {
   return (
     <Container size="xs" py="xl">
@@ -128,7 +201,20 @@ export default function App() {
       }
     })
     electronAPI.onPopupClosed((id) => {
-      usePopupStore.getState().removePopup(id)
+      const state = usePopupStore.getState()
+      const popup = state.popups.find((p) => p.id === id)
+      state.removePopup(id)
+
+      if (!popup || popup.mitosisSpawned) return
+
+      const cfg = useConfigStore.getState()
+      if (!cfg.mitosisMode) return
+      if (!roll(cfg.mitosisChance)) return
+
+      const count = randomInt(1, cfg.mitosisStrength)
+      for (let i = 0; i < count; i++) {
+        spawnMitosisPopup(popup.type, electronAPI)
+      }
     })
     attachScriptListeners()
 
@@ -189,7 +275,7 @@ export default function App() {
       if (isAudio) {
         // Audio popups have no visual representation, just a store entry
         const id = audioIdCounter++
-        usePopupStore.getState().addPopup({ id, type: 'audio', mediaPath: path, x: 0, y: 0, width: 0, height: 0, moving: false, dx: 0, dy: 0 })
+        usePopupStore.getState().addPopup({ id, type: 'audio', mediaPath: path, x: 0, y: 0, width: 0, height: 0, moving: false, dx: 0, dy: 0, mitosisSpawned: false })
       } else {
         // Enforce per-type popup limits
         const popups = usePopupStore.getState().popups
@@ -243,6 +329,7 @@ export default function App() {
               x, y, width: w, height: h,
               moving,
               dx: dir.dx, dy: dir.dy,
+              mitosisSpawned: false,
             })
             logMovementEvent({ ts: Date.now(), type: 'spawn', popupId, moving, x, y, dx: dir.dx, dy: dir.dy })
           }).catch((err) => {

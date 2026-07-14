@@ -43,6 +43,7 @@ function simulateSpawnTick() {
     x, y, width: w, height: h,
     moving,
     dx: dir.dx, dy: dir.dy,
+    mitosisSpawned: false,
   })
 }
 

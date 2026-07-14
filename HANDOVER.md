@@ -41,6 +41,7 @@
 ### Recent Commits
 
 ```
+15fac0b feat: integrate Discord presence via discord-rpc
 e01b5fd feat: wire Fengari scripting engine to renderer via IPC
 7e0251b fix: sync ConfigData type with renderer Config (add maxImages, popupScale)
 c594a48 docs: add comprehensive comments with markers to all code files

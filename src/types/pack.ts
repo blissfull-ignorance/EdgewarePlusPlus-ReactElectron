@@ -74,6 +74,7 @@ export interface Config {
   panicDisabled: boolean
   promptMistakes: number
   mitosisMode: boolean
+  mitosisChance: number
   webPopup: boolean
   rotateWallpaper: boolean
   wallpaperTimer: number

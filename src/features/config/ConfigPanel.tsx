@@ -421,10 +421,14 @@ export function ConfigPanel() {
               onChange={(e) => config.updateConfig({ mitosisMode: e.currentTarget.checked })}
             />
             {config.mitosisMode && (
-              <NumberInput label="Mitosis Strength" value={config.mitosisStrength}
-                onChange={(v) => config.updateConfig({ mitosisStrength: Number(v) || 1 })}
-                min={1} max={50}
-              />
+              <>
+                <SliderLabel label="Mitosis Chance (%)" value={config.mitosisChance}
+                  onChange={(v) => config.updateConfig({ mitosisChance: v })} />
+                <NumberInput label="Mitosis Strength" value={config.mitosisStrength}
+                  onChange={(v) => config.updateConfig({ mitosisStrength: Number(v) || 1 })}
+                  min={1} max={50}
+                />
+              </>
             )}
             <Switch label="Single Mode" description="Only one popup type per cycle"
               checked={config.singleMode}
