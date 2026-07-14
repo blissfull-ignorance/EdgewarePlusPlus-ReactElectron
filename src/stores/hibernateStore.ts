@@ -15,7 +15,7 @@ import { create } from 'zustand'
 export interface HibernateState {
   active: boolean
   timerId: number | null
-  type: 'Original' | 'Spaced' | 'Glitch' | 'Ramp' | 'PumpScare' | 'Chaos'
+  type: 'Original' | 'Spaced' | 'Glitch' | 'Ramp' | 'Pump-Scare' | 'Chaos'
   activate: (type: HibernateState['type']) => void
   deactivate: () => void
 }

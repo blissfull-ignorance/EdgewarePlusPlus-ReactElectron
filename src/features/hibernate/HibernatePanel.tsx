@@ -6,7 +6,7 @@ const hibernateTypes: { value: string; label: string }[] = [
   { value: 'Spaced', label: 'Spaced' },
   { value: 'Glitch', label: 'Glitch' },
   { value: 'Ramp', label: 'Ramp' },
-  { value: 'PumpScare', label: 'PumpScare' },
+  { value: 'Pump-Scare', label: 'Pump-Scare' },
   { value: 'Chaos', label: 'Chaos' },
 ]
 

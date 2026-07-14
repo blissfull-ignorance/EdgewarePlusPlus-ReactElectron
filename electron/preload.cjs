@@ -32,6 +32,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   onHibernateTimer: (cb) => { ipcRenderer.on('hibernate:timer', () => cb()) },
 
+  onHibernateSkip: (cb) => { ipcRenderer.on('hibernate:skip', () => cb()) },
+
   onPopupClosed: (cb) => {
     ipcRenderer.on('popup:closed', (_event, id) => cb(id))
   },

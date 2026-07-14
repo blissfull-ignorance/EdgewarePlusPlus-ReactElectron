@@ -13,6 +13,9 @@ import { PopupContainer } from '@/components/PopupContainer'
 import { ConfigPanel } from '@/features/config/ConfigPanel'
 import { PromptModal } from '@/features/prompt/PromptModal'
 import { HibernatePanel } from '@/features/hibernate/HibernatePanel'
+import { useHibernateStore } from '@/stores/hibernateStore'
+import { planActivity, hibernateDelay, shouldResetWallpaper } from '@/features/hibernate/hibernate'
+import type { HibernateType } from '@/features/hibernate/hibernate'
 import { shouldMove, randomDirection, tickPopups } from '@/features/popup/movement'
 import { logMovementEvent } from '@/features/popup/debug'
 import { Container, Title, Text, Anchor } from '@mantine/core'
@@ -531,6 +534,257 @@ export default function App() {
       }
     }
   }, [running])
+
+  // --- Hibernate runtime ---
+  // When hibernateMode is enabled and no popups are active, starts a sleep timer
+  // with random delay between hibernateMin and hibernateMax. On fire, runs the
+  // activity schedule for the configured type. On completion, checks wallpaper reset.
+  //
+  // FUTUREWORK: Add hibernate timer display in UI (countdown to next activity).
+  // FUTUREWORK: Support schedule-based hibernate activation (time-of-day triggers).
+  // FUTUREWORK: If the user changes hibernate config (type, length, activity)
+  // mid-sleep, the current timer uses old values. A store subscription could
+  // cancel and restart the timer when hibernateMin/hibernateMax/hibernateType change.
+  const hibernateTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const activityTimerRefs = useRef<ReturnType<typeof setTimeout>[]>([])
+  const pumpScareCloseRefs = useRef<ReturnType<typeof setTimeout>[]>([])
+
+  const spawnHibernatePopup = useCallback((electronAPI: ReturnType<typeof useElectronAPI>) => {
+    const pack = usePackStore.getState().pack
+    if (!pack) return
+
+    const pool = [...pack.media.images, ...pack.media.videos]
+    const audioPool = pack.media.audio
+    if (pool.length === 0 && audioPool.length === 0) return
+
+    const path = pool.length > 0 ? pickRandom(pool) : pickRandom(audioPool)
+    const isVideo = pool.length > 0 && pack.media.videos.includes(path)
+    const isAudio = audioPool.includes(path)
+
+    if (isAudio) {
+      const id = audioIdCounter++
+      usePopupStore.getState().addPopup({
+        id, type: 'audio', mediaPath: path, x: 0, y: 0, width: 0, height: 0,
+        moving: false, dx: 0, dy: 0, mitosisSpawned: true,
+      })
+      return
+    }
+
+    const cfg = useConfigStore.getState()
+    const scale = cfg.popupScale || 1
+    const w = Math.round(randInt(200, 400) * scale)
+    const h = Math.round(randInt(150, 300) * scale)
+    const bounds = screenRef.current
+    const x = randInt(0, Math.max(0, bounds.width - w))
+    const y = randInt(0, Math.max(0, bounds.height - h))
+
+    if (electronAPI) {
+      const mediaExt = extOf(path)
+      const isStaticImage = STATIC_IMG_EXTS.has(mediaExt)
+      const hypnoMediaPath = isStaticImage && roll(cfg.subliminalsChance) && pack.media.hypno.length > 0
+        ? pickRandom(pack.media.hypno)
+        : undefined
+
+      electronAPI.createPopup({
+        mediaPath: path,
+        type: isVideo ? 'video' : 'image',
+        width: w, height: h, x, y,
+        opacity: 100,
+        clickthrough: cfg.clickthroughPopups,
+        clicksToClose: cfg.buttonless ? 999 : 1,
+        popupClose: usePackStore.getState().getPopupCloseText(),
+        buttonless: cfg.buttonless,
+        denialFilter: roll(cfg.denialChance) ? pickDenialFilter() : undefined,
+        hypnoMediaPath,
+        hypnoOpacity: cfg.subliminalsAlpha,
+      }).then((popupId) => {
+        const dir = randomDirection()
+        const moving = shouldMove(cfg.movingChance)
+        usePopupStore.getState().addPopup({
+          id: popupId, type: isVideo ? 'video' : 'image',
+          x, y, width: w, height: h,
+          moving,
+          dx: dir.dx, dy: dir.dy,
+          mitosisSpawned: true,
+        })
+      }).catch((err) => {
+        console.error('hibernate:createPopup failed', err)
+      })
+    }
+  }, [])
+
+  const cancelHibernateTimers = useCallback(() => {
+    if (hibernateTimerRef.current) {
+      clearTimeout(hibernateTimerRef.current)
+      hibernateTimerRef.current = null
+    }
+    for (const t of activityTimerRefs.current) clearTimeout(t)
+    activityTimerRefs.current = []
+    for (const t of pumpScareCloseRefs.current) clearTimeout(t)
+    pumpScareCloseRefs.current = []
+  }, [])
+
+  const runHibernateActivity = useCallback((electronAPI: ReturnType<typeof useElectronAPI>) => {
+    const cfg = useConfigStore.getState()
+    const hType = cfg.hibernateType as HibernateType
+    const hLength = cfg.hibernateLength
+    const wakeup = cfg.wakeupActivity
+
+    const schedule = planActivity(hType, hLength, wakeup)
+    useHibernateStore.getState().activate(hType)
+
+    for (const tick of schedule) {
+      const timer = setTimeout(() => {
+        if (useAppStore.getState().inPanicMode) return
+
+        if (hType === 'Pump-Scare') {
+          // Spawn one image and one audio popup
+          const pack = usePackStore.getState().pack
+          if (pack) {
+            if (pack.media.images.length > 0) {
+              const imgPath = pickRandom(pack.media.images)
+              const cfgLocal = useConfigStore.getState()
+              const scale = cfgLocal.popupScale || 1
+              const w = Math.round(randInt(200, 400) * scale)
+              const h = Math.round(randInt(150, 300) * scale)
+              const bounds = screenRef.current
+              const x = randInt(0, Math.max(0, bounds.width - w))
+              const y = randInt(0, Math.max(0, bounds.height - h))
+
+              if (electronAPI) {
+                electronAPI.createPopup({
+                  mediaPath: imgPath, type: 'image',
+                  width: w, height: h, x, y,
+                  opacity: 100,
+                  clickthrough: cfgLocal.clickthroughPopups,
+                  clicksToClose: cfgLocal.buttonless ? 999 : 1,
+                  popupClose: usePackStore.getState().getPopupCloseText(),
+                  buttonless: cfgLocal.buttonless,
+                  denialFilter: roll(cfgLocal.denialChance) ? pickDenialFilter() : undefined,
+                  hypnoMediaPath: undefined,
+                  hypnoOpacity: 0,
+                }).then((popupId) => {
+                  usePopupStore.getState().addPopup({
+                    id: popupId, type: 'image',
+                    x, y, width: w, height: h,
+                    moving: false, dx: 0, dy: 0,
+                    mitosisSpawned: true,
+                  })
+                  // FUTUREWORK: Make pump-scare auto-close duration configurable
+                  const autoCloseTimer = setTimeout(() => {
+                    electronAPI.closePopup(popupId).catch(() => {})
+                    usePopupStore.getState().removePopup(popupId)
+                  }, 2500)
+                  pumpScareCloseRefs.current.push(autoCloseTimer)
+                }).catch((err) => console.error('pump-scare:createPopup image failed', err))
+              }
+            }
+            if (pack.media.audio.length > 0) {
+              const audioPath = pickRandom(pack.media.audio)
+              const audioId = audioIdCounter++
+              usePopupStore.getState().addPopup({
+                id: audioId, type: 'audio', mediaPath: audioPath,
+                x: 0, y: 0, width: 0, height: 0,
+                moving: false, dx: 0, dy: 0,
+                mitosisSpawned: true,
+              })
+            }
+          }
+        } else {
+          spawnHibernatePopup(electronAPI)
+        }
+      }, tick.delay)
+
+      activityTimerRefs.current.push(timer)
+    }
+
+    // Schedule deactivation after all ticks have fired
+    const totalDuration = schedule.length > 0
+      ? Math.max(...schedule.map((t) => t.delay)) + 100
+      : 0
+
+    const deactivateTimer = setTimeout(() => {
+      useHibernateStore.getState().deactivate()
+
+      // Check wallpaper reset
+      const cfgNow = useConfigStore.getState()
+      if (shouldResetWallpaper(cfgNow.fixWallpaper, usePopupStore.getState().popupCount, false)) {
+        const pack = usePackStore.getState().pack
+        if (pack && electronAPI) {
+          electronAPI.setWallpaper(pack.media.images[0] || '')
+        }
+      }
+
+      // Start next sleep cycle if still running
+      if (useAppStore.getState().running && !useAppStore.getState().inPanicMode) {
+        scheduleNextHibernateSleep(electronAPI)
+      }
+    }, totalDuration)
+
+    activityTimerRefs.current.push(deactivateTimer)
+  }, [spawnHibernatePopup])
+
+  const scheduleNextHibernateSleep = useCallback((electronAPI: ReturnType<typeof useElectronAPI>) => {
+    const cfg = useConfigStore.getState()
+    if (!cfg.hibernateMode) return
+
+    cancelHibernateTimers()
+
+    const delayMs = hibernateDelay(cfg.hibernateMin, cfg.hibernateMax)
+
+    hibernateTimerRef.current = setTimeout(() => {
+      if (useAppStore.getState().inPanicMode) return
+      runHibernateActivity(electronAPI)
+    }, delayMs)
+  }, [cancelHibernateTimers, runHibernateActivity])
+
+  useEffect(() => {
+    if (!running || !electronAPI) {
+      cancelHibernateTimers()
+      return
+    }
+
+    const cfg = useConfigStore.getState()
+
+    if (cfg.hibernateMode && usePopupStore.getState().popupCount === 0) {
+      scheduleNextHibernateSleep(electronAPI)
+    }
+
+    return () => {
+      cancelHibernateTimers()
+    }
+  }, [running, electronAPI, scheduleNextHibernateSleep, cancelHibernateTimers])
+
+  // Listen for "Skip to Hibernate" tray action
+  useEffect(() => {
+    if (!electronAPI) return
+    electronAPI.onHibernateSkip(() => {
+      if (useAppStore.getState().inPanicMode) return
+      if (!useConfigStore.getState().hibernateMode) return
+      cancelHibernateTimers()
+      runHibernateActivity(electronAPI)
+    })
+  }, [electronAPI, cancelHibernateTimers, runHibernateActivity])
+
+  // Reactive wallpaper reset — when popup count drops to 0 and hibernate is not
+  // active, restore the wallpaper if fixWallpaper is enabled. This mirrors the
+  // Python Subject/Observer pattern on popup_number.
+  const prevPopupCountRef = useRef(popupCount)
+  useEffect(() => {
+    const prevCount = prevPopupCountRef.current
+    prevPopupCountRef.current = popupCount
+
+    if (popupCount > prevCount || popupCount !== 0) return
+    if (!electronAPI) return
+
+    const cfg = useConfigStore.getState()
+    if (!shouldResetWallpaper(cfg.fixWallpaper, popupCount, useHibernateStore.getState().active)) return
+
+    const pack = usePackStore.getState().pack
+    if (pack) {
+      electronAPI.setWallpaper(pack.media.images[0] || '')
+    }
+  }, [popupCount, electronAPI])
 
   const handleSplashComplete = useCallback(() => {
     completeSplash()

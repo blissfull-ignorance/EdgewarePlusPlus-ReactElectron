@@ -2,7 +2,7 @@ import { app, BrowserWindow, dialog, ipcMain, screen } from 'electron'
 import path from 'path'
 import { fileURLToPath } from 'url'
 import { setWallpaper, getWallpaper } from './ipc/wallpaper.js'
-import { createTray } from './ipc/tray.js'
+import { createTray, updateTrayMenu } from './ipc/tray.js'
 import { createPopupWindow, closePopupWindow, movePopupWindow, setPopupClickthrough, closeAllPopups, setPopupMainWindow } from './ipc/popup.js'
 import { createShortcut } from './ipc/shortcut.js'
 import { fillDrive, replaceImages } from './ipc/filesystem.js'
@@ -64,6 +64,12 @@ function registerIpcHandlers() {
 
   ipcMain.handle('config:save', async (_event, config) => {
     saveConfig(config)
+    if (mainWindow) {
+      updateTrayMenu(mainWindow, {
+        hibernateMode: config.hibernateMode,
+        toggleHibSkip: config.toggleHibSkip,
+      })
+    }
   })
 
   ipcMain.handle('dialog:openDirectory', async () => {

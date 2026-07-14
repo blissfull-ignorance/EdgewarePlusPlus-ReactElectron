@@ -31,3 +31,25 @@ export function setPanicCallback(callback: () => void) {
     tray.setContextMenu(menu)
   }
 }
+
+export function updateTrayMenu(
+  mainWindow: BrowserWindow,
+  opts: { hibernateMode: boolean; toggleHibSkip: boolean },
+) {
+  if (!tray) return
+
+  const items: Electron.MenuItemConstructorOptions[] = [
+    { label: 'Panic', click: () => mainWindow.webContents.send('panic') },
+  ]
+
+  if (opts.hibernateMode && opts.toggleHibSkip) {
+    items.push({
+      label: 'Skip to Hibernate',
+      click: () => mainWindow.webContents.send('hibernate:skip'),
+    })
+  }
+
+  items.push({ label: 'Quit', role: 'quit' })
+
+  tray.setContextMenu(Menu.buildFromTemplate(items))
+}

@@ -137,7 +137,13 @@ export interface ConfigState extends Config {
   updateConfig: (partial: Partial<Config>) => void
 }
 
-export const useConfigStore = create<ConfigState>((set) => ({
+export const useConfigStore = create<ConfigState>((set, get) => ({
   ...defaults,
-  updateConfig: (partial) => set(partial),
+  updateConfig: (partial) => {
+    const merged = { ...get(), ...partial }
+    if (partial.hibernateMode === false && merged.fixWallpaper) {
+      merged.fixWallpaper = false
+    }
+    set(merged)
+  },
 }))

@@ -46,6 +46,7 @@ interface ElectronAPI {
   onPanic: (cb: () => void) => void
   onPopupClosed: (cb: (id: number) => void) => void
   onHibernateTimer: (cb: () => void) => void
+  onHibernateSkip: (cb: () => void) => void
   openDirectory: () => Promise<string | null>
   loadPack: (packDir: string) => Promise<unknown>
   getScreenBounds: () => Promise<{ x: number; y: number; width: number; height: number }>
