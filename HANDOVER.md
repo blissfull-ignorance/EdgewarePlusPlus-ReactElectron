@@ -2,7 +2,7 @@
 
 ## Current Status
 
-**Last Session:** Discord presence via discord-rpc
+**Last Session:** Mitosis mode logic
 
 **Date:** July 14, 2026
 
@@ -31,6 +31,7 @@
 - **Fengari scripting wired** — Lua VM lifecycle, IPC bridge (script:start/stop/execute), scriptStore dispatches Lua callbacks to popupStore, corruptionStore, moodStore, promptStore, and appStore
 - **Notifications** — `electron.Notification` API wired via IPC, preload exposes `showNotification`, Lua `sendNotification` triggers native desktop notification
 - **Discord presence** — `discord-rpc` integrated via IPC, preload, Zustand store; updates on popup count/pack changes; respects `showDiscord` config toggle; destroys on panic/quit
+- **Mitosis mode** — spawn-on-close logic with `mitosisChance` (0–100%) and `mitosisStrength` (max popups per close); `mitosisSpawned` flag prevents infinite loops; config toggle + slider in Modes tab
 
 ### Known Issues
 
@@ -41,6 +42,7 @@
 ### Recent Commits
 
 ```
+fd71bb9 feat: implement mitosis mode spawn-on-close logic
 15fac0b feat: integrate Discord presence via discord-rpc
 e01b5fd feat: wire Fengari scripting engine to renderer via IPC
 7e0251b fix: sync ConfigData type with renderer Config (add maxImages, popupScale)
@@ -59,7 +61,6 @@ f9477ae fix: restrict video formats to Chromium-supported codecs
 
 ### What's NOT Done
 
-- **Mitosis mode** — config exists but no spawn-on-close logic
 - **Web open** — `shell.openExternal()` not wired
 - **Playwright tests** — No browser integration tests
 - **Cross-platform verification** — Only tested on macOS
@@ -144,10 +145,10 @@ EdgewarePlusPlus/
 
 ### Next Session Priority Order
 
-1. **MEDIUM**: Mitosis mode logic (spawn popup when count hits 0)
-3. **LOW**: Playwright integration tests
-4. **LOW**: Cross-platform verification (Windows, Linux)
-5. **LOW**: Tray icon assets (.icns, .ico, .png)
+1. **LOW**: Web open — `shell.openExternal()` not wired
+2. **LOW**: Playwright integration tests
+3. **LOW**: Cross-platform verification (Windows, Linux)
+4. **LOW**: Tray icon assets (.icns, .ico, .png)
 
 ### Important Notes
 
