@@ -8,6 +8,7 @@ export interface ConfigData {
   replace: boolean
   webMod: number
   popupMod: number
+  popupScale: number
   audioMod: number
   promptMod: number
   vidMod: number
@@ -49,6 +50,7 @@ export interface ConfigData {
   denialChance: number
   drivePath: string
   maxAudio: number
+  maxImages: number
   maxVideos: number
   subliminalsChance: number
   safeMode: boolean
@@ -138,6 +140,7 @@ export function getDefaultConfig(): ConfigData {
     replace: false,
     webMod: 0,
     popupMod: 100,
+    popupScale: 1,
     audioMod: 0,
     promptMod: 0,
     vidMod: 10,
@@ -179,6 +182,7 @@ export function getDefaultConfig(): ConfigData {
     denialChance: 0,
     drivePath: '',
     maxAudio: 1,
+    maxImages: 10,
     maxVideos: 10,
     subliminalsChance: 0,
     safeMode: true,
