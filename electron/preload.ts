@@ -105,4 +105,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   showNotification: (title: string, body: string): Promise<void> =>
     ipcRenderer.invoke('notification:show', title, body),
+
+  initDiscord: (): Promise<{ success: boolean; error?: string }> =>
+    ipcRenderer.invoke('discord:init'),
+  updateDiscord: (activity: Record<string, unknown>): Promise<{ success: boolean }> =>
+    ipcRenderer.invoke('discord:update', activity),
+  destroyDiscord: (): Promise<void> =>
+    ipcRenderer.invoke('discord:destroy'),
 })

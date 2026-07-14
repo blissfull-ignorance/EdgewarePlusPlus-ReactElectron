@@ -1,50 +1,59 @@
-# TASK — Notifications via Electron API
+# TASK — Discord Presence via discord-rpc
 
 **Priority:** Medium
 **Branch:** `macos-cross-platform`
 
 ## Objective
 
-Wire `electron.Notification` API so the app can send desktop notifications
-(e.g. on script events, hibernate start/end, or panic).
+Integrate `discord-rpc` to show presence on Discord (e.g. app name, state, timestamps, pack info, popup count).
 
 ---
 
 ### Steps
 
-1. **Add IPC handlers in `electron/ipc/`**
-   - Create `electron/ipc/notifications.ts`
-   - Implement `notification:show` handler using `electron.Notification`
-   - Register the handler in `electron/main.ts`
+1. **Check package availability**
+   - Verify if `discord-rpc` is already in `package.json`; if not:
+     - `npm install discord-rpc` (main process Node.js dependency)
+     - Confirm the module is compatible with macOS/Windows/Linux
 
-2. **Expose in preload**
-   - Add `showNotification(title, body)` to `electron/preload.ts` via `contextBridge`
+2. **Create IPC handler** — `electron/ipc/discord.ts`
+   - `discord:init` — authenticate with Discord, set activity
+   - `discord:update` — update activity fields (state, details, timestamps)
+   - `discord:destroy` — clear presence, dispose of RPC client
+   - Register handlers in `electron/main.ts`
 
-3. **Update renderer types**
-   - Add `showNotification` signature to `src/types/global.d.ts` in `ElectronAPI`
+3. **Expose in preload** — `electron/preload.ts`
+   - Add `initDiscord()`, `updateDiscord(activity)`, `destroyDiscord()` to contextBridge
 
-4. **Create a notification hook/store**
-   - Either add a Zustand store slice or a React hook in `src/hooks/`
-   - Expose a simple `notify(title, body)` function
+4. **Update renderer types** — `src/types/global.d.ts`
+   - Add the three new methods to the `ElectronAPI` interface
 
-5. **Wire to Lua scripting callbacks**
-   - In `electron/scripting/callbacks.ts`, invoke `notification:show` when Lua scripts call a `notify()` function
+5. **Create Zustand store** — `src/stores/discordStore.ts`
+   - State: `connected: boolean`, `error: string | null`
+   - Actions: `initPresence()`, `updatePresence(state)`, `destroyPresence()`
+   - Wire `updatePresence` to react to popupStore count and packStore changes
 
-6. **Verify**
+6. **Wire to app lifecycle**
+   - In `src/App.tsx` or a dedicated side-effect hook:
+     - `initPresence()` on startup
+     - `updatePresence()` when popup count or pack changes
+     - `destroyPresence()` on panic / quit
+
+7. **Verify**
    - `npm run check` — TypeScript passes
    - `npm run lint` — ESLint passes
    - `npm run test` — Vitest passes (54 tests)
 
-7. **Commit**
+8. **Commit**
    ```bash
-   git add -A && git commit -m "feat: wire desktop notifications via Electron Notification API"
+   git add -A && git commit -m "feat: integrate Discord presence via discord-rpc"
    ```
 
-8. **Update HANDOVER.md**
-   - Move "Notifications" from "What's NOT Done" to "What's Working"
-   - Add a "Last Session: Notifications via Electron API" entry at top
-   - Update test count if new tests were added
-   - Remove or reorder "Next Session Priority Order"
+9. **Update HANDOVER.md**
+   - Move "Discord presence" from "What's NOT Done" to "What's Working"
+   - Update "Last Session" heading to "Discord presence via discord-rpc"
+   - Add the commit hash under Recent Commits
+   - Reorder or remove from "Next Session Priority Order"
 
 ---
 

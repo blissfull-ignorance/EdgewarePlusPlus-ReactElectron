@@ -10,6 +10,7 @@ import { loadConfig, saveConfig } from './ipc/config.js'
 import { loadPackFromDirectory, extractPackZip, isZipFile } from './ipc/pack.js'
 import { setScriptingMainWindow, startScripting, stopScripting, executeLuaScript, executeLuaCode, getScriptingStatus } from './ipc/scripting.js'
 import { showNotification } from './ipc/notifications.js'
+import { initDiscord, updateDiscord, destroyDiscord } from './ipc/discord.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -150,6 +151,18 @@ function registerIpcHandlers() {
   ipcMain.handle('notification:show', async (_event, title: string, body: string) => {
     showNotification(title, body)
   })
+
+  ipcMain.handle('discord:init', async () => {
+    return initDiscord()
+  })
+
+  ipcMain.handle('discord:update', async (_event, activity) => {
+    return updateDiscord(activity)
+  })
+
+  ipcMain.handle('discord:destroy', async () => {
+    destroyDiscord()
+  })
 }
 
 app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required')
@@ -164,6 +177,10 @@ app.whenReady().then(() => {
       createWindow()
     }
   })
+})
+
+app.on('before-quit', () => {
+  destroyDiscord()
 })
 
 app.on('window-all-closed', () => {

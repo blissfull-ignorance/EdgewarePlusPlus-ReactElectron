@@ -2,7 +2,7 @@
 
 ## Current Status
 
-**Last Session:** Wire desktop notifications via Electron Notification API
+**Last Session:** Discord presence via discord-rpc
 
 **Date:** July 14, 2026
 
@@ -30,6 +30,7 @@
 - **54 Vitest tests** — movement (37) + hypno (17), all passing
 - **Fengari scripting wired** — Lua VM lifecycle, IPC bridge (script:start/stop/execute), scriptStore dispatches Lua callbacks to popupStore, corruptionStore, moodStore, promptStore, and appStore
 - **Notifications** — `electron.Notification` API wired via IPC, preload exposes `showNotification`, Lua `sendNotification` triggers native desktop notification
+- **Discord presence** — `discord-rpc` integrated via IPC, preload, Zustand store; updates on popup count/pack changes; respects `showDiscord` config toggle; destroys on panic/quit
 
 ### Known Issues
 
@@ -57,7 +58,6 @@ f9477ae fix: restrict video formats to Chromium-supported codecs
 
 ### What's NOT Done
 
-- **Discord presence** — `discord-rpc` not integrated
 - **Mitosis mode** — config exists but no spawn-on-close logic
 - **Web open** — `shell.openExternal()` not wired
 - **Playwright tests** — No browser integration tests
@@ -93,7 +93,8 @@ EdgewarePlusPlus/
 │   │   ├── wallpaper.ts   # Cross-platform wallpaper
 │   │   ├── filesystem.ts  # Drive fill, image replace
 │   │   ├── shortcut.ts    # Desktop shortcuts
-│   │   └── scripting.ts   # Fengari IPC bridge (script:start/stop/execute)
+│   │   ├── scripting.ts   # Fengari IPC bridge (script:start/stop/execute)
+│   │   └── discord.ts     # Discord RPC IPC (init/update/destroy)
 │   └── scripting/         # Fengari Lua VM (wired to renderer via IPC)
 │       ├── engine.ts      # Lua state lifecycle
 │       ├── api_v1.ts      # edgeware_v1 module
@@ -110,6 +111,7 @@ EdgewarePlusPlus/
 │   │   ├── packStore.ts   # Loaded pack + getMedia()
 │   │   ├── appStore.ts    # Splash, panic, running state
 │   │   ├── scriptStore.ts # Script engine state, Lua→renderer event listeners
+│   │   ├── discordStore.ts # Discord RPC connection state, activity updates
 │   │   └── ...            # corruptionStore, hibernateStore, moodStore, etc.
 │   ├── features/
 │   │   ├── config/ConfigPanel.tsx   # Full settings UI (tabs: General, Popups, System, Theme, Pack, Hibernate)
@@ -141,8 +143,7 @@ EdgewarePlusPlus/
 
 ### Next Session Priority Order
 
-1. **MEDIUM**: Discord presence via discord-rpc
-2. **MEDIUM**: Mitosis mode logic (spawn popup when count hits 0)
+1. **MEDIUM**: Mitosis mode logic (spawn popup when count hits 0)
 3. **LOW**: Playwright integration tests
 4. **LOW**: Cross-platform verification (Windows, Linux)
 5. **LOW**: Tray icon assets (.icns, .ico, .png)

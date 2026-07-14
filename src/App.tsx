@@ -4,6 +4,7 @@ import { useAppStore } from '@/stores/appStore'
 import { useConfigStore } from '@/stores/configStore'
 import { usePackStore } from '@/stores/packStore'
 import { usePopupStore } from '@/stores/popupStore'
+import { useDiscordStore } from '@/stores/discordStore'
 import { useElectronAPI } from '@/hooks/useElectronAPI'
 import { attachScriptListeners } from '@/stores/scriptStore'
 import { SplashScreen } from '@/components/SplashScreen'
@@ -99,6 +100,9 @@ export default function App() {
     electronAPI.loadConfig()
       .then((savedConfig) => {
         useConfigStore.getState().updateConfig(savedConfig)
+        if (savedConfig.showDiscord) {
+          useDiscordStore.getState().initPresence()
+        }
       })
       .catch((err) => console.error('config:load failed', err))
   }, [electronAPI])
@@ -109,21 +113,36 @@ export default function App() {
     electronAPI.onPanic(() => {
       useAppStore.getState().triggerPanic()
       usePopupStore.getState().clearPopups()
+      useDiscordStore.getState().destroyPresence()
     })
     electronAPI.onKeyEvent((_type, key) => {
       if (key === useConfigStore.getState().panicButton) {
         useAppStore.getState().triggerPanic()
+        useDiscordStore.getState().destroyPresence()
       }
     })
     electronAPI.onTrayAction((action) => {
       if (action === 'panic') {
         useAppStore.getState().triggerPanic()
+        useDiscordStore.getState().destroyPresence()
       }
     })
     electronAPI.onPopupClosed((id) => {
       usePopupStore.getState().removePopup(id)
     })
     attachScriptListeners()
+
+    const unsubDiscord = useConfigStore.subscribe((state, prev) => {
+      if (state.showDiscord !== prev.showDiscord) {
+        if (state.showDiscord) {
+          useDiscordStore.getState().initPresence()
+        } else {
+          useDiscordStore.getState().destroyPresence()
+        }
+      }
+    })
+
+    return () => { unsubDiscord() }
   }, [electronAPI])
 
   // --- Popup spawning loop ---
@@ -290,6 +309,20 @@ export default function App() {
       }
     }
   }, [running, electronAPI])
+
+  // --- Discord presence updates ---
+  useEffect(() => {
+    useDiscordStore.getState().updatePresence()
+  }, [popupCount])
+
+  const pack = usePackStore((s) => s.pack)
+  useEffect(() => {
+    useDiscordStore.getState().updatePresence()
+  }, [pack])
+
+  useEffect(() => {
+    return () => { useDiscordStore.getState().destroyPresence() }
+  }, [])
 
   const handleSplashComplete = useCallback(() => {
     completeSplash()

@@ -71,6 +71,9 @@ interface ElectronAPI {
   onScriptOpenSubliminal: (cb: (info: { text: string }) => void) => void
   onScriptNotification: (cb: (info: { text: string }) => void) => void
   showNotification: (title: string, body: string) => Promise<void>
+  initDiscord: () => Promise<{ success: boolean; error?: string }>
+  updateDiscord: (activity: Record<string, unknown>) => Promise<{ success: boolean }>
+  destroyDiscord: () => Promise<void>
 }
 
 declare global {
