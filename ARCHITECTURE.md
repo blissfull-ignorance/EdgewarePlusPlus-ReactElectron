@@ -87,9 +87,12 @@ The popup movement system spans React (renderer), Zustand stores, pure logic mod
 ```
 ConfigPanel (slider) ──► configStore (movingChance, movingSpeed)
                                   │
-App.tsx spawn effect ─────────────┘
+App.tsx spawn tick (configurable interval) ───────┘
+  ├─ per-type limit check: imageCount < maxImages, videoCount < maxVideos
+  ├─ pickRandom from combined image + video pool (or audio if no media)
   ├─ shouldMove(cfg.movingChance) → boolean (assigned once at spawn time)
   ├─ randomDirection() → { dx, dy } (persistent directional vector)
+  ├─ hypno overlay: only applied to static images (png/jpg/bmp/webp), not gifs or videos
   └─ addPopup({ moving, dx, dy, ... }) ──► popupStore
                                                 │
 App.tsx movement effect (setInterval 50ms) ─────┘
@@ -105,9 +108,10 @@ App.tsx movement effect (setInterval 50ms) ─────┘
 | `src/features/popup/movement.ts` | Pure functions: `computeMove`, `tickPopups`, `shouldMove`, `randomDirection` |
 | `src/features/popup/debug.ts` | Structured movement event logger (toggle-able, logs to console) |
 | `src/stores/popupStore.ts` | Zustand store: `popups[]`, `addPopup`, `updatePopup`, `removePopup` |
-| `src/stores/configStore.ts` | Config defaults (e.g. `movingChance: 0`, `movingSpeed: 5`) |
+| `src/stores/configStore.ts` | Config defaults (e.g. `movingChance: 0`, `movingSpeed: 5`, `maxImages: 10`, `maxVideos: 10`) |
 | `src/App.tsx` | Two `useEffect` loops: spawn (configurable interval) + movement (50ms fixed) |
 | `electron/ipc/popup.ts` | Main process: `createPopupWindow`, `movePopupWindow` (`BrowserWindow.setPosition`) |
+| `electron/ipc/pack.ts` | Pack loader: `categorizeByExt`, `HYPN_EXTS` (.gif only), `IMAGE_EXTS`, `VIDEO_EXTS` |
 | `electron/preload.ts` | Exposes `movePopup`, `createPopup`, etc. via `ipcRenderer.invoke` |
 
 ### Movement Design
@@ -116,6 +120,14 @@ App.tsx movement effect (setInterval 50ms) ─────┘
 - **Bounce at edges**: `computeMove` clamps to `[0, screen.width - popup.width]` and `[0, screen.height - popup.height]`, reversing `dx`/`dy` on bounce.
 - **Per-popup `moving` flag**: Set once at spawn via `shouldMove(cfg.movingChance)`. A popup that starts stationary never moves; one that starts moving always moves.
 - **Tick interval**: 50ms (20 ticks/sec). Each tick reads fresh store state via `getState()`.
+- **Integer coordinates**: `computeMove` returns `Math.round()` values to prevent Electron IPC float serialization errors.
+
+### Hypno Overlay System
+
+- **Pack loading** (`electron/ipc/pack.ts`): `HYPN_EXTS` contains only `.gif` files. Mp4/webm files are never counted as hypno, only as videos.
+- **Spawn decision** (`App.tsx`): Hypno overlay is only applied to static images (png, jpg, jpeg, bmp, webp). Gifs, videos, and audio never receive hypno overlays.
+- **Opacity**: Controlled by `cfg.subliminalsAlpha` (0–100), applied as CSS opacity on the `#hypno-img` element.
+- **Eligibility check**: `extOf(path)` extracts file extension; `STATIC_IMG_EXTS.has(ext)` gates the hypno random roll.
 
 ### Test Architecture
 
@@ -124,12 +136,14 @@ App.tsx movement effect (setInterval 50ms) ─────┘
 | `movement.test.ts` | Unit tests for `computeMove`, `shouldMove`, `randomDirection`, `tickPopups` (23 tests) |
 | `movement.runtime.test.ts` | Full store integration: `addPopup` → `tickPopups` → `updatePopup` with real Zustand stores (6 tests) |
 | `movement.flow.test.ts` | End-to-end simulation: config → spawn decision → tick loop → store updates, replicating App.tsx logic (8 tests) |
+| `hypno.test.ts` | `categorizeByExt` verification: gif → hypno, mp4/webm → not hypno, static images → not hypno (8 tests) |
+| `hypno.runtime.test.ts` | Spawn decision logic: `canHaveHypno` extension checks, subliminalsChance/Alpha gating (9 tests) |
 
 ### Debug Logging
 
 `src/features/popup/debug.ts` provides `logMovementEvent()` which logs structured JSON events with `[movement:tick]`, `[movement:move]`, `[movement:spawn]` tags. Enabled by default; call `disableMovementDebug()` to silence.
 
-`App.tsx` also has always-on `console.log` diagnostics tagged `[movement]`, `[movement:tick]`, `[movement:move]`, and `[spawn]`.
+`App.tsx` also has always-on `console.log` diagnostics tagged `[movement]`, `[movement:tick]`, `[movement:move]`, `[spawn]`, and `[spawn:hypno]`.
 
 ### Known Issue
 
