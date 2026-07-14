@@ -163,3 +163,189 @@ describe('full flow simulation — config → spawn → move tick', () => {
     expect(popups[0].moving).toBe(true)
   })
 })
+
+/**
+ * Popup removal mid-simulation tests.
+ *
+ * These verify that the movement tick loop handles popups being removed
+ * between ticks — the exact scenario that occurs during mitosis close flow
+ * (onPopupClosed → removePopup → spawnMitosisPopup). The tick loop must
+ * not crash or produce stale references when the popup list changes.
+ */
+describe('popup removal mid-simulation — mitosis close flow', () => {
+  beforeEach(() => {
+    resetAll()
+  })
+
+  it('removing a popup mid-tick does not affect remaining popups', () => {
+    simulateSpawnTick()
+    simulateSpawnTick()
+    simulateSpawnTick()
+    expect(usePopupStore.getState().popups).toHaveLength(3)
+
+    // Remove popup 2 mid-simulation (simulates mitosis close)
+    usePopupStore.getState().removePopup(2)
+    expect(usePopupStore.getState().popups).toHaveLength(2)
+
+    // Movement tick should still process remaining popups correctly
+    simulateMoveTick()
+    expect(usePopupStore.getState().popups).toHaveLength(2)
+    // Remaining popups (1 and 3) should still exist
+    const remaining = usePopupStore.getState().popups
+    expect(remaining.find((p) => p.id === 1)).toBeDefined()
+    expect(remaining.find((p) => p.id === 3)).toBeDefined()
+    expect(remaining.find((p) => p.id === 2)).toBeUndefined()
+  })
+
+  it('removing all popups mid-simulation produces empty tick', () => {
+    simulateSpawnTick()
+    simulateSpawnTick()
+    expect(usePopupStore.getState().popups).toHaveLength(2)
+
+    usePopupStore.getState().clearPopups()
+    expect(usePopupStore.getState().popups).toHaveLength(0)
+
+    // Tick on empty store should not crash
+    const popups = usePopupStore.getState().popups as TickablePopup[]
+    const updates = tickPopups(popups, 5, screen)
+    expect(updates.size).toBe(0)
+  })
+
+  it('removing the only popup mid-simulation leaves empty state', () => {
+    simulateSpawnTick()
+    expect(usePopupStore.getState().popups).toHaveLength(1)
+
+    usePopupStore.getState().removePopup(1)
+    expect(usePopupStore.getState().popups).toHaveLength(0)
+    expect(usePopupStore.getState().popupCount).toBe(0)
+
+    // Subsequent tick should be harmless
+    const popups = usePopupStore.getState().popups as TickablePopup[]
+    const updates = tickPopups(popups, 5, screen)
+    expect(updates.size).toBe(0)
+  })
+
+  it('simulated mitosis: remove original, spawn replacement, continue moving', () => {
+    // Spawn 2 popups
+    simulateSpawnTick()
+    simulateSpawnTick()
+    const initial = usePopupStore.getState().popups
+    expect(initial).toHaveLength(2)
+
+    // Simulate mitosis close: remove popup 1, spawn replacement with new id
+    usePopupStore.getState().removePopup(1)
+    usePopupStore.getState().addPopup({
+      id: 100, type: 'image', x: 600, y: 300, width: 300, height: 200,
+      moving: true, dx: 1, dy: 0, mitosisSpawned: true,
+    })
+    expect(usePopupStore.getState().popups).toHaveLength(2)
+
+    // Move tick should process both remaining popups
+    const updates = simulateMoveTick()
+    expect(updates.size).toBe(2)
+    expect(updates.has(2)).toBe(true)
+    expect(updates.has(100)).toBe(true)
+  })
+
+  it('multiple rapid removals: store stays consistent', () => {
+    for (let i = 0; i < 10; i++) {
+      simulateSpawnTick()
+    }
+    expect(usePopupStore.getState().popups).toHaveLength(10)
+
+    // Remove 5 popups in rapid succession
+    for (let i = 1; i <= 5; i++) {
+      usePopupStore.getState().removePopup(i)
+    }
+    expect(usePopupStore.getState().popups).toHaveLength(5)
+    expect(usePopupStore.getState().popupCount).toBe(5)
+
+    // Remaining 5 should all move correctly
+    const popups = usePopupStore.getState().popups as TickablePopup[]
+    const moving = popups.filter((p) => p.moving)
+    expect(moving.length).toBeGreaterThan(0)
+  })
+})
+
+/**
+ * Stress tests for rapid add/remove cycles.
+ *
+ * These verify that the popup store and movement system remain consistent
+ * under rapid state changes — e.g., spawning and immediately removing
+ * popups in quick succession, which can occur during high-frequency
+ * mitosis events or panic mode.
+ */
+describe('stress tests — rapid add/remove cycles', () => {
+  beforeEach(() => {
+    resetAll()
+  })
+
+  it('rapid add then immediate remove: count stays consistent', () => {
+    for (let i = 0; i < 50; i++) {
+      usePopupStore.getState().addPopup({
+        id: i + 1, type: 'image', x: 100, y: 100, width: 300, height: 200,
+        moving: false, dx: 0, dy: 0, mitosisSpawned: false,
+      })
+      usePopupStore.getState().removePopup(i + 1)
+    }
+    const state = usePopupStore.getState()
+    expect(state.popups).toHaveLength(0)
+    expect(state.popupCount).toBe(0)
+  })
+
+  it('interleaved add/remove: final count matches net operations', () => {
+    // Add 20, remove 5, add 3, remove 2 → net 16
+    for (let i = 0; i < 20; i++) {
+      usePopupStore.getState().addPopup({
+        id: i + 1, type: 'image', x: 100, y: 100, width: 300, height: 200,
+        moving: false, dx: 0, dy: 0, mitosisSpawned: false,
+      })
+    }
+    for (let i = 1; i <= 5; i++) {
+      usePopupStore.getState().removePopup(i)
+    }
+    for (let i = 21; i <= 23; i++) {
+      usePopupStore.getState().addPopup({
+        id: i, type: 'image', x: 100, y: 100, width: 300, height: 200,
+        moving: false, dx: 0, dy: 0, mitosisSpawned: false,
+      })
+    }
+    usePopupStore.getState().removePopup(6)
+    usePopupStore.getState().removePopup(7)
+
+    const state = usePopupStore.getState()
+    expect(state.popups).toHaveLength(16)
+    expect(state.popupCount).toBe(16)
+  })
+
+  it('tickPopups on rapidly modified list does not crash', () => {
+    // Add 20 popups, remove half, tick the remainder
+    for (let i = 0; i < 20; i++) {
+      usePopupStore.getState().addPopup({
+        id: i + 1, type: 'image', x: 500, y: 400, width: 300, height: 200,
+        moving: true, dx: 1, dy: 0, mitosisSpawned: false,
+      })
+    }
+    for (let i = 1; i <= 10; i++) {
+      usePopupStore.getState().removePopup(i)
+    }
+
+    const popups = usePopupStore.getState().popups as TickablePopup[]
+    expect(popups).toHaveLength(10)
+    const updates = tickPopups(popups, 5, screen)
+    expect(updates.size).toBe(10)
+  })
+
+  it('clearPopups during active movement: tick on empty list is safe', () => {
+    for (let i = 0; i < 10; i++) {
+      simulateSpawnTick()
+    }
+    // Panic mode: clear all
+    usePopupStore.getState().clearPopups()
+
+    const popups = usePopupStore.getState().popups as TickablePopup[]
+    const updates = tickPopups(popups, 5, screen)
+    expect(updates.size).toBe(0)
+    expect(usePopupStore.getState().popupCount).toBe(0)
+  })
+})

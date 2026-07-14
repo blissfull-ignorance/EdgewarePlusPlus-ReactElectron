@@ -265,3 +265,91 @@ describe('tickPopups', () => {
     expect(popups[0].dx).toBe(1)
   })
 })
+
+/**
+ * Edge case tests: popup dimensions larger than the screen.
+ *
+ * These verify that computeMove and tickPopups handle degenerate geometry
+ * correctly — e.g., a popup wider than the screen should clamp to x=0 and
+ * immediately reverse direction, and a popup taller than the screen should
+ * clamp to y=0 and reverse vertically.
+ */
+describe('computeMove — large popup dimensions relative to screen', () => {
+  const smallScreen: ScreenBounds = { width: 800, height: 600 }
+
+  it('popup wider than screen clamps to x=0 and reverses dx', () => {
+    const popup = makePopup({ width: 1200, height: 200, x: 0, y: 100, dx: 1, dy: 0 })
+    const result = computeMove(popup, 10, smallScreen)
+    // screen.width - popup.width = -400, so x > -400 is always true → clamped at max
+    // But x starts at 0 and moves to 10, then checks > 800-1200 = -400 → x=10 > -400 → clamped
+    expect(result.x).toBe(-400)
+    expect(result.dx).toBe(-1)
+  })
+
+  it('popup taller than screen clamps to y=0 and reverses dy', () => {
+    const popup = makePopup({ width: 200, height: 900, x: 100, y: 0, dx: 0, dy: 1 })
+    const result = computeMove(popup, 10, smallScreen)
+    // screen.height - popup.height = -300, y=10 > -300 → clamped at -300
+    expect(result.y).toBe(-300)
+    expect(result.dy).toBe(-1)
+  })
+
+  it('popup wider than screen moving left clamps to x=0', () => {
+    const popup = makePopup({ width: 1200, height: 200, x: 0, y: 100, dx: -1, dy: 0 })
+    const result = computeMove(popup, 10, smallScreen)
+    expect(result.x).toBe(0)
+    expect(result.dx).toBe(1)
+  })
+
+  it('popup taller than screen moving up clamps to y=0', () => {
+    const popup = makePopup({ width: 200, height: 900, x: 100, y: 0, dx: 0, dy: -1 })
+    const result = computeMove(popup, 10, smallScreen)
+    expect(result.y).toBe(0)
+    expect(result.dy).toBe(1)
+  })
+
+  it('popup exactly screen-size moves freely within [0, 0]', () => {
+    const popup = makePopup({ width: 800, height: 600, x: 0, y: 0, dx: 1, dy: 1 })
+    const result = computeMove(popup, 10, smallScreen)
+    // screen.width - width = 0, so x=10 > 0 → clamped back to 0, reversed
+    expect(result.x).toBe(0)
+    expect(result.dx).toBe(-1)
+    expect(result.y).toBe(0)
+    expect(result.dy).toBe(-1)
+  })
+
+  it('zero-size popup moves freely without clamping issues', () => {
+    const popup = makePopup({ width: 0, height: 0, x: 400, y: 300, dx: 1, dy: 1 })
+    const result = computeMove(popup, 10, smallScreen)
+    expect(result.x).toBe(410)
+    expect(result.y).toBe(310)
+    expect(result.dx).toBe(1)
+    expect(result.dy).toBe(1)
+  })
+})
+
+describe('tickPopups — large popup dimensions', () => {
+  const smallScreen: ScreenBounds = { width: 800, height: 600 }
+
+  it('popup wider than screen gets bounce update', () => {
+    const popups = [
+      makeTickPopup({ id: 1, moving: true, width: 1200, height: 200, x: 0, y: 100, dx: 1, dy: 0 }),
+    ]
+    const updates = tickPopups(popups, 10, smallScreen)
+    expect(updates.size).toBe(1)
+    const u = updates.get(1)!
+    expect(u.x).toBe(-400)
+    expect(u.dx).toBe(-1)
+  })
+
+  it('mixed sizes: only oversized popup bounces', () => {
+    const popups = [
+      makeTickPopup({ id: 1, moving: true, width: 1200, height: 200, x: 0, y: 100, dx: 1, dy: 0 }),
+      makeTickPopup({ id: 2, moving: true, width: 100, height: 100, x: 400, y: 200, dx: 1, dy: 0 }),
+    ]
+    const updates = tickPopups(popups, 10, smallScreen)
+    expect(updates.size).toBe(2)
+    expect(updates.get(1)!.dx).toBe(-1)
+    expect(updates.get(2)!.dx).toBe(1)
+  })
+})

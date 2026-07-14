@@ -1,31 +1,35 @@
-# TASK — Test Assessment & Improvement
+# Task: Test Improvement — Next Session
 
 ## Goal
-Assess all existing Vitest tests for viability, runtime detection capability, and improvement opportunities.
+Improve test coverage and quality for existing test files.
+
+## Priority
+**Highest** — This is the next task per HANDOVER.md priority order.
 
 ## Steps
 
-1. **Run existing tests** — `npm run test` to confirm all 54 tests pass
+1. **Add component-level tests for hypno overlay spawn decision logic in `hypno.runtime.test.ts`**
+   - Currently only store accessors are tested
+   - Add tests that verify the actual component-level decision logic
 
-2. **Review test files** — Read through all `*.test.ts` files in `src/features/popup/`
+2. **Add edge case tests for very large popup dimensions relative to screen size in `movement.test.ts`**
+   - Test behavior when popups are larger than the screen
 
-3. **Assess each test** — For each test, evaluate:
-   - Can the test realistically fail in production?
-   - Does it catch real runtime issues?
-   - Is the assertion meaningful?
+3. **Add test for popup removal mid-simulation (mitosis close flow) in `movement.flow.test.ts`**
+   - Verify correct behavior when popups are removed during movement simulation
 
-4. **Improve weak tests** — Strengthen tests with better assertions or more realistic scenarios
+4. **Consider adding stress tests for rapid add/remove cycles across all test files**
+   - Test performance and correctness under rapid state changes
 
-5. **Remove dead tests** — Identify tests that can't meaningfully fail and remove them
+5. **Improve comments in test files for better documentation**
+   - Add descriptive comments explaining test logic and edge cases
 
-6. **Add missing tests** — Identify untested critical paths and add new tests
+6. **Commit changes**
+   - Run `npm run check`, `npm run lint`, `npm run test` to verify
+   - Commit with descriptive message following conventional commit format
 
-7. **Improve comments for documentation** — Add/update comments in test files for clarity
-
-8. **Commit changes** — `git add -A && git commit -m "test: improve test viability and documentation"`
-
-9. **Update HANDOVER.md** — Update:
-   - "Last Session" line
-   - "What's Working" section
-   - "Recent Commits" section
-   - "Next Session Priority Order" with list of tests needing further improvement
+7. **Update HANDOVER.md**
+   - Update "Last Session" description
+   - Update "Recent Commits" section
+   - Update test count if changed
+   - Update "Next Session Priority Order" if needed
