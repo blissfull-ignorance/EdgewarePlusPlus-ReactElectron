@@ -1,5 +1,6 @@
 import { lua } from 'fengari'
-import { interop } from 'fengari-interop'
+import fengariInterop from 'fengari-interop'
+const { interop } = fengariInterop as { interop: { tojs: (L: unknown, index: number) => unknown } }
 import type { EdgewareCallbacks } from './callbacks.js'
 
 export function registerEdgewareV1(

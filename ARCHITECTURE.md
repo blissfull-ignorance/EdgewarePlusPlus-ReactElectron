@@ -250,3 +250,75 @@ Each popup is a standalone Electron BrowserWindow (not an in-app overlay).
 | `hypno.runtime.test.ts` | 9 | Spawn decision: canHaveHypno, subliminalsChance/Alpha gating |
 
 Run with: `npm run test` (Vitest)
+
+---
+
+## Playwright Integration Tests
+
+Browser-level integration tests using `@playwright/test` with Electron's `_electron` launcher. These tests launch the full Electron app, interact with real BrowserWindows, and verify end-to-end behavior.
+
+**Status: NOT RUNNABLE** — Blocked by `preload.cjs`/`preload.ts` sync and `fengari-interop` CJS/ESM issues. See HANDOVER.md Known Issues #2–4.
+
+### Test Strategy
+
+Tests run against the **Vite dev server** (not production build) because:
+- Production mode crashes on `fengari-interop` named CJS export (`import { interop } from 'fengari-interop'`)
+- Dev mode uses Vite for module bundling, avoiding the ESM/CJS conflict
+
+The `test:e2e` script:
+1. Compiles electron TypeScript (`tsc -p tsconfig.electron.json`)
+2. Starts Vite dev server on port 5173
+3. Launches Electron with `--dev` flag (loads from `localhost:5173`)
+4. Runs Playwright tests against the live Electron windows
+
+### Test Cases
+
+| Test | What It Verifies |
+|------|-----------------|
+| `splash screen appears and then config panel opens` | App mounts, splash renders, config panel visible after splash completes |
+| `config panel shows tabs` | ConfigPanel tabs (Start, Popup Types, Pack) are rendered |
+| `popup spawns and can be closed` | `electronAPI.createPopup()` creates a BrowserWindow, `closePopup()` destroys it |
+| `popup can be moved` | `electronAPI.movePopup()` repositions a popup window |
+| `multiple popups can coexist` | Two popups exist simultaneously, both close cleanly |
+| `panic kills all popups and shows panic screen` | `sendPanic()` closes all popups, renderer shows "PANIC MODE" |
+
+### Key Files
+
+| File | Role |
+|------|------|
+| `playwright.config.ts` | Playwright config: test dir, timeout (60s), single worker |
+| `tests/electron.spec.ts` | 6 integration tests across 3 describe blocks |
+| `electron/main.ts` | `EDGWARE_NO_DEVTOOLS` env var gates `openDevTools()` to avoid DevTools window in tests |
+
+### Test Lifecycle
+
+```
+beforeAll:
+  1. tsc -p tsconfig.electron.json   (compile electron TS)
+  2. vite --port 5173                 (start dev server)
+  3. waitForVite()                    (poll localhost:5173 until 200 OK)
+
+beforeEach:
+  electron.launch({ args: [ROOT, '--dev'], env: { EDGWARE_NO_DEVTOOLS: '1' } })
+  mainWindow = electronApp.firstWindow()
+
+afterEach:
+  electronApp.close()
+
+afterAll:
+  viteProcess.kill()
+```
+
+### Window Handling
+
+- `electronApp.firstWindow()` returns the main app window (not DevTools, thanks to `EDGWARE_NO_DEVTOOLS`)
+- Popup windows are separate `BrowserWindow` instances accessible via `electronApp.windows()`
+- Tests use `electronApp.windows().find(w => w !== mainWindow)` to locate popup windows
+
+### Current Blockers
+
+1. `preload.cjs` missing `onScriptStatus`, `destroyDiscord`, etc. → App crashes on mount
+2. `fengari-interop` CJS/ESM → Production builds crash; dev mode works for Vite-bundled code
+3. React `<App>` component throws due to missing preload APIs → `#root` stays empty
+
+Run with: `npm run test:e2e` (when blockers are fixed)

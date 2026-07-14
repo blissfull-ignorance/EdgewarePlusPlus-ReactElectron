@@ -2,7 +2,7 @@
 
 ## Current Status
 
-**Last Session:** Web open (shell.openExternal)
+**Last Session:** Playwright integration tests (partial — not runnable)
 
 **Date:** July 14, 2026
 
@@ -38,7 +38,11 @@
 
 1. **Tray icon missing** — No icon assets in repo, shows default Electron icon.
 
-3. **No Playwright tests** — Only Vitest unit/integration tests. No browser-level integration tests.
+2. **Playwright tests not runnable — `preload.cjs` out of sync with `preload.ts`** — `preload.cjs` (the file actually loaded by BrowserWindow) is missing many APIs that `preload.ts` exposes: `onScriptStatus`, `destroyDiscord`, `initDiscord`, `updateDiscord`, `showNotification`, all `onScript*` listeners, etc. The renderer crashes on mount with `api.onScriptStatus is not a function` and `window.electronAPI.destroyDiscord is not a function`. **Fix:** Either regenerate `preload.cjs` from `preload.ts` (e.g. via a build step), or delete `preload.ts` and make `preload.cjs` the single source of truth.
+
+3. **Playwright tests not runnable — `fengari-interop` CJS/ESM incompatibility** — `electron/scripting/api_v1.ts` uses `import { interop } from 'fengari-interop'` which fails at runtime because `fengari-interop` is a CJS module and Electron's Node ESM loader rejects named exports from CJS. A partial fix was applied (default import + destructure) but the root cause may affect other CJS dependencies. **Fix:** Apply the default-import pattern to all CJS interop imports, or switch the electron TS compile target to CommonJS.
+
+4. **Playwright tests not runnable — React App component crashes** — Even with fixes 2 and 3, the `<App>` component throws during initialization because it calls `api.onScriptStatus(...)` and `api.destroyDiscord()` which don't exist on the window.electronAPI from `preload.cjs`. This prevents the splash screen and config panel from rendering. **Fix:** Requires fix 2 (preload.cjs sync) to resolve.
 
 ### Recent Commits
 
@@ -63,7 +67,7 @@ f9477ae fix: restrict video formats to Chromium-supported codecs
 
 ### What's NOT Done
 
-- **Playwright tests** — No browser integration tests
+- **Playwright tests runnable** — Tests written but blocked by preload.cjs sync + fengari CJS/ESM issues
 - **Cross-platform verification** — Only tested on macOS
 - **Tray icon assets** — No .icns/.ico/.png icons in repo
 
@@ -73,6 +77,7 @@ f9477ae fix: restrict video formats to Chromium-supported codecs
 npm run check            # TypeScript type checking (tsc --noEmit)
 npm run lint             # ESLint
 npm run test             # Vitest (54 tests)
+npm run test:e2e         # Playwright Electron integration tests (NOT RUNNABLE — see Known Issues)
 npm run dev              # Vite dev server
 npm run electron:dev     # Dev with Electron
 npm run build            # Build React app
@@ -85,7 +90,8 @@ npm run electron:build   # Build Electron app
 EdgewarePlusPlus/
 ├── electron/              # Electron main process
 │   ├── main.ts            # Entry point, IPC handler registration
-│   ├── preload.ts         # contextBridge API
+│   ├── preload.ts         # contextBridge API (TypeScript source)
+│   ├── preload.cjs        # contextBridge API (CJS, actually loaded — OUT OF SYNC with preload.ts)
 │   ├── popup.html         # Popup window HTML/CSS/JS
 │   ├── ipc/               # IPC handlers
 │   │   ├── config.ts      # Config load/save
@@ -101,7 +107,7 @@ EdgewarePlusPlus/
 │   │   └── web.ts         # Web open IPC (shell.openExternal)
 │   └── scripting/         # Fengari Lua VM (wired to renderer via IPC)
 │       ├── engine.ts      # Lua state lifecycle
-│       ├── api_v1.ts      # edgeware_v1 module
+│       ├── api_v1.ts      # edgeware_v1 module (fengari-interop CJS/ESM issue)
 │       ├── api_v0.ts      # edgeware_v0 module
 │       ├── api_basic.ts   # print() override
 │       └── callbacks.ts   # Lua function reference management
@@ -139,6 +145,9 @@ EdgewarePlusPlus/
 │       ├── popup.ts         # Popup types
 │       ├── global.d.ts      # window.electronAPI type declarations
 │       └── fengari.d.ts     # Fengari module declarations
+├── tests/                 # Playwright integration tests (NOT RUNNABLE — see Known Issues)
+│   └── electron.spec.ts   # 6 tests: splash/config, popup lifecycle, panic mode
+├── playwright.config.ts   # Playwright configuration
 ├── ARCHITECTURE.md         # System architecture (up to date)
 ├── REACT-APP.md            # Migration plan (up to date)
 ├── AGENTS.md               # Agent instructions (up to date)
@@ -147,9 +156,14 @@ EdgewarePlusPlus/
 
 ### Next Session Priority Order
 
-1. **LOW**: Playwright integration tests
-2. **LOW**: Cross-platform verification (Windows, Linux)
-3. **LOW**: Tray icon assets (.icns, .ico, .png)
+1. **HIGH**: Fix `preload.cjs` to match `preload.ts` — either add a build step to auto-generate CJS from TS, or make `preload.cjs` the canonical file. This is the #1 blocker for Playwright tests and potentially for production builds.
+2. **HIGH**: Fix `fengari-interop` CJS/ESM import in `electron/scripting/api_v1.ts` — apply default-import pattern or switch electron compile to CommonJS. App crashes on load without this.
+3. **HIGH**: Verify Playwright tests pass once blockers 1+2 are fixed — run `npm run test:e2e` and fix any remaining issues.
+4. **MEDIUM**: In the original project, clicking the image/gif/video didn't close the popup. Instead, there was a button in the lower right corner, which had a custom text defined in the pack files, which closed the popup on click.
+5. **LOW**: Go through all existing tests. Assess tests viability: Can the test realistically fail? Does the test work for finding issues at runtime? Can the test be improved?
+6. **LOW**: Compare the former edgeware python projects features and config options to the current state of the implementation: Are all features ported? Are all tests ported?
+7. **LOW**: Cross-platform verification (Windows, Linux)
+8. **LOW**: Tray icon assets (.icns, .ico, .png)
 
 ### Important Notes
 
@@ -161,6 +175,9 @@ EdgewarePlusPlus/
 - React app uses HashRouter for Electron file:// compatibility
 - `Math.round()` is critical for popup coordinates — Electron IPC throws on floats
 - `HYPN_EXTS` contains only `.gif` — mp4/webm are videos, not hypno overlays
+- **`preload.cjs` is the actual file loaded by BrowserWindow** — `preload.ts` is the TS source but is NOT what runs. Keep them in sync or use a build step.
+- **Playwright tests use Vite dev server** — `test:e2e` script compiles electron TS, starts Vite on port 5173, then launches Electron in dev mode. Production mode has the CJS/ESM fengari crash.
+- **`EDGWARE_NO_DEVTOOLS` env var** — When set, prevents Electron from opening DevTools in dev mode (used by Playwright tests to avoid DevTools window interfering with `firstWindow()`)
 
 ---
 

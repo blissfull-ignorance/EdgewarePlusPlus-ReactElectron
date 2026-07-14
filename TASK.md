@@ -1,18 +1,35 @@
-# TASK — Web Open (shell.openExternal)
+# TASK: Playwright Integration Tests
 
-**Priority:** Next session highest priority
-**Status:** Not started
+**Session:** 2026-07-14
+**Branch:** `macos-cross-platform`
 
 ## Goal
 
-Wire `shell.openExternal()` via IPC so the renderer can open URLs in the default browser.
+Add Playwright browser-level integration tests for the Electron app.
 
-## Steps
+## Status: PARTIAL — NOT RUNNABLE
 
-1. **Create IPC handler** — Add `web:openExternal` handler in `electron/ipc/web.ts` that calls `shell.openExternal(url)`
-2. **Register handler** — Import and register the new IPC handler in `electron/main.ts`
-3. **Expose in preload** — Add `openExternal(url: string)` to `electron/preload.ts` via `contextBridge`
-4. **Add type declaration** — Extend `window.electronAPI` in `src/types/global.d.ts`
-5. **Verify** — Run `npm run check` and `npm run lint`
-6. **Commit** — `feat: wire shell.openExternal via IPC for web links`
-7. **Update HANDOVER.md** — Move web open from "What's NOT Done" to "What's Working"
+Steps 1–5 completed. Step 6 (run tests) blocked by preload.cjs sync and fengari CJS/ESM issues. See HANDOVER.md.
+
+## Completed
+
+1. ✅ Install Playwright and configure for Electron (`@playwright/test`)
+2. ✅ Create `tests/electron.spec.ts` with 6 test cases
+3. ✅ Create `playwright.config.ts`
+4. ✅ Add `test:e2e` and `test:e2e:ui` npm scripts
+5. ✅ Fix `EDGWARE_NO_DEVTOOLS` env var in `electron/main.ts`
+6. ✅ Fix `fengari-interop` CJS import in `electron/scripting/api_v1.ts` (partial)
+7. ✅ Update HANDOVER.md with blockers as high-priority tasks
+8. ✅ Update ARCHITECTURE.md with Playwright section
+
+## Blocked
+
+- **preload.cjs out of sync with preload.ts** — Renderer crashes calling missing APIs
+- **fengari-interop CJS/ESM** — Production builds crash; dev mode works
+- **App component throws** — `#root` stays empty due to missing preload APIs
+
+## Next Steps (HANDOVER.md priority order)
+
+1. Fix preload.cjs to match preload.ts
+2. Fix fengari-interop import pattern
+3. Verify Playwright tests pass

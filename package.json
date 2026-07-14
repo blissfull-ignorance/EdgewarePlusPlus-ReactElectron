@@ -13,7 +13,9 @@
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "check": "tsc --noEmit",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "test:e2e": "tsc -p tsconfig.electron.json && vite build && playwright test",
+    "test:e2e:ui": "tsc -p tsconfig.electron.json && vite build && playwright test --ui"
   },
   "dependencies": {
     "@mantine/core": "^7",
@@ -30,6 +32,7 @@
     "zustand": "^5"
   },
   "devDependencies": {
+    "@playwright/test": "^1.61.1",
     "@types/adm-zip": "^0.5.8",
     "@types/node": "^22",
     "@types/react": "^19",
