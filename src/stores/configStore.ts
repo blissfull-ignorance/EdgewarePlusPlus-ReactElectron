@@ -48,6 +48,7 @@ const defaults: Config = {
   denialChance: 0,
   drivePath: '',
   maxAudio: 1,
+  maxImages: 10,
   maxVideos: 10,
   subliminalsChance: 0,
   safeMode: true,

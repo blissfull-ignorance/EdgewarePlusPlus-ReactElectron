@@ -45,6 +45,7 @@ export interface Config {
   denialChance: number
   drivePath: string
   maxAudio: number
+  maxImages: number
   maxVideos: number
   subliminalsChance: number
   safeMode: boolean

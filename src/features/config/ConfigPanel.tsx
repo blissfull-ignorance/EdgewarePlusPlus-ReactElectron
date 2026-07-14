@@ -145,6 +145,10 @@ export function ConfigPanel() {
                 marks={[{ value: 100, label: '100ms' }, { value: 5000, label: '5s' }, { value: 30000, label: '30s' }]}
               />
             </div>
+            <NumberInput label="Max Images" value={config.maxImages}
+              onChange={(v) => config.updateConfig({ maxImages: Number(v) || 1 })}
+              min={1} max={500}
+            />
             <NumberInput label="Max Videos" value={config.maxVideos}
               onChange={(v) => config.updateConfig({ maxVideos: Number(v) || 1 })}
               min={1} max={500}

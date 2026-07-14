@@ -124,17 +124,15 @@ export default function App() {
       if (!pack) return
 
       const cfg = useConfigStore.getState()
-      const popup = usePopupStore.getState()
-      if (popup.popupCount >= cfg.maxVideos) return
 
       const images = pack.media.images
       const videos = pack.media.videos
       const audio = pack.media.audio
-      const hasNonAudio = images.length + videos.length > 0
-      const pool = hasNonAudio ? [...images, ...videos] : audio
-      if (pool.length === 0) return
 
-      const path = pickRandom(pool)
+      const hasNonAudio = images.length + videos.length > 0
+      if (!hasNonAudio && audio.length === 0) return
+
+      const path = pickRandom(hasNonAudio ? [...images, ...videos] : audio)
       const isVideo = videos.includes(path)
       const isAudio = audio.includes(path)
 
@@ -142,6 +140,11 @@ export default function App() {
         const id = audioIdCounter++
         usePopupStore.getState().addPopup({ id, type: 'audio', mediaPath: path, x: 0, y: 0, width: 0, height: 0, moving: false, dx: 0, dy: 0 })
       } else {
+        const popups = usePopupStore.getState().popups
+        const currentImages = popups.filter((p) => p.type === 'image').length
+        const currentVideos = popups.filter((p) => p.type === 'video').length
+        if (isVideo && currentVideos >= cfg.maxVideos) return
+        if (!isVideo && currentImages >= cfg.maxImages) return
         const scale = cfg.popupScale || 1
         const w = Math.round(randomInt(200, 400) * scale)
         const h = Math.round(randomInt(150, 300) * scale)
