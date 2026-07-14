@@ -182,6 +182,7 @@ export function ConfigPanel() {
             <SliderLabel label="Image Chance" value={config.popupMod} onChange={(v) => config.updateConfig({ popupMod: v })} />
             <SliderLabel label="Video Chance" value={config.vidMod} onChange={(v) => config.updateConfig({ vidMod: v })} />
             <SliderLabel label="Video Volume (%)" value={config.videoVolume} onChange={(v) => config.updateConfig({ videoVolume: v })} />
+            <SliderLabel label="Audio Volume (%)" value={config.audioVolume} onChange={(v) => config.updateConfig({ audioVolume: v })} />
             <SliderLabel label="Audio Chance" value={config.audioMod} onChange={(v) => config.updateConfig({ audioMod: v })} />
             <NumberInput label="Fade In Duration (ms)" value={config.fadeInDuration}
               onChange={(v) => config.updateConfig({ fadeInDuration: Math.max(0, Number(v) || 0) })}
@@ -291,6 +292,10 @@ export function ConfigPanel() {
                 />
               </>
             )}
+            <TextInput label="Wallpaper Data" description="Internal JSON field for wallpaper paths"
+              value={config.wallpaperDat}
+              onChange={(e) => config.updateConfig({ wallpaperDat: e.currentTarget.value })}
+            />
           </Stack>
         </Tabs.Panel>
 
@@ -540,6 +545,10 @@ export function ConfigPanel() {
             <TextInput label="Global Panic Key" description="Universal panic hotkey"
               value={config.globalPanicButton}
               onChange={(e) => config.updateConfig({ globalPanicButton: e.currentTarget.value })}
+            />
+            <TextInput label="Per-Popup Panic Button" description="Per-popup panic key override"
+              value={config.panicButton}
+              onChange={(e) => config.updateConfig({ panicButton: e.currentTarget.value })}
             />
             <Button color="red" variant="outline" onClick={triggerPanic}>
               Trigger Panic (Test)

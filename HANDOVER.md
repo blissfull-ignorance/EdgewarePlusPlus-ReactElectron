@@ -2,7 +2,7 @@
 
 ## Current Status
 
-**Last Session:** Wire Fengari scripting engine to renderer via IPC
+**Last Session:** Add missing ConfigPanel controls (audioVolume, panicButton, wallpaperDat)
 
 **Date:** July 14, 2026
 
@@ -36,12 +36,10 @@
 
 3. **No Playwright tests** — Only Vitest unit/integration tests. No browser-level integration tests.
 
-4. **Config Panel missing controls** — Some config fields (e.g., `maxAudio`, `videoVolume`, `notificationChance`) have no UI controls yet.
-
 ### Recent Commits
 
 ```
-feat: wire Fengari scripting engine to renderer via IPC
+e01b5fd feat: wire Fengari scripting engine to renderer via IPC
 7e0251b fix: sync ConfigData type with renderer Config (add maxImages, popupScale)
 c594a48 docs: add comprehensive comments with markers to all code files
 5b6a031 docs: update ARCHITECTURE.md with current feature state
@@ -143,13 +141,12 @@ EdgewarePlusPlus/
 
 ### Next Session Priority Order
 
-1. **HIGH**: Add missing ConfigPanel controls (videoVolume, notificationChance, maxAudio, etc.)
-2. **MEDIUM**: Notifications via Electron API
-3. **MEDIUM**: Discord presence via discord-rpc
-4. **MEDIUM**: Mitosis mode logic (spawn popup when count hits 0)
-5. **LOW**: Playwright integration tests
-6. **LOW**: Cross-platform verification (Windows, Linux)
-7. **LOW**: Tray icon assets (.icns, .ico, .png)
+1. **MEDIUM**: Notifications via Electron API
+2. **MEDIUM**: Discord presence via discord-rpc
+3. **MEDIUM**: Mitosis mode logic (spawn popup when count hits 0)
+4. **LOW**: Playwright integration tests
+5. **LOW**: Cross-platform verification (Windows, Linux)
+6. **LOW**: Tray icon assets (.icns, .ico, .png)
 
 ### Important Notes
 
