@@ -44,6 +44,11 @@ interface ElectronAPI {
   replaceImages: (path: string, count: number) => Promise<void>
   sendPanic: () => Promise<void>
   onPanic: (cb: () => void) => void
+  startLockout: (lockoutMinutes: number) => Promise<number>
+  clearLockout: () => Promise<void>
+  validateSafeword: (input: string) => Promise<{ valid: boolean }>
+  onLockoutStart: (cb: (endTime: number) => void) => void
+  onLockoutClear: (cb: () => void) => void
   onPopupClosed: (cb: (id: number) => void) => void
   onHibernateTimer: (cb: () => void) => void
   onHibernateSkip: (cb: () => void) => void

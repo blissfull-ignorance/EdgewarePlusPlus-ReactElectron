@@ -9,6 +9,7 @@ import { fillDrive, replaceImages } from './ipc/filesystem.js'
 import { loadConfig, saveConfig } from './ipc/config.js'
 import { loadPackFromDirectory, extractPackZip, isZipFile } from './ipc/pack.js'
 import { setScriptingMainWindow, startScripting, stopScripting, executeLuaScript, executeLuaCode, getScriptingStatus } from './ipc/scripting.js'
+import { setPanicMainWindow, registerPanicHandlers, updateSafeword } from './ipc/panic.js'
 import { showNotification } from './ipc/notifications.js'
 import { initDiscord, updateDiscord, destroyDiscord } from './ipc/discord.js'
 import { openExternal } from './ipc/web.js'
@@ -45,6 +46,7 @@ function createWindow() {
 
   setPopupMainWindow(mainWindow)
   setScriptingMainWindow(mainWindow)
+  setPanicMainWindow(mainWindow)
 
   mainWindow.on('closed', () => {
     mainWindow = null
@@ -64,6 +66,7 @@ function registerIpcHandlers() {
 
   ipcMain.handle('config:save', async (_event, config) => {
     saveConfig(config)
+    updateSafeword(config.safeword)
     if (mainWindow) {
       updateTrayMenu(mainWindow, {
         hibernateMode: config.hibernateMode,
@@ -131,6 +134,8 @@ function registerIpcHandlers() {
     closeAllPopups()
     mainWindow?.webContents.send('panic')
   })
+
+  registerPanicHandlers()
 
   ipcMain.handle('screen:bounds', async () => {
     const primary = screen.getPrimaryDisplay().bounds

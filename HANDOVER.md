@@ -2,9 +2,9 @@
 
 ## Current Status
 
-**Last Session:** Hibernate runtime gap fixes — pump-scare auto-close, tray skip button, reactive wallpaper reset, config validation, and 38 unit tests
+**Last Session:** Panic lockout runtime — timer, safeword validation dialog, lockout state tracking, 32 unit tests
 
-**Date:** July 14, 2026
+**Date:** July 15, 2026
 
 **Branch:** `macos-cross-platform`
 
@@ -21,6 +21,7 @@
 - **Config persistence** — load/save via IPC to `userData/config.json`
 - **Pack loading** — directory scanning, zip extraction, media categorization, popupClose from index.json
 - **Keyboard shortcuts** — panic button via `globalShortcut`
+- **Panic lockout runtime** — Timed lockout after timer mode enabled, safeword validation dialog (Mantine modal), lockout state tracking in appStore, IPC channels (startLockout/clearLockout/validateSafeword), blocks panic triggers during lockout
 - **System tray** — context menu with Panic/Quit + "Skip to Hibernate" (when enabled)
 - **Wallpaper** — cross-platform (osascript/gsettings/user32.dll) + reactive reset when popups clear
 - **Splash screen** — fade animation on startup
@@ -28,7 +29,7 @@
 - **Prompt modal** — Mantine modal with Levenshtein distance validation
 - **Hibernate runtime** — Activity loop scheduling with 6 types (Original/Spaced/Glitch/Ramp/Pump-Scare/Chaos), sleep timer, pump-scare auto-close, tray skip button, reactive wallpaper reset, config validation (fixWallpaper forced off when hibernate disabled)
 - **Hibernate panel** — hibernate activation with type selection
-- **185 Vitest tests** — movement (35) + movement.runtime (6) + movement.flow (17) + hypno (11) + hypno.runtime (34) + corruption (44) + hibernate (38), all passing
+- **217 Vitest tests** — movement (35) + movement.runtime (6) + movement.flow (17) + hypno (11) + hypno.runtime (34) + corruption (44) + hibernate (38) + panic (32), all passing
 - **Fengari scripting wired** — Lua VM lifecycle, IPC bridge (script:start/stop/execute), scriptStore dispatches Lua callbacks to popupStore, corruptionStore, moodStore, promptStore, and appStore
 - **Notifications** — `electron.Notification` API wired via IPC, preload exposes `showNotification`, Lua `sendNotification` triggers native desktop notification
 - **Discord presence** — `discord-rpc` integrated via IPC, preload, Zustand store; updates on popup count/pack changes; respects `showDiscord` config toggle; destroys on panic/quit
@@ -72,7 +73,7 @@ f9477ae fix: restrict video formats to Chromium-supported codecs
 
 ### What's NOT Done
 
-- **Panic lockout runtime** — Config exists but no timer, safeword validation dialog, or lockout state tracking
+- **Panic lockout runtime** — ✅ Implemented: timer, safeword validation dialog, lockout state, IPC, 32 unit tests
 - **Wallpaper rotation** — Config exists but no timer-based rotation logic
 - **Popup overlap avoidance** — Python uses grid-based weighting; TS uses random positioning
 - **Lowkey corner positioning** — Config exists but no corner-based positioning logic
@@ -91,7 +92,7 @@ f9477ae fix: restrict video formats to Chromium-supported codecs
 ```bash
 npm run check            # TypeScript type checking (tsc --noEmit)
 npm run lint             # ESLint
-npm run test             # Vitest (185 tests)
+npm run test             # Vitest (217 tests)
 npm run test:e2e         # Playwright Electron integration tests (6 tests)
 npm run dev              # Vite dev server
 npm run electron:dev     # Dev with Electron
@@ -119,6 +120,7 @@ EdgewarePlusPlus/
 │   │   ├── shortcut.ts    # Desktop shortcuts
 │   │   ├── scripting.ts   # Fengari IPC bridge (script:start/stop/execute)
 │   │   ├── discord.ts     # Discord RPC IPC (init/update/destroy)
+│   │   ├── panic.ts       # Panic lockout IPC (startLockout/clearLockout/validateSafeword)
 │   │   └── web.ts         # Web open IPC (shell.openExternal)
 │   └── scripting/         # Fengari Lua VM (wired to renderer via IPC)
 │       ├── engine.ts      # Lua state lifecycle
@@ -153,6 +155,10 @@ EdgewarePlusPlus/
 │   │   │   ├── SubliminalPopup.tsx   # Subliminal text overlay
 │   │   │   └── *.test.ts            # 103 tests across 5 files
 │   │   ├── prompt/PromptModal.tsx    # Mantine modal with Levenshtein
+│   │   ├── panic/
+│   │   │   ├── panic.ts              # Pure functions: lockout timer, safeword validation, shouldBlockPanic
+│   │   │   ├── panic.test.ts         # 32 unit tests for panic lockout pure functions
+│   │   │   └── SafewordModal.tsx     # Mantine modal for safeword entry during lockout
 │   │   └── hibernate/
 │   │       ├── hibernate.ts          # Pure functions: delay computation, activity scheduling, wallpaper reset
 │   │       ├── hibernate.test.ts     # 38 unit tests for hibernate pure functions
@@ -177,17 +183,18 @@ EdgewarePlusPlus/
 
 ### Next Session Priority Order
 
-1. **HIGH**: Implement panic lockout runtime (timer, safeword validation, lockout state)
-2. **MEDIUM**: Implement wallpaper rotation (timer-based rotation with variance)
-3. **MEDIUM**: Implement popup overlap avoidance positioning
-4. **LOW**: Implement popup timeout (auto-close timer)
-5. **LOW**: Implement single mode weighted random spawn selection
-6. **LOW**: Add mood-based media filtering (requires pack loader mood tagging)
-7. **LOW**: Add corruption danger check dialog (warns when full-perm enables dangerous settings)
-8. **LOW**: Add launch count persistence for corruption (via Electron IPC)
-9. **LOW**: Cross-platform verification (Windows, Linux)
-10. **LOW**: Tray icon assets (.icns, .ico, .png)
-11. **MEDIUM**: Based on FEATURE_PARITY_AUDIT.md, ARCHITECTURE.md and general project analysis, overhaul the README.md completely. Make sure the README.md explains a transition from the original project to the cross platform react project, include some reasoning behind it. Make sure to include the previous information and expand.
+1. ~~**HIGH**: Implement panic lockout runtime~~ ✅ Done
+2. **MEDIUM**: Audio playback (from pure audio files, not videos) is currently not working properly. Implement tests to catch this error automatically. Fix the issue
+3. **MEDIUM**: Implement wallpaper rotation (timer-based rotation with variance)
+4. **MEDIUM**: Implement popup overlap avoidance positioning
+5. **LOW**: Implement popup timeout (auto-close timer)
+6. **LOW**: Implement single mode weighted random spawn selection
+7. **LOW**: Add mood-based media filtering (requires pack loader mood tagging)
+8. **LOW**: Add corruption danger check dialog (warns when full-perm enables dangerous settings)
+9. **LOW**: Add launch count persistence for corruption (via Electron IPC)
+10. **LOW**: Cross-platform verification (Windows, Linux)
+11. **LOW**: Tray icon assets (.icns, .ico, .png)
+12. **MEDIUM**: Based on FEATURE_PARITY_AUDIT.md, ARCHITECTURE.md and general project analysis, overhaul the README.md completely. Make sure the README.md explains a transition from the original project to the cross platform react project, include some reasoning behind it. Make sure to include the previous information and expand
 
 
 ### Important Notes

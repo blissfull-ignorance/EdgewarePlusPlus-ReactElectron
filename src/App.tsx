@@ -18,6 +18,8 @@ import { planActivity, hibernateDelay, shouldResetWallpaper } from '@/features/h
 import type { HibernateType } from '@/features/hibernate/hibernate'
 import { shouldMove, randomDirection, tickPopups } from '@/features/popup/movement'
 import { logMovementEvent } from '@/features/popup/debug'
+import { shouldBlockPanic } from '@/features/panic/panic'
+import { SafewordModal } from '@/features/panic/SafewordModal'
 import { Container, Title, Text, Anchor } from '@mantine/core'
 
 // DISCUSSION: audioIdCounter is module-level, not reset on pack change. If packs
@@ -155,7 +157,7 @@ function pickDenialFilter(): string {
 }
 
 export default function App() {
-  const { inPanicMode, splashComplete, running, completeSplash } = useAppStore()
+  const { inPanicMode, isLockedOut, splashComplete, running, completeSplash } = useAppStore()
   const popupCount = usePopupStore((s) => s.popupCount)
   const electronAPI = useElectronAPI()
   const spawnTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
@@ -182,29 +184,44 @@ export default function App() {
         if (savedConfig.showDiscord) {
           useDiscordStore.getState().initPresence()
         }
+        if (savedConfig.timerMode && savedConfig.timerSetupTime > 0) {
+          electronAPI.startLockout(savedConfig.timerSetupTime)
+        }
       })
       .catch((err) => console.error('config:load failed', err))
   }, [electronAPI])
 
-  // Register Electron IPC event listeners (panic, key, tray, popup closed)
+  // Register Electron IPC event listeners (panic, key, tray, popup closed, lockout)
   useEffect(() => {
     if (!electronAPI) return
     electronAPI.onPanic(() => {
-      useAppStore.getState().triggerPanic()
+      const appState = useAppStore.getState()
+      if (shouldBlockPanic(appState.inPanicMode, appState.lockoutEndTime)) return
+      appState.triggerPanic()
       usePopupStore.getState().clearPopups()
       useDiscordStore.getState().destroyPresence()
     })
     electronAPI.onKeyEvent((_type, key) => {
       if (key === useConfigStore.getState().panicButton) {
-        useAppStore.getState().triggerPanic()
+        const appState = useAppStore.getState()
+        if (shouldBlockPanic(appState.inPanicMode, appState.lockoutEndTime)) return
+        appState.triggerPanic()
         useDiscordStore.getState().destroyPresence()
       }
     })
     electronAPI.onTrayAction((action) => {
       if (action === 'panic') {
-        useAppStore.getState().triggerPanic()
+        const appState = useAppStore.getState()
+        if (shouldBlockPanic(appState.inPanicMode, appState.lockoutEndTime)) return
+        appState.triggerPanic()
         useDiscordStore.getState().destroyPresence()
       }
+    })
+    electronAPI.onLockoutStart((endTime) => {
+      useAppStore.getState().startLockout(endTime)
+    })
+    electronAPI.onLockoutClear(() => {
+      useAppStore.getState().clearLockout()
     })
     electronAPI.onPopupClosed((id) => {
       const state = usePopupStore.getState()
@@ -795,8 +812,12 @@ export default function App() {
       <Container size="xs" py="xl" ta="center">
         <Title order={2} c="red">PANIC MODE</Title>
         <Text c="dimmed" mt="md">
-          All popups have been closed. Press "Clear Panic" in the config panel to resume.
+          All popups have been closed.
+          {isLockedOut
+            ? 'Enter the safeword or press "Clear Panic" in the config panel to resume.'
+            : 'Press "Clear Panic" in the config panel to resume.'}
         </Text>
+        <SafewordModal />
       </Container>
     )
   }
@@ -821,6 +842,7 @@ export default function App() {
       )}
 
       <PromptModal />
+      <SafewordModal />
       <PopupContainer />
     </>
   )
