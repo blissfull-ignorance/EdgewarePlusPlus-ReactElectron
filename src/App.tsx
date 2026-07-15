@@ -16,7 +16,8 @@ import { HibernatePanel } from '@/features/hibernate/HibernatePanel'
 import { useHibernateStore } from '@/stores/hibernateStore'
 import { planActivity, hibernateDelay, shouldResetWallpaper } from '@/features/hibernate/hibernate'
 import type { HibernateType } from '@/features/hibernate/hibernate'
-import { shouldMove, randomDirection, tickPopups } from '@/features/popup/movement'
+import { shouldMove, randomDirection, tickPopups, computeSpawnPosition } from '@/features/popup/movement'
+import type { OccupiedZone } from '@/features/popup/movement'
 import { logMovementEvent } from '@/features/popup/debug'
 import { shouldBlockPanic } from '@/features/panic/panic'
 import { computeRotation, shouldRotate } from '@/features/wallpaper/rotation'
@@ -62,8 +63,8 @@ function spawnMitosisPopup(
   const scale = cfg.popupScale || 1
   const w = Math.round(randomInt(200, 400) * scale)
   const h = Math.round(randomInt(150, 300) * scale)
-  const x = randomInt(0, Math.max(0, bounds.width - w))
-  const y = randomInt(0, Math.max(0, bounds.height - h))
+  const occupied: OccupiedZone[] = usePopupStore.getState().popups
+  const { x, y } = computeSpawnPosition(w, h, bounds, occupied)
 
   if (electronAPI) {
     const mediaExt = extOf(mediaPath)
@@ -320,8 +321,8 @@ export default function App() {
         const w = Math.round(randomInt(200, 400) * scale)
         const h = Math.round(randomInt(150, 300) * scale)
         const bounds = screenRef.current
-        const x = randomInt(0, Math.max(0, bounds.width - w))
-        const y = randomInt(0, Math.max(0, bounds.height - h))
+        const occupied: OccupiedZone[] = usePopupStore.getState().popups
+        const { x, y } = computeSpawnPosition(w, h, bounds, occupied)
 
         if (electronAPI) {
           // Hypno overlay: only applied to static images (not gifs, not videos)
@@ -599,11 +600,11 @@ export default function App() {
 
     const cfg = useConfigStore.getState()
     const scale = cfg.popupScale || 1
-    const w = Math.round(randInt(200, 400) * scale)
-    const h = Math.round(randInt(150, 300) * scale)
+    const w = Math.round(randomInt(200, 400) * scale)
+    const h = Math.round(randomInt(150, 300) * scale)
     const bounds = screenRef.current
-    const x = randInt(0, Math.max(0, bounds.width - w))
-    const y = randInt(0, Math.max(0, bounds.height - h))
+    const occupied: OccupiedZone[] = usePopupStore.getState().popups
+    const { x, y } = computeSpawnPosition(w, h, bounds, occupied)
 
     if (electronAPI) {
       const mediaExt = extOf(path)
@@ -672,11 +673,11 @@ export default function App() {
               const imgPath = pickRandom(pack.media.images)
               const cfgLocal = useConfigStore.getState()
               const scale = cfgLocal.popupScale || 1
-              const w = Math.round(randInt(200, 400) * scale)
-              const h = Math.round(randInt(150, 300) * scale)
+              const w = Math.round(randomInt(200, 400) * scale)
+              const h = Math.round(randomInt(150, 300) * scale)
               const bounds = screenRef.current
-              const x = randInt(0, Math.max(0, bounds.width - w))
-              const y = randInt(0, Math.max(0, bounds.height - h))
+              const occupiedPump: OccupiedZone[] = usePopupStore.getState().popups
+              const { x, y } = computeSpawnPosition(w, h, bounds, occupiedPump)
 
               if (electronAPI) {
                 electronAPI.createPopup({

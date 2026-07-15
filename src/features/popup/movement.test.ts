@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import { computeMove, shouldMove, randomDirection, tickPopups } from './movement'
-import type { MovingPopup, TickablePopup, ScreenBounds } from './movement'
+import { computeMove, shouldMove, randomDirection, tickPopups, computeSpawnPosition } from './movement'
+import type { MovingPopup, TickablePopup, ScreenBounds, OccupiedZone } from './movement'
 
 /** Factory for MovingPopup with sensible defaults. Override any field via spread. */
 function makePopup(overrides: Partial<MovingPopup> = {}): MovingPopup {
@@ -351,5 +351,145 @@ describe('tickPopups — large popup dimensions', () => {
     expect(updates.size).toBe(2)
     expect(updates.get(1)!.dx).toBe(-1)
     expect(updates.get(2)!.dx).toBe(1)
+  })
+})
+
+describe('computeSpawnPosition', () => {
+  const screen: ScreenBounds = { width: 1920, height: 1080 }
+  const popupW = 300
+  const popupH = 200
+
+  it('returns coordinates within screen bounds with no occupied zones', () => {
+    for (let i = 0; i < 50; i++) {
+      const pos = computeSpawnPosition(popupW, popupH, screen, [])
+      expect(pos.x).toBeGreaterThanOrEqual(0)
+      expect(pos.x).toBeLessThanOrEqual(screen.width - popupW)
+      expect(pos.y).toBeGreaterThanOrEqual(0)
+      expect(pos.y).toBeLessThanOrEqual(screen.height - popupH)
+    }
+  })
+
+  it('returns integer coordinates', () => {
+    for (let i = 0; i < 20; i++) {
+      const pos = computeSpawnPosition(popupW, popupH, screen, [])
+      expect(Number.isInteger(pos.x)).toBe(true)
+      expect(Number.isInteger(pos.y)).toBe(true)
+    }
+  })
+
+  it('avoids cell occupied by a popup in top-left quadrant', () => {
+    const occupied: OccupiedZone[] = [{ x: 100, y: 100, width: 300, height: 200 }]
+    const samples: Array<{ x: number; y: number }> = []
+    for (let i = 0; i < 200; i++) {
+      samples.push(computeSpawnPosition(popupW, popupH, screen, occupied))
+    }
+    const inOccupiedCell = samples.filter((p) =>
+      p.x < 480 && p.x >= 0 && p.y < 360 && p.y >= 0,
+    )
+    expect(inOccupiedCell.length).toBeLessThan(samples.length * 0.4)
+  })
+
+  it('all cells full: still returns valid position within bounds', () => {
+    const occupied: OccupiedZone[] = [
+      { x: 0, y: 0, width: 500, height: 400 },
+      { x: 480, y: 0, width: 500, height: 400 },
+      { x: 960, y: 0, width: 500, height: 400 },
+      { x: 1440, y: 0, width: 500, height: 400 },
+      { x: 0, y: 360, width: 500, height: 400 },
+      { x: 480, y: 360, width: 500, height: 400 },
+      { x: 960, y: 360, width: 500, height: 400 },
+      { x: 1440, y: 360, width: 500, height: 400 },
+      { x: 0, y: 720, width: 500, height: 400 },
+      { x: 480, y: 720, width: 500, height: 400 },
+      { x: 960, y: 720, width: 500, height: 400 },
+      { x: 1440, y: 720, width: 500, height: 400 },
+    ]
+    for (let i = 0; i < 50; i++) {
+      const pos = computeSpawnPosition(popupW, popupH, screen, occupied)
+      expect(pos.x).toBeGreaterThanOrEqual(0)
+      expect(pos.x).toBeLessThanOrEqual(screen.width - popupW)
+      expect(pos.y).toBeGreaterThanOrEqual(0)
+      expect(pos.y).toBeLessThanOrEqual(screen.height - popupH)
+    }
+  })
+
+  it('popup larger than screen returns valid clamped position', () => {
+    const bigW = 2400
+    const bigH = 1200
+    const pos = computeSpawnPosition(bigW, bigH, screen, [])
+    expect(pos.x).toBe(0)
+    expect(pos.y).toBe(0)
+  })
+
+  it('deterministic with injectable random: same seed gives same result', () => {
+    const deterministic = () => 0.5
+    const pos1 = computeSpawnPosition(popupW, popupH, screen, [], deterministic)
+    const pos2 = computeSpawnPosition(popupW, popupH, screen, [], deterministic)
+    expect(pos1).toEqual(pos2)
+  })
+
+  it('empty occupied list produces spread across grid cells', () => {
+    const cells = new Set<string>()
+    const randomInputs = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
+    for (let i = 0; i < 100; i++) {
+      const r = randomInputs[i % randomInputs.length]
+      const pos = computeSpawnPosition(popupW, popupH, screen, [], () => r)
+      const col = Math.floor(pos.x / (screen.width / 4))
+      const row = Math.floor(pos.y / (screen.height / 3))
+      cells.add(`${col},${row}`)
+    }
+    expect(cells.size).toBeGreaterThan(1)
+  })
+
+  it('occupied zone outside screen does not affect positioning', () => {
+    const outside: OccupiedZone[] = [{ x: -500, y: -500, width: 200, height: 200 }]
+    const pos = computeSpawnPosition(popupW, popupH, screen, outside)
+    expect(pos.x).toBeGreaterThanOrEqual(0)
+    expect(pos.y).toBeGreaterThanOrEqual(0)
+  })
+
+  it('multiple occupied zones in one cell concentrate spawn in other cells', () => {
+    const topCellOccupied: OccupiedZone[] = [
+      { x: 100, y: 50, width: 300, height: 200 },
+      { x: 200, y: 80, width: 300, height: 200 },
+      { x: 50, y: 120, width: 300, height: 200 },
+    ]
+    const bottomSpawns: Array<{ y: number }> = []
+    for (let i = 0; i < 100; i++) {
+      bottomSpawns.push(computeSpawnPosition(popupW, popupH, screen, topCellOccupied))
+    }
+    const inBottomHalf = bottomSpawns.filter((p) => p.y >= screen.height / 3)
+    expect(inBottomHalf.length).toBeGreaterThan(50)
+  })
+
+  it('popup with zero width and height still returns valid position', () => {
+    const pos = computeSpawnPosition(0, 0, screen, [])
+    expect(pos.x).toBeGreaterThanOrEqual(0)
+    expect(pos.y).toBeGreaterThanOrEqual(0)
+    expect(Number.isInteger(pos.x)).toBe(true)
+    expect(Number.isInteger(pos.y)).toBe(true)
+  })
+
+  it('small screen: popup fits exactly at one corner', () => {
+    const tiny: ScreenBounds = { width: 300, height: 200 }
+    const pos = computeSpawnPosition(300, 200, tiny, [])
+    expect(pos.x).toBe(0)
+    expect(pos.y).toBe(0)
+  })
+
+  it('very many occupied zones: returns valid position', () => {
+    const zones: OccupiedZone[] = Array.from({ length: 50 }, (_, i) => ({
+      x: (i % 10) * 190,
+      y: Math.floor(i / 10) * 210,
+      width: 180,
+      height: 200,
+    }))
+    for (let i = 0; i < 30; i++) {
+      const pos = computeSpawnPosition(popupW, popupH, screen, zones)
+      expect(pos.x).toBeGreaterThanOrEqual(0)
+      expect(pos.x).toBeLessThanOrEqual(screen.width - popupW)
+      expect(pos.y).toBeGreaterThanOrEqual(0)
+      expect(pos.y).toBeLessThanOrEqual(screen.height - popupH)
+    }
   })
 })
