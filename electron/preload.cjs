@@ -30,6 +30,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
   sendPanic: () => ipcRenderer.invoke('panic:trigger'),
   onPanic: (cb) => { ipcRenderer.on('panic', () => cb()) },
 
+  startLockout: (lockoutMinutes) => ipcRenderer.invoke('panic:startLockout', lockoutMinutes),
+  clearLockout: () => ipcRenderer.invoke('panic:clearLockout'),
+  validateSafeword: (input) => ipcRenderer.invoke('panic:validateSafeword', input),
+  onLockoutStart: (cb) => { ipcRenderer.on('panic:lockout-start', (_event, endTime) => cb(endTime)) },
+  onLockoutClear: (cb) => { ipcRenderer.on('panic:lockout-clear', () => cb()) },
+
   onHibernateTimer: (cb) => { ipcRenderer.on('hibernate:timer', () => cb()) },
 
   onHibernateSkip: (cb) => { ipcRenderer.on('hibernate:skip', () => cb()) },
