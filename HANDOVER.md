@@ -2,7 +2,7 @@
 
 ## Current Status
 
-**Last Session:** Audio playback — volume config, maxAudio limit, audioMod probability, fade in/out, panic cleanup, 33 unit tests
+**Last Session:** Wallpaper rotation — timer-based cycling with random variance, panic cleanup, 19 unit tests
 
 **Date:** July 15, 2026
 
@@ -23,13 +23,13 @@
 - **Keyboard shortcuts** — panic button via `globalShortcut`
 - **Panic lockout runtime** — Timed lockout after timer mode enabled, safeword validation dialog (Mantine modal), lockout state tracking in appStore, IPC channels (startLockout/clearLockout/validateSafeword), blocks panic triggers during lockout
 - **System tray** — context menu with Panic/Quit + "Skip to Hibernate" (when enabled)
-- **Wallpaper** — cross-platform (osascript/gsettings/user32.dll) + reactive reset when popups clear
+- **Wallpaper** — cross-platform (osascript/gsettings/user32.dll) + reactive reset when popups clear + timer-based rotation with random variance
 - **Splash screen** — fade animation on startup
 - **Config Panel** — full settings UI with tabs (General, Popups, System, Theme, Pack, Hibernate)
 - **Prompt modal** — Mantine modal with Levenshtein distance validation
 - **Hibernate runtime** — Activity loop scheduling with 6 types (Original/Spaced/Glitch/Ramp/Pump-Scare/Chaos), sleep timer, pump-scare auto-close, tray skip button, reactive wallpaper reset, config validation (fixWallpaper forced off when hibernate disabled)
 - **Hibernate panel** — hibernate activation with type selection
-- **250 Vitest tests** — movement (35) + movement.runtime (6) + movement.flow (17) + hypno (11) + hypno.runtime (34) + corruption (44) + hibernate (38) + panic (32) + audio (33), all passing
+- **269 Vitest tests** — movement (35) + movement.runtime (6) + movement.flow (17) + hypno (11) + hypno.runtime (34) + corruption (44) + hibernate (38) + panic (32) + audio (33) + wallpaper rotation (19), all passing
 - **Fengari scripting wired** — Lua VM lifecycle, IPC bridge (script:start/stop/execute), scriptStore dispatches Lua callbacks to popupStore, corruptionStore, moodStore, promptStore, and appStore
 - **Notifications** — `electron.Notification` API wired via IPC, preload exposes `showNotification`, Lua `sendNotification` triggers native desktop notification
 - **Discord presence** — `discord-rpc` integrated via IPC, preload, Zustand store; updates on popup count/pack changes; respects `showDiscord` config toggle; destroys on panic/quit
@@ -46,6 +46,7 @@
 ### Recent Commits
 
 ```
+feat: wallpaper rotation — timer-based cycling with random variance, panic cleanup, 19 tests
 fix: audio playback — volume config, maxAudio limit, audioMod probability, fade, panic cleanup, tests
 feat: hibernate gap fixes — pump-scare auto-close, tray skip, reactive wallpaper reset, tests
 feat: implement corruption runtime with level progression, mood cycling, and config overrides
@@ -77,7 +78,7 @@ f9477ae fix: restrict video formats to Chromium-supported codecs
 
 - **Panic lockout runtime** — ✅ Implemented: timer, safeword validation dialog, lockout state, IPC, 32 unit tests
 - **Audio playback** — ✅ Implemented: volume config, maxAudio limit, audioMod probability, fade in/out, panic cleanup, 33 unit tests
-- **Wallpaper rotation** — Config exists but no timer-based rotation logic
+- **Wallpaper rotation** — ✅ Implemented: timer-based cycling with random variance, panic cleanup, 19 unit tests
 - **Popup overlap avoidance** — Python uses grid-based weighting; TS uses random positioning
 - **Lowkey corner positioning** — Config exists but no corner-based positioning logic
 - **Popup timeout (auto-close)** — Config exists but no auto-close timer on popups
@@ -95,7 +96,7 @@ f9477ae fix: restrict video formats to Chromium-supported codecs
 ```bash
 npm run check            # TypeScript type checking (tsc --noEmit)
 npm run lint             # ESLint
-npm run test             # Vitest (250 tests)
+npm run test             # Vitest (269 tests)
 npm run test:e2e         # Playwright Electron integration tests (6 tests)
 npm run dev              # Vite dev server
 npm run electron:dev     # Dev with Electron
@@ -166,6 +167,9 @@ EdgewarePlusPlus/
 │   │       ├── hibernate.ts          # Pure functions: delay computation, activity scheduling, wallpaper reset
 │   │       ├── hibernate.test.ts     # 38 unit tests for hibernate pure functions
 │   │       └── HibernatePanel.tsx    # UI: type selection, activate/deactivate button
+│   │   └── wallpaper/
+│   │       ├── rotation.ts           # Pure functions: next index, interval with variance, schedule computation
+│   │       └── rotation.test.ts      # 19 unit tests for wallpaper rotation pure functions
 │   ├── components/
 │   │   ├── SplashScreen.tsx          # Startup splash animation
 │   │   └── PopupContainer.tsx        # In-app popup dispatch
@@ -188,7 +192,7 @@ EdgewarePlusPlus/
 
 1. ~~**HIGH**: Implement panic lockout runtime~~ ✅ Done
 2. ~~**MEDIUM**: Audio playback~~ ✅ Done
-3. **MEDIUM**: Implement wallpaper rotation (timer-based rotation with variance)
+3. ~~**MEDIUM**: Implement wallpaper rotation~~ ✅ Done
 4. **MEDIUM**: Implement popup overlap avoidance positioning
 5. **LOW**: Implement popup timeout (auto-close timer)
 6. **LOW**: Implement single mode weighted random spawn selection

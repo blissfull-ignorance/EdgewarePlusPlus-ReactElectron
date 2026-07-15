@@ -13,7 +13,7 @@
  * UI controls but lack runtime implementation. Notable gaps:
  *   - Corruption: no level progression, mood cycling, or config overrides
  *   - Hibernate: no activity loop scheduling or type behaviors
- *   - Wallpaper rotation: no timer logic
+ *   - Wallpaper rotation: ✅ implemented
  *   - Panic lockout: no safeword validation
  *   - Single mode: no weighted random type selection
  *   - Booru download: no download logic

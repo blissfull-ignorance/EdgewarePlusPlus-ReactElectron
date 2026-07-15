@@ -19,6 +19,7 @@ import type { HibernateType } from '@/features/hibernate/hibernate'
 import { shouldMove, randomDirection, tickPopups } from '@/features/popup/movement'
 import { logMovementEvent } from '@/features/popup/debug'
 import { shouldBlockPanic } from '@/features/panic/panic'
+import { computeRotation, shouldRotate } from '@/features/wallpaper/rotation'
 import { SafewordModal } from '@/features/panic/SafewordModal'
 import { Container, Title, Text, Anchor } from '@mantine/core'
 
@@ -572,6 +573,8 @@ export default function App() {
   const hibernateTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const activityTimerRefs = useRef<ReturnType<typeof setTimeout>[]>([])
   const pumpScareCloseRefs = useRef<ReturnType<typeof setTimeout>[]>([])
+  const rotationTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const rotationIndexRef = useRef(0)
 
   const spawnHibernatePopup = useCallback((electronAPI: ReturnType<typeof useElectronAPI>) => {
     const pack = usePackStore.getState().pack
@@ -809,6 +812,70 @@ export default function App() {
       electronAPI.setWallpaper(pack.media.images[0] || '')
     }
   }, [popupCount, electronAPI])
+
+  // --- Wallpaper rotation timer ---
+  // When rotateWallpaper is enabled and a pack with multiple images is loaded,
+  // cycle wallpapers at a configurable interval with random variance. Uses
+  // recursive setTimeout (not setInterval) so each tick computes its own delay.
+  // Stops when panic mode activates or rotation is disabled via config.
+  useEffect(() => {
+    const cancelRotation = () => {
+      if (rotationTimerRef.current) {
+        clearTimeout(rotationTimerRef.current)
+        rotationTimerRef.current = null
+      }
+    }
+
+    if (!running || !electronAPI || inPanicMode) {
+      cancelRotation()
+      return
+    }
+
+    const cfg = useConfigStore.getState()
+    const pack = usePackStore.getState().pack
+    const wallpaperCount = pack ? pack.media.images.length : 0
+
+    if (!shouldRotate(cfg.rotateWallpaper, wallpaperCount)) {
+      cancelRotation()
+      return
+    }
+
+    const scheduleNext = () => {
+      const currentCfg = useConfigStore.getState()
+      const currentPack = usePackStore.getState().pack
+      const count = currentPack ? currentPack.media.images.length : 0
+
+      const schedule = computeRotation(
+        {
+          currentIndex: rotationIndexRef.current,
+          enabled: currentCfg.rotateWallpaper,
+          interval: currentCfg.wallpaperTimer,
+          variance: currentCfg.wallpaperVariance,
+        },
+        count,
+      )
+      if (!schedule) return
+
+      rotationTimerRef.current = setTimeout(() => {
+        if (useAppStore.getState().inPanicMode) return
+
+        rotationIndexRef.current = schedule.nextIndex
+        const latestPack = usePackStore.getState().pack
+        if (latestPack) {
+          const wallpaperPath = latestPack.media.images[schedule.nextIndex]
+          if (wallpaperPath) {
+            electronAPI.setWallpaper(wallpaperPath)
+          }
+        }
+
+        scheduleNext()
+      }, schedule.intervalMs)
+    }
+
+    scheduleNext()
+
+    return cancelRotation
+  }, [running, electronAPI, inPanicMode])
 
   const handleSplashComplete = useCallback(() => {
     completeSplash()
