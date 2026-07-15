@@ -19,9 +19,9 @@
  * supported but underutilized). Packs could declare their own media categories
  * and custom extensions.
  *
- * REMOVABLE: The `index.json` loading (loadIndex) is currently unused by the
- * spawn system — it's loaded but never referenced in the tick loop. Consider
- * removing if the index system is not needed.
+ * index.json is used as a fallback for text fields (captions, subliminals,
+ * etc.) when the corresponding .txt files are missing. This matches the
+ * Python pack loader behavior.
  */
 
 import fs from 'fs'
@@ -109,6 +109,18 @@ function readTextFile(filePath: string): string[] {
   }
 }
 
+/**
+ * Extracts a string array from index.json's "default" section.
+ * The Python pack loader reads texts (captions, subliminals, etc.) from
+ * index.json rather than .txt files. This fallback bridges that gap.
+ */
+function getIndexTexts(index: PackIndex, key: string): string[] {
+  const def = index['default']
+  if (!def || Array.isArray(def)) return []
+  const raw = (def as unknown as Record<string, unknown>)[key]
+  return Array.isArray(raw) ? raw.filter((v): v is string => typeof v === 'string') : []
+}
+
 export interface PackInfo {
   name: string
   version: string
@@ -176,6 +188,23 @@ export function loadPackFromDirectory(packPath: string): ScannedPack {
     subliminals: readTextFile(path.join(packPath, 'subliminals.txt')),
     notifications: readTextFile(path.join(packPath, 'notifications.txt')),
     web: readTextFile(path.join(packPath, 'web.txt')),
+  }
+
+  // Fallback: the Python pack loader reads texts from index.json's "default"
+  // section (e.g. index.default.subliminals). When .txt files are missing or
+  // empty, fall back to index.json values to stay compatible with most packs.
+  const indexDefaults: Record<string, string[]> = {
+    captions: getIndexTexts(index, 'captions'),
+    denials: getIndexTexts(index, 'denial'),
+    prompts: getIndexTexts(index, 'prompts'),
+    subliminals: getIndexTexts(index, 'subliminals'),
+    notifications: getIndexTexts(index, 'notifications'),
+    web: getIndexTexts(index, 'web'),
+  }
+  for (const key of Object.keys(texts) as (keyof typeof texts)[]) {
+    if (texts[key].length === 0 && indexDefaults[key]?.length > 0) {
+      texts[key] = indexDefaults[key]
+    }
   }
   const script = readScript(path.join(packPath, 'script.lua'))
   const scriptVersion = detectScriptVersion(script)

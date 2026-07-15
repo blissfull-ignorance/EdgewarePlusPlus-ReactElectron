@@ -5,6 +5,8 @@ import { useMoodStore } from './moodStore'
 import { useAppStore } from './appStore'
 import { usePromptStore } from './promptStore'
 import { usePackStore } from './packStore'
+import { useConfigStore } from './configStore'
+import { useSubliminalStore, nextSubliminalId } from './subliminalStore'
 
 export interface ScriptState {
   running: boolean
@@ -105,6 +107,22 @@ export function attachScriptListeners(): void {
     if (info.url) {
       window.open(info.url, '_blank')
     }
+  })
+
+  api.onScriptOpenSubliminal((info) => {
+    const cfg = useConfigStore.getState()
+    // Center on the Electron window viewport, not the screen.
+    const x = Math.round(window.innerWidth / 2)
+    const y = Math.round(window.innerHeight / 2)
+    useSubliminalStore.getState().addSubliminal({
+      id: nextSubliminalId(),
+      text: info.text,
+      x,
+      y,
+      opacity: cfg.capPopOpacity,
+      duration: cfg.capPopTimer * 1000,
+      spawnTime: Date.now(),
+    })
   })
 
   // DISCUSSION: set_popup_close_text is a Lua scripting API that overrides the

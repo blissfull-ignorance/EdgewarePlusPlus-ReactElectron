@@ -6,6 +6,7 @@ import { usePackStore } from '@/stores/packStore'
 import { usePopupStore } from '@/stores/popupStore'
 import { useCorruptionStore } from '@/stores/corruptionStore'
 import { useDiscordStore } from '@/stores/discordStore'
+import { useSubliminalStore, nextSubliminalId } from '@/stores/subliminalStore'
 import { useElectronAPI } from '@/hooks/useElectronAPI'
 import { attachScriptListeners } from '@/stores/scriptStore'
 import { SplashScreen } from '@/components/SplashScreen'
@@ -203,6 +204,7 @@ export default function App() {
       if (shouldBlockPanic(appState.inPanicMode, appState.lockoutEndTime)) return
       appState.triggerPanic()
       usePopupStore.getState().clearPopups()
+      useSubliminalStore.getState().clearSubliminals()
       useDiscordStore.getState().destroyPresence()
     })
     electronAPI.onKeyEvent((_type, key) => {
@@ -286,6 +288,25 @@ export default function App() {
       if (!pack) return
 
       const cfg = useConfigStore.getState()
+
+      if (cfg.capPopChance > 0 && roll(cfg.capPopChance)) {
+        const subliminals = usePackStore.getState().getTexts('subliminal')
+        if (subliminals.length > 0) {
+          // Center on the Electron window viewport (position: fixed is relative
+          // to the viewport, not the screen). The main window is 1200x800.
+          const x = Math.round(window.innerWidth / 2)
+          const y = Math.round(window.innerHeight / 2)
+          useSubliminalStore.getState().addSubliminal({
+            id: nextSubliminalId(),
+            text: pickRandom(subliminals),
+            x,
+            y,
+            opacity: cfg.capPopOpacity,
+            duration: cfg.capPopTimer * 1000,
+            spawnTime: Date.now(),
+          })
+        }
+      }
 
       const images = pack.media.images
       const videos = pack.media.videos

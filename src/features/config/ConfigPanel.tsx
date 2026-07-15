@@ -654,6 +654,7 @@ export function ConfigPanel() {
                   <Badge size="xs" color="blue">{packStore.pack.media.images.length} images</Badge>
                   <Badge size="xs" color="orange">{packStore.pack.media.videos.length} videos</Badge>
                   <Badge size="xs" color="green">{packStore.pack.media.audio.length} audio</Badge>
+                  <Badge size="xs" color="grape">{packStore.getTexts('subliminal').length} subliminals</Badge>
                 </Group>
               </Paper>
             )}

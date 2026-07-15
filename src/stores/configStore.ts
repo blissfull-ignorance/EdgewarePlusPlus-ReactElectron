@@ -106,7 +106,7 @@ const defaults: Config = {
   movingSpeed: 5,
   capPopChance: 0,
   capPopOpacity: 100,
-  capPopTimer: 300,
+  capPopTimer: 1,
   subliminalsAlpha: 20,
   messageOff: false,
   notificationChance: 0,
