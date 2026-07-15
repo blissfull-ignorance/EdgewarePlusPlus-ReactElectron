@@ -2,7 +2,7 @@
 
 ## Current Status
 
-**Last Session:** Popup overlap avoidance — grid-based weighted positioning, 12 new unit tests
+**Last Session:** Popup timeout auto-close timer — configurable timeout with edge case handling, 16 new tests
 
 **Date:** July 15, 2026
 
@@ -15,6 +15,7 @@
 - **Popup scale** — `popupScale` config (0.5x–3x) with slider in Config Panel
 - **Persistent movement** — directional vectors with bounce, 50ms tick, Math.round for IPC safety
 - **Grid-based popup positioning** — 4×3 grid weighted by occupancy, avoids overlap with existing popups, handles oversized popups and all-cells-full fallback
+- **Popup timeout (auto-close)** — configurable duration (1–300s) via `timeoutPopups`/`popupTimeout` config; skips audio popups and panic mode; checked each movement tick
 - **Per-type limits** — separate `maxImages` and `maxVideos` caps (default 10 each)
 - **Hypno overlays** — .gif only, applied to static images (png/jpg/bmp/webp), not gifs or videos
 - **Denial filters** — CSS blur/saturate/brightness applied randomly based on `denialChance`
@@ -30,7 +31,7 @@
 - **Prompt modal** — Mantine modal with Levenshtein distance validation
 - **Hibernate runtime** — Activity loop scheduling with 6 types (Original/Spaced/Glitch/Ramp/Pump-Scare/Chaos), sleep timer, pump-scare auto-close, tray skip button, reactive wallpaper reset, config validation (fixWallpaper forced off when hibernate disabled)
 - **Hibernate panel** — hibernate activation with type selection
-- **281 Vitest tests** — movement (47) + movement.runtime (6) + movement.flow (17) + hypno (11) + hypno.runtime (34) + corruption (44) + hibernate (38) + panic (32) + audio (33) + wallpaper rotation (19), all passing
+- **297 Vitest tests** — movement (47) + movement.runtime (6) + movement.flow (17) + hypno (11) + hypno.runtime (34) + corruption (44) + hibernate (38) + panic (32) + audio (33) + wallpaper rotation (19) + timeout (16), all passing
 - **Fengari scripting wired** — Lua VM lifecycle, IPC bridge (script:start/stop/execute), scriptStore dispatches Lua callbacks to popupStore, corruptionStore, moodStore, promptStore, and appStore
 - **Notifications** — `electron.Notification` API wired via IPC, preload exposes `showNotification`, Lua `sendNotification` triggers native desktop notification
 - **Discord presence** — `discord-rpc` integrated via IPC, preload, Zustand store; updates on popup count/pack changes; respects `showDiscord` config toggle; destroys on panic/quit
@@ -47,6 +48,7 @@
 ### Recent Commits
 
 ```
+feat: popup auto-close timer — configurable timeout with edge case handling, 16 new tests
 feat: popup overlap avoidance — grid-based weighted positioning, 12 tests
 feat: wallpaper rotation — timer-based cycling with random variance, panic cleanup, 19 tests
 fix: audio playback — volume config, maxAudio limit, audioMod probability, fade, panic cleanup, tests
@@ -83,7 +85,7 @@ f9477ae fix: restrict video formats to Chromium-supported codecs
 - **Wallpaper rotation** — ✅ Implemented: timer-based cycling with random variance, panic cleanup, 19 unit tests
 - **Popup overlap avoidance** — ✅ Implemented: 4×3 grid-based weighted positioning, occupancy-aware cell selection, oversized popup handling, 12 unit tests
 - **Lowkey corner positioning** — Config exists but no corner-based positioning logic
-- **Popup timeout (auto-close)** — Config exists but no auto-close timer on popups
+- **Popup timeout (auto-close)** — ✅ Implemented: configurable duration, audio/panic skip, 16 unit tests
 - **Single mode spawn logic** — Config exists but spawn tick doesn't use weighted random selection
 - **Booru download** — Config exists but no download logic wired
 - **Run at startup** — Config exists but no OS-level auto-start registration
@@ -98,7 +100,7 @@ f9477ae fix: restrict video formats to Chromium-supported codecs
 ```bash
 npm run check            # TypeScript type checking (tsc --noEmit)
 npm run lint             # ESLint
-npm run test             # Vitest (281 tests)
+npm run test             # Vitest (297 tests)
 npm run test:e2e         # Playwright Electron integration tests (6 tests)
 npm run dev              # Vite dev server
 npm run electron:dev     # Dev with Electron
@@ -153,13 +155,14 @@ EdgewarePlusPlus/
 │   │   │   └── corruption.test.ts   # 44 unit tests for corruption pure functions
 │   │   ├── popup/
 │   │   │   ├── movement.ts          # Pure functions: computeMove, computeSpawnPosition, tickPopups, shouldMove, randomDirection
+│   │   │   ├── timeout.ts           # Pure functions: shouldAutoClose, getExpiredPopupIds
 │   │   │   ├── debug.ts             # Movement event logger
 │   │   │   ├── ImagePopup.tsx        # Image popup component
 │   │   │   ├── VideoPopup.tsx        # Video popup component
 │   │   │   ├── AudioPopup.tsx        # Audio popup component
 │   │   │   ├── HypnoOverlay.tsx      # Hypno overlay component
 │   │   │   ├── SubliminalPopup.tsx   # Subliminal text overlay
-│   │   │   └── *.test.ts            # 115 tests across 5 files
+│   │   │   └── *.test.ts            # 131 tests across 6 files
 │   │   ├── prompt/PromptModal.tsx    # Mantine modal with Levenshtein
 │   │   ├── panic/
 │   │   │   ├── panic.ts              # Pure functions: lockout timer, safeword validation, shouldBlockPanic
@@ -190,13 +193,17 @@ EdgewarePlusPlus/
 └── HANDOVER.md             # This file
 ```
 
+### Active Task
+
+See **TASK.md** for the current highest-priority task: Popup Timeout (Auto-Close Timer).
+
 ### Next Session Priority Order
 
 1. ~~**HIGH**: Implement panic lockout runtime~~ ✅ Done
 2. ~~**MEDIUM**: Audio playback~~ ✅ Done
 3. ~~**MEDIUM**: Implement wallpaper rotation~~ ✅ Done
 4. ~~**MEDIUM**: Implement popup overlap avoidance positioning~~ ✅ Done
-5. **LOW**: Implement popup timeout (auto-close timer)
+5. ~~**LOW**: Implement popup timeout (auto-close timer)~~ ✅ Done
 6. **LOW**: Implement single mode weighted random spawn selection
 7. **LOW**: Add mood-based media filtering (requires pack loader mood tagging)
 8. **LOW**: Add corruption danger check dialog (warns when full-perm enables dangerous settings)
