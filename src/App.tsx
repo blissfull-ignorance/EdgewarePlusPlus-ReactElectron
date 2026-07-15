@@ -18,6 +18,7 @@ import { planActivity, hibernateDelay, shouldResetWallpaper } from '@/features/h
 import type { HibernateType } from '@/features/hibernate/hibernate'
 import { shouldMove, randomDirection, tickPopups, computeSpawnPosition } from '@/features/popup/movement'
 import type { OccupiedZone } from '@/features/popup/movement'
+import { getExpiredPopupIds } from '@/features/popup/timeout'
 import { logMovementEvent } from '@/features/popup/debug'
 import { shouldBlockPanic } from '@/features/panic/panic'
 import { computeRotation, shouldRotate } from '@/features/wallpaper/rotation'
@@ -51,7 +52,7 @@ function spawnMitosisPopup(
     const id = 100000 + mitosisIdCounter++
     usePopupStore.getState().addPopup({
       id, type: 'audio', mediaPath, x: 0, y: 0, width: 0, height: 0,
-      moving: false, dx: 0, dy: 0, mitosisSpawned: true,
+      moving: false, dx: 0, dy: 0, mitosisSpawned: true, spawnTime: Date.now(),
     })
     return
   }
@@ -97,6 +98,7 @@ function spawnMitosisPopup(
         moving,
         dx: dir.dx, dy: dir.dy,
         mitosisSpawned: true,
+        spawnTime: Date.now(),
       })
     }).catch((err) => {
       console.error('mitosis:createPopup failed', err)
@@ -307,7 +309,7 @@ export default function App() {
         const currentAudio = popups.filter((p) => p.type === 'audio').length
         if (currentAudio >= cfg.maxAudio) return
         const id = audioIdCounter++
-        usePopupStore.getState().addPopup({ id, type: 'audio', mediaPath: path, x: 0, y: 0, width: 0, height: 0, moving: false, dx: 0, dy: 0, mitosisSpawned: false })
+        usePopupStore.getState().addPopup({ id, type: 'audio', mediaPath: path, x: 0, y: 0, width: 0, height: 0, moving: false, dx: 0, dy: 0, mitosisSpawned: false, spawnTime: Date.now() })
       } else {
         // Enforce per-type popup limits
         const popups = usePopupStore.getState().popups
@@ -364,6 +366,7 @@ export default function App() {
               moving,
               dx: dir.dx, dy: dir.dy,
               mitosisSpawned: false,
+              spawnTime: Date.now(),
             })
             logMovementEvent({ ts: Date.now(), type: 'spawn', popupId, moving, x, y, dx: dir.dx, dy: dir.dy })
           }).catch((err) => {
@@ -403,6 +406,9 @@ export default function App() {
     }
 
     const moveTick = () => {
+      const { inPanicMode: panicked } = useAppStore.getState()
+      if (panicked) return
+
       const cfg = useConfigStore.getState()
       const bounds = screenRef.current
       const popups = usePopupStore.getState().popups
@@ -412,11 +418,19 @@ export default function App() {
         console.log('[movement:tick]', { total: popups.length, movingCount, speed: cfg.movingSpeed, bounds, updateCount: updates.size })
       }
       for (const [id, update] of updates) {
-        // Math.round() is critical: Electron IPC throws on float coordinates
         electronAPI.movePopup(id, Math.round(update.x), Math.round(update.y)).catch(() => {})
         usePopupStore.getState().updatePopup(id, { ...update, x: Math.round(update.x), y: Math.round(update.y) })
         console.log('[movement:move]', { id, x: Math.round(update.x), y: Math.round(update.y), dx: update.dx, dy: update.dy })
         logMovementEvent({ ts: Date.now(), type: 'move', popupId: id, x: Math.round(update.x), y: Math.round(update.y), dx: update.dx, dy: update.dy })
+      }
+
+      if (cfg.timeoutPopups) {
+        const now = Date.now()
+        const expiredIds = getExpiredPopupIds(popups, cfg.popupTimeout, now)
+        for (const id of expiredIds) {
+          electronAPI.closePopup(id).catch(() => {})
+          usePopupStore.getState().removePopup(id)
+        }
       }
     }
 
@@ -593,7 +607,7 @@ export default function App() {
       const id = audioIdCounter++
       usePopupStore.getState().addPopup({
         id, type: 'audio', mediaPath: path, x: 0, y: 0, width: 0, height: 0,
-        moving: false, dx: 0, dy: 0, mitosisSpawned: true,
+        moving: false, dx: 0, dy: 0, mitosisSpawned: true, spawnTime: Date.now(),
       })
       return
     }
@@ -634,6 +648,7 @@ export default function App() {
           moving,
           dx: dir.dx, dy: dir.dy,
           mitosisSpawned: true,
+          spawnTime: Date.now(),
         })
       }).catch((err) => {
         console.error('hibernate:createPopup failed', err)
@@ -697,6 +712,7 @@ export default function App() {
                     x, y, width: w, height: h,
                     moving: false, dx: 0, dy: 0,
                     mitosisSpawned: true,
+                    spawnTime: Date.now(),
                   })
                   // FUTUREWORK: Make pump-scare auto-close duration configurable
                   const autoCloseTimer = setTimeout(() => {
@@ -715,6 +731,7 @@ export default function App() {
                 x: 0, y: 0, width: 0, height: 0,
                 moving: false, dx: 0, dy: 0,
                 mitosisSpawned: true,
+                spawnTime: Date.now(),
               })
             }
           }

@@ -29,6 +29,8 @@ export interface ActivePopup {
   dy: number
   /** If true, this popup was spawned by mitosis and should not trigger further mitosis. */
   mitosisSpawned: boolean
+  /** Timestamp (Date.now()) when the popup was created, used for auto-close timeout. */
+  spawnTime: number
 }
 
 export interface PopupState {

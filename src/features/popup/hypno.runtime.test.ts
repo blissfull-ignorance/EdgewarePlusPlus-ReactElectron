@@ -259,7 +259,7 @@ describe('popupStore lifecycle', () => {
   it('addPopup increments count and appends popup', () => {
     usePopupStore.getState().addPopup({
       id: 1, type: 'image', x: 100, y: 100, width: 300, height: 200,
-      moving: false, dx: 0, dy: 0, mitosisSpawned: false,
+      moving: false, dx: 0, dy: 0, spawnTime: 0, mitosisSpawned: false,
     })
     const state = usePopupStore.getState()
     expect(state.popups).toHaveLength(1)
@@ -269,7 +269,7 @@ describe('popupStore lifecycle', () => {
   it('removePopup decrements count and removes popup', () => {
     usePopupStore.getState().addPopup({
       id: 1, type: 'image', x: 100, y: 100, width: 300, height: 200,
-      moving: false, dx: 0, dy: 0, mitosisSpawned: false,
+      moving: false, dx: 0, dy: 0, spawnTime: 0, mitosisSpawned: false,
     })
     usePopupStore.getState().removePopup(1)
     const state = usePopupStore.getState()
@@ -285,11 +285,11 @@ describe('popupStore lifecycle', () => {
   it('clearPopups resets both popups array and count', () => {
     usePopupStore.getState().addPopup({
       id: 1, type: 'image', x: 100, y: 100, width: 300, height: 200,
-      moving: true, dx: 1, dy: 0, mitosisSpawned: false,
+      moving: true, dx: 1, dy: 0, spawnTime: 0, mitosisSpawned: false,
     })
     usePopupStore.getState().addPopup({
       id: 2, type: 'video', x: 200, y: 200, width: 400, height: 300,
-      moving: false, dx: 0, dy: 0, mitosisSpawned: false,
+      moving: false, dx: 0, dy: 0, spawnTime: 0, mitosisSpawned: false,
     })
     usePopupStore.getState().clearPopups()
     const state = usePopupStore.getState()
@@ -300,7 +300,7 @@ describe('popupStore lifecycle', () => {
   it('updatePopup only modifies specified fields', () => {
     usePopupStore.getState().addPopup({
       id: 1, type: 'image', x: 100, y: 200, width: 300, height: 200,
-      moving: true, dx: 1, dy: 0, mitosisSpawned: false,
+      moving: true, dx: 1, dy: 0, spawnTime: 0, mitosisSpawned: false,
     })
     usePopupStore.getState().updatePopup(1, { x: 500 })
     const popup = usePopupStore.getState().popups[0]

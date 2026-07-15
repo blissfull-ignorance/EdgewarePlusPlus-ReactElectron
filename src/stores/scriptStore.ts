@@ -49,7 +49,7 @@ export function attachScriptListeners(): void {
         moving: false,
         dx: 0,
         dy: 0,
-        mitosisSpawned: false,
+        spawnTime: 0, mitosisSpawned: false,
       })
     } else {
       usePopupStore.getState().addPopup({
@@ -63,7 +63,7 @@ export function attachScriptListeners(): void {
         moving: false,
         dx: 0,
         dy: 0,
-        mitosisSpawned: false,
+        spawnTime: 0, mitosisSpawned: false,
       })
     }
   })

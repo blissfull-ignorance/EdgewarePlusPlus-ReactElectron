@@ -106,7 +106,7 @@ describe('maxAudio enforcement via popupStore', () => {
     usePopupStore.getState().addPopup({
       id: 1, type: 'audio', mediaPath: '/audio/a.mp3',
       x: 0, y: 0, width: 0, height: 0,
-      moving: false, dx: 0, dy: 0, mitosisSpawned: false,
+      moving: false, dx: 0, dy: 0, spawnTime: 0, mitosisSpawned: false,
     })
     const audioCount = usePopupStore.getState().popups.filter(p => p.type === 'audio').length
     expect(audioCount).toBe(1)
@@ -117,7 +117,7 @@ describe('maxAudio enforcement via popupStore', () => {
     usePopupStore.getState().addPopup({
       id: 1, type: 'audio', mediaPath: '/audio/a.mp3',
       x: 0, y: 0, width: 0, height: 0,
-      moving: false, dx: 0, dy: 0, mitosisSpawned: false,
+      moving: false, dx: 0, dy: 0, spawnTime: 0, mitosisSpawned: false,
     })
     const currentAudio = usePopupStore.getState().popups.filter(p => p.type === 'audio').length
     const shouldSpawn = currentAudio < maxAudio
@@ -129,7 +129,7 @@ describe('maxAudio enforcement via popupStore', () => {
     usePopupStore.getState().addPopup({
       id: 1, type: 'audio', mediaPath: '/audio/a.mp3',
       x: 0, y: 0, width: 0, height: 0,
-      moving: false, dx: 0, dy: 0, mitosisSpawned: false,
+      moving: false, dx: 0, dy: 0, spawnTime: 0, mitosisSpawned: false,
     })
     const currentAudio = usePopupStore.getState().popups.filter(p => p.type === 'audio').length
     const shouldSpawn = currentAudio < maxAudio

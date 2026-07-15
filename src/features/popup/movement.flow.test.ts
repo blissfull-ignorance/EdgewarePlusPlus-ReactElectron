@@ -45,7 +45,7 @@ function simulateSpawnTick() {
     x, y, width: w, height: h,
     moving,
     dx: dir.dx, dy: dir.dy,
-    mitosisSpawned: false,
+    spawnTime: 0, mitosisSpawned: false,
   })
 }
 
@@ -236,7 +236,7 @@ describe('popup removal mid-simulation — mitosis close flow', () => {
     usePopupStore.getState().removePopup(1)
     usePopupStore.getState().addPopup({
       id: 100, type: 'image', x: 600, y: 300, width: 300, height: 200,
-      moving: true, dx: 1, dy: 0, mitosisSpawned: true,
+      moving: true, dx: 1, dy: 0, spawnTime: 0, mitosisSpawned: true,
     })
     expect(usePopupStore.getState().popups).toHaveLength(2)
 
@@ -284,7 +284,7 @@ describe('stress tests — rapid add/remove cycles', () => {
     for (let i = 0; i < 50; i++) {
       usePopupStore.getState().addPopup({
         id: i + 1, type: 'image', x: 100, y: 100, width: 300, height: 200,
-        moving: false, dx: 0, dy: 0, mitosisSpawned: false,
+        moving: false, dx: 0, dy: 0, spawnTime: 0, mitosisSpawned: false,
       })
       usePopupStore.getState().removePopup(i + 1)
     }
@@ -298,7 +298,7 @@ describe('stress tests — rapid add/remove cycles', () => {
     for (let i = 0; i < 20; i++) {
       usePopupStore.getState().addPopup({
         id: i + 1, type: 'image', x: 100, y: 100, width: 300, height: 200,
-        moving: false, dx: 0, dy: 0, mitosisSpawned: false,
+        moving: false, dx: 0, dy: 0, spawnTime: 0, mitosisSpawned: false,
       })
     }
     for (let i = 1; i <= 5; i++) {
@@ -307,7 +307,7 @@ describe('stress tests — rapid add/remove cycles', () => {
     for (let i = 21; i <= 23; i++) {
       usePopupStore.getState().addPopup({
         id: i, type: 'image', x: 100, y: 100, width: 300, height: 200,
-        moving: false, dx: 0, dy: 0, mitosisSpawned: false,
+        moving: false, dx: 0, dy: 0, spawnTime: 0, mitosisSpawned: false,
       })
     }
     usePopupStore.getState().removePopup(6)
@@ -323,7 +323,7 @@ describe('stress tests — rapid add/remove cycles', () => {
     for (let i = 0; i < 20; i++) {
       usePopupStore.getState().addPopup({
         id: i + 1, type: 'image', x: 500, y: 400, width: 300, height: 200,
-        moving: true, dx: 1, dy: 0, mitosisSpawned: false,
+        moving: true, dx: 1, dy: 0, spawnTime: 0, mitosisSpawned: false,
       })
     }
     for (let i = 1; i <= 10; i++) {
