@@ -2,7 +2,7 @@
 
 ## Current Status
 
-**Last Session:** Panic lockout runtime — timer, safeword validation dialog, lockout state tracking, 32 unit tests
+**Last Session:** Audio playback — volume config, maxAudio limit, audioMod probability, fade in/out, panic cleanup, 33 unit tests
 
 **Date:** July 15, 2026
 
@@ -29,11 +29,12 @@
 - **Prompt modal** — Mantine modal with Levenshtein distance validation
 - **Hibernate runtime** — Activity loop scheduling with 6 types (Original/Spaced/Glitch/Ramp/Pump-Scare/Chaos), sleep timer, pump-scare auto-close, tray skip button, reactive wallpaper reset, config validation (fixWallpaper forced off when hibernate disabled)
 - **Hibernate panel** — hibernate activation with type selection
-- **217 Vitest tests** — movement (35) + movement.runtime (6) + movement.flow (17) + hypno (11) + hypno.runtime (34) + corruption (44) + hibernate (38) + panic (32), all passing
+- **250 Vitest tests** — movement (35) + movement.runtime (6) + movement.flow (17) + hypno (11) + hypno.runtime (34) + corruption (44) + hibernate (38) + panic (32) + audio (33), all passing
 - **Fengari scripting wired** — Lua VM lifecycle, IPC bridge (script:start/stop/execute), scriptStore dispatches Lua callbacks to popupStore, corruptionStore, moodStore, promptStore, and appStore
 - **Notifications** — `electron.Notification` API wired via IPC, preload exposes `showNotification`, Lua `sendNotification` triggers native desktop notification
 - **Discord presence** — `discord-rpc` integrated via IPC, preload, Zustand store; updates on popup count/pack changes; respects `showDiscord` config toggle; destroys on panic/quit
 - **Mitosis mode** — spawn-on-close logic with `mitosisChance` (0–100%) and `mitosisStrength` (max popups per close); `mitosisSpawned` flag prevents infinite loops; config toggle + slider in Modes tab
+- **Audio playback** — volume config (`audioVolume` 0–100), `maxAudio` limit enforcement, `audioMod` probability for spawning alongside visual media, fade in/out (`fadeInDuration`/`fadeOutDuration`), panic cleanup (pause on unmount)
 - **Web open** — `shell.openExternal()` wired via IPC (`web:openExternal`), preload exposes `openExternal(url)`, opens URLs in default browser
 - **Feature parity audit** — All 97 Python config options verified present; 11 runtime gaps identified and documented in FEATURE_PARITY_AUDIT.md
 - **Corruption runtime** — Level progression with timed/popup/launch/script triggers; mood cycling via cumulative add/remove; config overrides per level (respecting CORRUPTION_BLOCK); pack corruption.json loading; ConfigPanel shows corruption level and override count; 44 unit tests
@@ -45,6 +46,7 @@
 ### Recent Commits
 
 ```
+fix: audio playback — volume config, maxAudio limit, audioMod probability, fade, panic cleanup, tests
 feat: hibernate gap fixes — pump-scare auto-close, tray skip, reactive wallpaper reset, tests
 feat: implement corruption runtime with level progression, mood cycling, and config overrides
 docs: feature parity audit and comment improvements
@@ -74,6 +76,7 @@ f9477ae fix: restrict video formats to Chromium-supported codecs
 ### What's NOT Done
 
 - **Panic lockout runtime** — ✅ Implemented: timer, safeword validation dialog, lockout state, IPC, 32 unit tests
+- **Audio playback** — ✅ Implemented: volume config, maxAudio limit, audioMod probability, fade in/out, panic cleanup, 33 unit tests
 - **Wallpaper rotation** — Config exists but no timer-based rotation logic
 - **Popup overlap avoidance** — Python uses grid-based weighting; TS uses random positioning
 - **Lowkey corner positioning** — Config exists but no corner-based positioning logic
@@ -92,7 +95,7 @@ f9477ae fix: restrict video formats to Chromium-supported codecs
 ```bash
 npm run check            # TypeScript type checking (tsc --noEmit)
 npm run lint             # ESLint
-npm run test             # Vitest (217 tests)
+npm run test             # Vitest (250 tests)
 npm run test:e2e         # Playwright Electron integration tests (6 tests)
 npm run dev              # Vite dev server
 npm run electron:dev     # Dev with Electron
@@ -184,7 +187,7 @@ EdgewarePlusPlus/
 ### Next Session Priority Order
 
 1. ~~**HIGH**: Implement panic lockout runtime~~ ✅ Done
-2. **MEDIUM**: Audio playback (from pure audio files, not videos) is currently not working properly. Implement tests to catch this error automatically. Fix the issue
+2. ~~**MEDIUM**: Audio playback~~ ✅ Done
 3. **MEDIUM**: Implement wallpaper rotation (timer-based rotation with variance)
 4. **MEDIUM**: Implement popup overlap avoidance positioning
 5. **LOW**: Implement popup timeout (auto-close timer)

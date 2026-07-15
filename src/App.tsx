@@ -287,16 +287,23 @@ export default function App() {
       const videos = pack.media.videos
       const audio = pack.media.audio
 
-      // If no images/videos exist, fall back to audio-only spawning
       const hasNonAudio = images.length + videos.length > 0
       if (!hasNonAudio && audio.length === 0) return
 
-      const path = pickRandom(hasNonAudio ? [...images, ...videos] : audio)
+      // DISCUSSION: audioMod controls whether audio can spawn alongside visual
+      // media. When audioMod > 0, audio gets a probability-based chance to be
+      // selected instead of visual media. When audioMod is 0, audio only spawns
+      // as a fallback when no visual media exists.
+      const audioPool = hasNonAudio && cfg.audioMod > 0 && roll(cfg.audioMod) ? audio : null
+      const visualPool = hasNonAudio ? [...images, ...videos] : audio
+      const path = audioPool ? pickRandom(audioPool) : pickRandom(visualPool)
       const isVideo = videos.includes(path)
       const isAudio = audio.includes(path)
 
       if (isAudio) {
-        // Audio popups have no visual representation, just a store entry
+        const popups = usePopupStore.getState().popups
+        const currentAudio = popups.filter((p) => p.type === 'audio').length
+        if (currentAudio >= cfg.maxAudio) return
         const id = audioIdCounter++
         usePopupStore.getState().addPopup({ id, type: 'audio', mediaPath: path, x: 0, y: 0, width: 0, height: 0, moving: false, dx: 0, dy: 0, mitosisSpawned: false })
       } else {
