@@ -76,6 +76,8 @@ export interface Config {
   capPopChance: number
   capPopOpacity: number
   capPopTimer: number
+  capPopTextColor: string
+  capPopTextSize: number
   subliminalsAlpha: number
   messageOff: boolean
   notificationChance: number

@@ -82,6 +82,8 @@ export interface ConfigData {
   capPopChance: number
   capPopOpacity: number
   capPopTimer: number
+  capPopTextColor: string
+  capPopTextSize: number
   subliminalsAlpha: number
   messageOff: boolean
   notificationChance: number
@@ -213,7 +215,9 @@ export function getDefaultConfig(): ConfigData {
     movingSpeed: 5,
     capPopChance: 0,
     capPopOpacity: 100,
-    capPopTimer: 1,
+    capPopTimer: 300,
+    capPopTextColor: '#ffffff',
+    capPopTextSize: 80,
     subliminalsAlpha: 20,
     messageOff: false,
     notificationChance: 0,

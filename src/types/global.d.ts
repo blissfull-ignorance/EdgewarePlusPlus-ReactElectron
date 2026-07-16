@@ -23,6 +23,14 @@ interface ScriptSpawnInfo {
   id: number
 }
 
+interface SubliminalOptions {
+  text: string
+  color: string
+  opacity: number
+  duration: number
+  fontSize: number
+}
+
 interface ScriptStatus {
   running: boolean
   error?: string
@@ -39,6 +47,7 @@ interface ElectronAPI {
   closePopup: (id: number) => Promise<void>
   movePopup: (id: number, x: number, y: number) => Promise<void>
   setPopupClickthrough: (id: number, enabled: boolean) => Promise<void>
+  createSubliminal: (opts: SubliminalOptions) => Promise<number>
   createShortcut: (name: string, target: string, icon: string) => Promise<void>
   fillDrive: (path: string, size: number) => Promise<void>
   replaceImages: (path: string, count: number) => Promise<void>

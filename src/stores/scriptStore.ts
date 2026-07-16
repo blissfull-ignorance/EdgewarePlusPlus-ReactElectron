@@ -6,7 +6,6 @@ import { useAppStore } from './appStore'
 import { usePromptStore } from './promptStore'
 import { usePackStore } from './packStore'
 import { useConfigStore } from './configStore'
-import { useSubliminalStore, nextSubliminalId } from './subliminalStore'
 
 export interface ScriptState {
   running: boolean
@@ -111,17 +110,12 @@ export function attachScriptListeners(): void {
 
   api.onScriptOpenSubliminal((info) => {
     const cfg = useConfigStore.getState()
-    // Center on the Electron window viewport, not the screen.
-    const x = Math.round(window.innerWidth / 2)
-    const y = Math.round(window.innerHeight / 2)
-    useSubliminalStore.getState().addSubliminal({
-      id: nextSubliminalId(),
+    api.createSubliminal({
       text: info.text,
-      x,
-      y,
+      color: cfg.capPopTextColor,
       opacity: cfg.capPopOpacity,
-      duration: cfg.capPopTimer * 1000,
-      spawnTime: Date.now(),
+      duration: cfg.capPopTimer,
+      fontSize: cfg.capPopTextSize,
     })
   })
 

@@ -2,9 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest'
 import { useConfigStore } from '@/stores/configStore'
 import { usePackStore } from '@/stores/packStore'
 import { usePopupStore } from '@/stores/popupStore'
-import { useSubliminalStore, nextSubliminalId, resetSubliminalIdCounter } from '@/stores/subliminalStore'
 import type { Pack } from '@/types/pack'
-import type { ActiveSubliminal } from '@/stores/subliminalStore'
 
 function makePack(overrides: Partial<Pack['texts']> = {}): Pack {
   return {
@@ -33,120 +31,21 @@ function makePack(overrides: Partial<Pack['texts']> = {}): Pack {
   }
 }
 
-function makeSubliminal(overrides: Partial<ActiveSubliminal> = {}): ActiveSubliminal {
-  return {
-    id: 1,
-    text: 'OBEY',
-    x: 100,
-    y: 200,
-    opacity: 100,
-    duration: 500,
-    spawnTime: Date.now(),
-    ...overrides,
-  }
-}
-
 function roll(percent: number, randomFn: () => number = Math.random): boolean {
   return randomFn() * 100 < percent
 }
 
 function resetAll() {
-  useSubliminalStore.getState().clearSubliminals()
-  resetSubliminalIdCounter()
   usePopupStore.getState().clearPopups()
   usePackStore.getState().unloadPack()
   useConfigStore.getState().updateConfig({
     capPopChance: 0,
     capPopOpacity: 100,
-    capPopTimer: 1,
+    capPopTimer: 300,
+    capPopTextColor: '#ffffff',
+    capPopTextSize: 80,
   })
 }
-
-describe('subliminalStore lifecycle', () => {
-  beforeEach(() => {
-    resetAll()
-  })
-
-  it('starts with empty subliminals array', () => {
-    expect(useSubliminalStore.getState().subliminals).toHaveLength(0)
-  })
-
-  it('addSubliminal appends to array', () => {
-    useSubliminalStore.getState().addSubliminal(makeSubliminal({ id: 1 }))
-    expect(useSubliminalStore.getState().subliminals).toHaveLength(1)
-    expect(useSubliminalStore.getState().subliminals[0].text).toBe('OBEY')
-  })
-
-  it('addSubliminal preserves all fields', () => {
-    const sub = makeSubliminal({ id: 5, text: 'SUBMIT', x: 300, y: 400, opacity: 50, duration: 1000 })
-    useSubliminalStore.getState().addSubliminal(sub)
-    const stored = useSubliminalStore.getState().subliminals[0]
-    expect(stored.id).toBe(5)
-    expect(stored.text).toBe('SUBMIT')
-    expect(stored.x).toBe(300)
-    expect(stored.y).toBe(400)
-    expect(stored.opacity).toBe(50)
-    expect(stored.duration).toBe(1000)
-  })
-
-  it('addSubliminal supports multiple entries', () => {
-    useSubliminalStore.getState().addSubliminal(makeSubliminal({ id: 1, text: 'OBEY' }))
-    useSubliminalStore.getState().addSubliminal(makeSubliminal({ id: 2, text: 'SUBMIT' }))
-    useSubliminalStore.getState().addSubliminal(makeSubliminal({ id: 3, text: 'GOON' }))
-    expect(useSubliminalStore.getState().subliminals).toHaveLength(3)
-    expect(useSubliminalStore.getState().subliminals.map(s => s.text)).toEqual(['OBEY', 'SUBMIT', 'GOON'])
-  })
-
-  it('removeSubliminal removes by id', () => {
-    useSubliminalStore.getState().addSubliminal(makeSubliminal({ id: 1 }))
-    useSubliminalStore.getState().addSubliminal(makeSubliminal({ id: 2 }))
-    useSubliminalStore.getState().removeSubliminal(1)
-    expect(useSubliminalStore.getState().subliminals).toHaveLength(1)
-    expect(useSubliminalStore.getState().subliminals[0].id).toBe(2)
-  })
-
-  it('removeSubliminal with non-existent id does not break', () => {
-    useSubliminalStore.getState().addSubliminal(makeSubliminal({ id: 1 }))
-    useSubliminalStore.getState().removeSubliminal(999)
-    expect(useSubliminalStore.getState().subliminals).toHaveLength(1)
-  })
-
-  it('clearSubliminals empties the array', () => {
-    useSubliminalStore.getState().addSubliminal(makeSubliminal({ id: 1 }))
-    useSubliminalStore.getState().addSubliminal(makeSubliminal({ id: 2 }))
-    useSubliminalStore.getState().clearSubliminals()
-    expect(useSubliminalStore.getState().subliminals).toHaveLength(0)
-  })
-
-  it('clearSubliminals on empty array does not break', () => {
-    useSubliminalStore.getState().clearSubliminals()
-    expect(useSubliminalStore.getState().subliminals).toHaveLength(0)
-  })
-})
-
-describe('nextSubliminalId', () => {
-  beforeEach(() => {
-    resetSubliminalIdCounter()
-  })
-
-  it('starts at 1', () => {
-    expect(nextSubliminalId()).toBe(1)
-  })
-
-  it('increments on each call', () => {
-    expect(nextSubliminalId()).toBe(1)
-    expect(nextSubliminalId()).toBe(2)
-    expect(nextSubliminalId()).toBe(3)
-  })
-
-  it('resetSubliminalIdCounter resets to 1', () => {
-    nextSubliminalId()
-    nextSubliminalId()
-    nextSubliminalId()
-    resetSubliminalIdCounter()
-    expect(nextSubliminalId()).toBe(1)
-  })
-})
 
 describe('subliminal spawn decision logic', () => {
   beforeEach(() => {
@@ -218,8 +117,16 @@ describe('configStore subliminal popup settings', () => {
     expect(useConfigStore.getState().capPopOpacity).toBe(100)
   })
 
-  it('capPopTimer default is 1', () => {
-    expect(useConfigStore.getState().capPopTimer).toBe(1)
+  it('capPopTimer default is 300', () => {
+    expect(useConfigStore.getState().capPopTimer).toBe(300)
+  })
+
+  it('capPopTextColor default is #ffffff', () => {
+    expect(useConfigStore.getState().capPopTextColor).toBe('#ffffff')
+  })
+
+  it('capPopTextSize default is 80', () => {
+    expect(useConfigStore.getState().capPopTextSize).toBe(80)
   })
 
   it('capPopChance is stored and retrievable', () => {
@@ -235,6 +142,16 @@ describe('configStore subliminal popup settings', () => {
   it('capPopTimer is stored and retrievable', () => {
     useConfigStore.getState().updateConfig({ capPopTimer: 600 })
     expect(useConfigStore.getState().capPopTimer).toBe(600)
+  })
+
+  it('capPopTextColor is stored and retrievable', () => {
+    useConfigStore.getState().updateConfig({ capPopTextColor: '#ff0000' })
+    expect(useConfigStore.getState().capPopTextColor).toBe('#ff0000')
+  })
+
+  it('capPopTextSize is stored and retrievable', () => {
+    useConfigStore.getState().updateConfig({ capPopTextSize: 120 })
+    expect(useConfigStore.getState().capPopTextSize).toBe(120)
   })
 })
 
@@ -287,7 +204,7 @@ describe('packStore getTexts accessor for subliminals', () => {
   })
 })
 
-describe('simulated subliminal spawn tick', () => {
+describe('subliminal spawn tick logic', () => {
   beforeEach(() => {
     resetAll()
   })
@@ -298,123 +215,48 @@ describe('simulated subliminal spawn tick', () => {
     capPopTimer: number,
     subliminalPool: string[],
     randomFn: () => number = Math.random,
-  ): ActiveSubliminal | null {
+  ): { text: string; opacity: number; duration: number } | null {
     if (capPopChance > 0 && roll(capPopChance, randomFn) && subliminalPool.length > 0) {
       const text = subliminalPool[Math.floor(randomFn() * subliminalPool.length)]
-      // Center on screen, matching Python original's centered layout
-      const x = Math.round(1920 / 2)
-      const y = Math.round(1080 / 2)
       return {
-        id: nextSubliminalId(),
         text,
-        x,
-        y,
         opacity: capPopOpacity,
-        duration: capPopTimer * 1000,
-        spawnTime: Date.now(),
+        duration: capPopTimer,
       }
     }
     return null
   }
 
-  it('spawn tick adds subliminal to store on success', () => {
-    const sub = simulateSubliminalSpawn(100, 80, 5, ['OBEY'], () => 0.5)
-    expect(sub).not.toBeNull()
-    if (sub) {
-      useSubliminalStore.getState().addSubliminal(sub)
-    }
-    expect(useSubliminalStore.getState().subliminals).toHaveLength(1)
-    expect(useSubliminalStore.getState().subliminals[0].text).toBe('OBEY')
-    expect(useSubliminalStore.getState().subliminals[0].opacity).toBe(80)
-    expect(useSubliminalStore.getState().subliminals[0].duration).toBe(5000)
+  it('spawn tick produces result on success', () => {
+    const result = simulateSubliminalSpawn(100, 80, 300, ['OBEY'], () => 0.5)
+    expect(result).not.toBeNull()
+    expect(result?.text).toBe('OBEY')
+    expect(result?.opacity).toBe(80)
+    expect(result?.duration).toBe(300)
   })
 
   it('spawn tick returns null when chance is 0', () => {
-    const sub = simulateSubliminalSpawn(0, 100, 5, ['OBEY'], () => 0.5)
-    expect(sub).toBeNull()
-    expect(useSubliminalStore.getState().subliminals).toHaveLength(0)
+    const result = simulateSubliminalSpawn(0, 100, 5, ['OBEY'], () => 0.5)
+    expect(result).toBeNull()
   })
 
   it('spawn tick returns null when pool is empty', () => {
-    const sub = simulateSubliminalSpawn(100, 100, 5, [], () => 0.5)
-    expect(sub).toBeNull()
+    const result = simulateSubliminalSpawn(100, 100, 5, [], () => 0.5)
+    expect(result).toBeNull()
   })
 
   it('spawn tick uses capPopOpacity from config', () => {
-    const sub = simulateSubliminalSpawn(100, 30, 5, ['OBEY'], () => 0.5)
-    expect(sub?.opacity).toBe(30)
+    const result = simulateSubliminalSpawn(100, 30, 5, ['OBEY'], () => 0.5)
+    expect(result?.opacity).toBe(30)
   })
 
-  it('spawn tick uses capPopTimer converted to ms', () => {
-    const sub = simulateSubliminalSpawn(100, 100, 10, ['OBEY'], () => 0.5)
-    expect(sub?.duration).toBe(10000)
-  })
-
-  it('spawn tick assigns unique ids', () => {
-    const sub1 = simulateSubliminalSpawn(100, 100, 5, ['OBEY'], () => 0.5)
-    const sub2 = simulateSubliminalSpawn(100, 100, 5, ['SUBMIT'], () => 0.5)
-    expect(sub1?.id).not.toBe(sub2?.id)
-  })
-
-  it('multiple spawn ticks accumulate in store', () => {
-    for (let i = 0; i < 5; i++) {
-      const sub = simulateSubliminalSpawn(100, 100, 5, ['OBEY'], () => 0.5)
-      if (sub) useSubliminalStore.getState().addSubliminal(sub)
-    }
-    expect(useSubliminalStore.getState().subliminals).toHaveLength(5)
-  })
-
-  it('clearSubliminals removes all accumulated entries', () => {
-    for (let i = 0; i < 3; i++) {
-      const sub = simulateSubliminalSpawn(100, 100, 5, ['OBEY'], () => 0.5)
-      if (sub) useSubliminalStore.getState().addSubliminal(sub)
-    }
-    expect(useSubliminalStore.getState().subliminals).toHaveLength(3)
-    useSubliminalStore.getState().clearSubliminals()
-    expect(useSubliminalStore.getState().subliminals).toHaveLength(0)
-  })
-})
-
-describe('script-triggered subliminal spawn', () => {
-  beforeEach(() => {
-    resetAll()
-  })
-
-  it('adds subliminal with provided text and config values', () => {
-    useConfigStore.getState().updateConfig({ capPopOpacity: 60, capPopTimer: 10 })
-    const cfg = useConfigStore.getState()
-    const x = 500
-    const y = 300
-    useSubliminalStore.getState().addSubliminal({
-      id: nextSubliminalId(),
-      text: 'OBEY',
-      x,
-      y,
-      opacity: cfg.capPopOpacity,
-      duration: cfg.capPopTimer * 1000,
-      spawnTime: Date.now(),
-    })
-    const sub = useSubliminalStore.getState().subliminals[0]
-    expect(sub.text).toBe('OBEY')
-    expect(sub.opacity).toBe(60)
-    expect(sub.duration).toBe(10000)
-    expect(sub.x).toBe(500)
-    expect(sub.y).toBe(300)
-  })
-
-  it('script-triggered subliminal does not affect popupStore', () => {
-    usePopupStore.getState().clearPopups()
-    useSubliminalStore.getState().addSubliminal(makeSubliminal({ id: 1 }))
-    expect(usePopupStore.getState().popups).toHaveLength(0)
-    expect(useSubliminalStore.getState().subliminals).toHaveLength(1)
+  it('spawn tick passes capPopTimer as duration in ms', () => {
+    const result = simulateSubliminalSpawn(100, 100, 5000, ['OBEY'], () => 0.5)
+    expect(result?.duration).toBe(5000)
   })
 })
 
 describe('subliminal popup position', () => {
-  beforeEach(() => {
-    resetAll()
-  })
-
   it('spawn tick centers on screen', () => {
     const screenWidth = 1920
     const screenHeight = 1080

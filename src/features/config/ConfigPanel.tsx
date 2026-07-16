@@ -251,9 +251,24 @@ export function ConfigPanel() {
             )}
             <SliderLabel label="Hypno Overlay Opacity (%)" value={config.subliminalsAlpha} onChange={(v) => config.updateConfig({ subliminalsAlpha: v })} />
             <SliderLabel label="Subliminal Popup Opacity (%)" value={config.capPopOpacity} onChange={(v) => config.updateConfig({ capPopOpacity: v })} />
-            <NumberInput label="Subliminal Popup Timeout (seconds)" value={config.capPopTimer}
+            <NumberInput label="Subliminal Popup Timeout (ms)" value={config.capPopTimer}
               onChange={(v) => config.updateConfig({ capPopTimer: Number(v) || 1 })}
               min={1} max={3600}
+            />
+            <Group>
+              <TextInput label="Subliminal Text Color" description="CSS color (hex, name, rgb)"
+                value={config.capPopTextColor}
+                onChange={(e) => config.updateConfig({ capPopTextColor: e.currentTarget.value || '#ffffff' })}
+                style={{ flex: 1 }}
+              />
+              <div style={{
+                width: 32, height: 32, borderRadius: 4, border: '1px solid #555',
+                backgroundColor: config.capPopTextColor, alignSelf: 'flex-end', marginBottom: 2,
+              }} />
+            </Group>
+            <NumberInput label="Subliminal Text Size (px)" value={config.capPopTextSize}
+              onChange={(v) => config.updateConfig({ capPopTextSize: Number(v) || 80 })}
+              min={12} max={500}
             />
             <SliderLabel label="Moving Popup Chance (%)" value={config.movingChance} onChange={(v) => config.updateConfig({ movingChance: v })} />
             <NumberInput label="Moving Popup Speed" value={config.movingSpeed}

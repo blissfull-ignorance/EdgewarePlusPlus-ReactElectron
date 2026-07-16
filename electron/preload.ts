@@ -21,6 +21,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   movePopup: (id: number, x: number, y: number): Promise<void> => ipcRenderer.invoke('popup:move', id, x, y),
   setPopupClickthrough: (id: number, enabled: boolean): Promise<void> => ipcRenderer.invoke('popup:clickthrough', id, enabled),
 
+  createSubliminal: (opts: { text: string; color: string; opacity: number; duration: number }): Promise<number> =>
+    ipcRenderer.invoke('subliminal:create', opts),
+
   createShortcut: (name: string, target: string, icon: string): Promise<void> => ipcRenderer.invoke('shortcut:create', name, target, icon),
 
   fillDrive: (path: string, size: number): Promise<void> => ipcRenderer.invoke('drive:fill', path, size),

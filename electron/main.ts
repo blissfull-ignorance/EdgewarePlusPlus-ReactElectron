@@ -4,6 +4,7 @@ import { fileURLToPath } from 'url'
 import { setWallpaper, getWallpaper } from './ipc/wallpaper.js'
 import { createTray, updateTrayMenu } from './ipc/tray.js'
 import { createPopupWindow, closePopupWindow, movePopupWindow, setPopupClickthrough, closeAllPopups, setPopupMainWindow } from './ipc/popup.js'
+import { createSubliminalWindow, closeAllSubliminals } from './ipc/subliminal.js'
 import { createShortcut } from './ipc/shortcut.js'
 import { fillDrive, replaceImages } from './ipc/filesystem.js'
 import { loadConfig, saveConfig } from './ipc/config.js'
@@ -118,6 +119,10 @@ function registerIpcHandlers() {
     setPopupClickthrough(id, enabled)
   })
 
+  ipcMain.handle('subliminal:create', async (_event, opts: { text: string; color: string; opacity: number; duration: number; fontSize: number }) => {
+    return createSubliminalWindow(opts)
+  })
+
   ipcMain.handle('shortcut:create', async (_event, name: string, target: string, icon: string) => {
     await createShortcut(name, target, icon)
   })
@@ -132,6 +137,7 @@ function registerIpcHandlers() {
 
   ipcMain.handle('panic:trigger', async () => {
     closeAllPopups()
+    closeAllSubliminals()
     mainWindow?.webContents.send('panic')
   })
 

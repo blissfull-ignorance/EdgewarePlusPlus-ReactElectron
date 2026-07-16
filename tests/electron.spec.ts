@@ -300,3 +300,50 @@ test.describe('Panic mode', () => {
     await expect(mainWindow.locator('text=PANIC MODE')).toBeVisible({ timeout: 5_000 })
   })
 })
+
+test.describe('Subliminal windows', () => {
+  test('subliminal window spawns as transparent click-through and auto-closes', async () => {
+    await expect(mainWindow.locator('text=Edgeware++ Configuration')).toBeVisible({ timeout: 15_000 })
+
+    await mainWindow.evaluate(async () => {
+      await window.electronAPI!.createSubliminal({
+        text: 'OBEY',
+        color: '#ffffff',
+        opacity: 100,
+        duration: 500,
+        fontSize: 80,
+      })
+    })
+
+    await expect.poll(() => electronApp.windows().length, 'subliminal window should appear').toBe(2)
+
+    const allWindows = electronApp.windows()
+    const subliminalWindow = allWindows.find(w => w !== mainWindow)!
+    const subliminalText = await subliminalWindow.locator('#text').innerText({ timeout: 3_000 })
+    expect(subliminalText).toBe('OBEY')
+
+    await expect.poll(() => electronApp.windows().length, 'subliminal window should auto-close').toBe(1, { timeout: 5_000 })
+  })
+
+  test('panic kills subliminal windows', async () => {
+    await expect(mainWindow.locator('text=Edgeware++ Configuration')).toBeVisible({ timeout: 15_000 })
+
+    await mainWindow.evaluate(async () => {
+      await window.electronAPI!.createSubliminal({
+        text: 'SUBMIT',
+        color: '#ff0000',
+        opacity: 80,
+        duration: 10_000,
+        fontSize: 80,
+      })
+    })
+
+    await expect.poll(() => electronApp.windows().length, 'subliminal window should appear').toBe(2)
+
+    await mainWindow.evaluate(async () => {
+      await window.electronAPI!.sendPanic()
+    })
+
+    await expect.poll(() => electronApp.windows().length, 'subliminal should be killed by panic').toBe(1, { timeout: 5_000 })
+  })
+})
