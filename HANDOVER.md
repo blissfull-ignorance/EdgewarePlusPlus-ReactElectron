@@ -2,7 +2,7 @@
 
 ## Current Status
 
-**Last Session:** Fix popupMod/vidMod bug — images and videos now respect chance filtering, 20 new tests
+**Last Session:** Fix Save Configuration button — destructure updateConfig out before IPC to prevent clone error
 
 **Date:** July 16, 2026
 
@@ -49,6 +49,7 @@
 ### Recent Commits
 
 ```
+fix: Save Configuration button — exclude updateConfig function from IPC to prevent clone error
 fix: popupMod/vidMod chance filtering — images and videos now respect spawn probability, 20 new tests
 feat: popup auto-close timer — configurable timeout with edge case handling, 16 new tests
 feat: popup overlap avoidance — grid-based weighted positioning, 12 tests
@@ -197,23 +198,22 @@ EdgewarePlusPlus/
 
 ### Active Task
 
-See **TASK.md** for the current highest-priority task: Popup Image/Video Chance (popupMod/vidMod) Bugfix.
+See **TASK.md** for the current highest-priority task.
 
 ### Next Session Priority Order
 
-1. **BUGFIX**: The Save Configuration button should save a config to file somewhere in the project files. Currently leads to an error: ConfigPanel.tsx:68 Uncaught (in promise) Error: An object could not be cloned.
-2. **BUGFIX**: The Audio popup logic seems buggy. The audio popup chance seems to be coupled to the image and video popup chance. Analyse the original Python source (edgeware) first, if this is intentional. Prepare a plan on how to implement proper behaviour. Check in with the plan before producing the TASK.md.
-3. **BUGFIX**: The corruption mode starts and overwrites the configuration as expected. However, the corruption mode guided audio coupling didn't work properly.
-4. **BUGFIX**: The corruption mode starts and overwrites the configuration as expected. However, the corruption mode phase transitioning logic didn't work. The mode was stuck on corruption level 1.
-5. **LOW**: Implement single mode weighted random spawn selection
-6. **LOW**: Add mood-based media filtering (requires pack loader mood tagging)
-7. **MEDIUM**: Explore the original Python source (edgeware): Is there a distinction in "caption" and "subliminal" handling? Prepare a plan on how to implement proper behaviour. Check in with the plan before producing the TASK.md.
-8. **MEDIUM**: Explore the original Python source (edgeware): Do hypno overlays have the size and ratio of the hypno overlay or is the overlay cut to the original image/video size? Are there differences in which hypno images are overlaid over what images & videos compared to the current implementation?  Prepare a plan on how to implement proper behaviour. Check in with the plan before producing the TASK.md.
-9. **LOW**: Add corruption danger check dialog (warns when full-perm enables dangerous settings)
-10. **LOW**: Add launch count persistence for corruption (via Electron IPC)
-11. **LOW**: Cross-platform verification (Windows, Linux)
-12. **LOW**: Tray icon assets (.icns, .ico, .png)
-13. **MEDIUM**: Based on FEATURE_PARITY_AUDIT.md, ARCHITECTURE.md and general project analysis, overhaul the README.md completely. Make sure the README.md explains a transition from the original project to the cross platform react project, include some reasoning behind it. Make sure to include the previous information and expand
+1. **BUGFIX**: The Audio popup logic seems buggy. The audio popup chance seems to be coupled to the image and video popup chance. Analyse the original Python source (edgeware) first, if this is intentional. Prepare a plan on how to implement proper behaviour. Check in with the plan before producing the TASK.md.
+2. **BUGFIX**: The corruption mode starts and overwrites the configuration as expected. However, the corruption mode guided audio coupling didn't work properly.
+3. **BUGFIX**: The corruption mode starts and overwrites the configuration as expected. However, the corruption mode phase transitioning logic didn't work. The mode was stuck on corruption level 1.
+4. **LOW**: Implement single mode weighted random spawn selection
+5. **LOW**: Add mood-based media filtering (requires pack loader mood tagging)
+6. **MEDIUM**: Explore the original Python source (edgeware): Is there a distinction in "caption" and "subliminal" handling? Prepare a plan on how to implement proper behaviour. Check in with the plan before producing the TASK.md.
+7. **MEDIUM**: Explore the original Python source (edgeware): Do hypno overlays have the size and ratio of the hypno overlay or is the overlay cut to the original image/video size? Are there differences in which hypno images are overlaid over what images & videos compared to the current implementation?  Prepare a plan on how to implement proper behaviour. Check in with the plan before producing the TASK.md.
+8. **LOW**: Add corruption danger check dialog (warns when full-perm enables dangerous settings)
+9. **LOW**: Add launch count persistence for corruption (via Electron IPC)
+10. **LOW**: Cross-platform verification (Windows, Linux)
+11. **LOW**: Tray icon assets (.icns, .ico, .png)
+12. **MEDIUM**: Based on FEATURE_PARITY_AUDIT.md, ARCHITECTURE.md and general project analysis, overhaul the README.md completely. Make sure the README.md explains a transition from the original project to the cross platform react project, include some reasoning behind it. Make sure to include the previous information and expand
 
 
 ### Important Notes

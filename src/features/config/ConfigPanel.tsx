@@ -8,7 +8,7 @@ import { useAppStore } from '@/stores/appStore'
 import { useCorruptionStore } from '@/stores/corruptionStore'
 import { usePackStore } from '@/stores/packStore'
 import { useElectronAPI } from '@/hooks/useElectronAPI'
-import type { Pack } from '@/types/pack'
+import type { Config, Pack } from '@/types/pack'
 
 const hibernateOptions = [
   { value: 'Original', label: 'Original' },
@@ -64,7 +64,8 @@ export function ConfigPanel() {
 
   const handleSave = useCallback(async () => {
     if (!electronAPI) return
-    await electronAPI.saveConfig(config)
+    const { updateConfig: _fn, ...configData } = config
+    await electronAPI.saveConfig(configData as Config)
   }, [electronAPI, config])
 
   const handleBrowse = useCallback(async () => {

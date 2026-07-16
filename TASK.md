@@ -1,35 +1,42 @@
-# Task: Test Improvement — Next Session
+# TASK.md — Highest Priority Task
 
-## Goal
-Improve test coverage and quality for existing test files.
+## Task: Fix Save Configuration Button (IPC Clone Error)
 
-## Priority
-**Highest** — This is the next task per HANDOVER.md priority order.
+**Priority:** BUGFIX (Highest)
+**Date:** July 16, 2026
 
-## Steps
+### Problem
 
-1. **Add component-level tests for hypno overlay spawn decision logic in `hypno.runtime.test.ts`**
-   - Currently only store accessors are tested
-   - Add tests that verify the actual component-level decision logic
+Clicking "Save Configuration" in the Config Panel throws:
+```
+ConfigPanel.tsx:68 Uncaught (in promise) Error: An object could not be cloned.
+```
 
-2. **Add edge case tests for very large popup dimensions relative to screen size in `movement.test.ts`**
-   - Test behavior when popups are larger than the screen
+### Root Cause
 
-3. **Add test for popup removal mid-simulation (mitosis close flow) in `movement.flow.test.ts`**
-   - Verify correct behavior when popups are removed during movement simulation
+`handleSave` in `ConfigPanel.tsx:67` passes the entire Zustand store state to `electronAPI.saveConfig(config)`. This state includes the `updateConfig` function, which is not serializable by Electron's structured clone algorithm (used by IPC).
 
-4. **Consider adding stress tests for rapid add/remove cycles across all test files**
-   - Test performance and correctness under rapid state changes
+### Fix
 
-5. **Improve comments in test files for better documentation**
-   - Add descriptive comments explaining test logic and edge cases
+In `ConfigPanel.tsx`, destructure to extract only the config data (excluding `updateConfig`) before sending it over IPC.
 
-6. **Commit changes**
-   - Run `npm run check`, `npm run lint`, `npm run test` to verify
-   - Commit with descriptive message following conventional commit format
+```typescript
+const handleSave = useCallback(async () => {
+  if (!electronAPI) return
+  const { updateConfig: _fn, ...configData } = config
+  await electronAPI.saveConfig(configData as Config)
+}, [electronAPI, config])
+```
 
-7. **Update HANDOVER.md**
-   - Update "Last Session" description
-   - Update "Recent Commits" section
-   - Update test count if changed
-   - Update "Next Session Priority Order" if needed
+### Steps
+
+1. Read `ConfigPanel.tsx` and confirm `handleSave` passes full store state (including `updateConfig`).
+2. Edit `handleSave` to destructure out `updateConfig` and pass only the data portion to `electronAPI.saveConfig()`.
+3. Verify the `Config` type from `@/types/pack` matches what's being sent (add `maxImages` if missing).
+4. Run `npm run check` — zero TypeScript errors.
+5. Run `npm run lint` — zero ESLint errors.
+6. Run `npm run test` — all tests pass.
+7. Run `npm run electron:dev`, open Config Panel, click Save Configuration, and verify no error occurs and `config.json` is written to `userData/`.
+8. Improve comments/documentation where appropriate.
+9. Commit all changes with a meaningful commit message.
+10. Update HANDOVER.md to describe the current project state and recommend the next highest-priority task.
