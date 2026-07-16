@@ -21,6 +21,36 @@ export interface CorruptionLevelData {
   config: Record<string, string | number>
 }
 
+export interface PackAsset {
+  path: string
+  mood?: string
+  type: 'image' | 'video' | 'audio' | 'hypno' | 'text'
+}
+
+/**
+ * Filters media paths by active corruption moods.
+ *
+ * If activeMoods is empty, all media is eligible (no filtering).
+ * If activeMoods has entries, only media whose mood tag is in activeMoods
+ * (or has no mood tag) is included.
+ *
+ * @param media Array of media file paths.
+ * @param activeMoods Currently active corruption moods.
+ * @param moodLookup Map from file path to mood tag (from pack index).
+ * @returns Filtered array of media paths eligible for spawning.
+ */
+export function filterMediaByMood(
+  media: string[],
+  activeMoods: string[],
+  moodLookup: Map<string, string>,
+): string[] {
+  if (activeMoods.length === 0) return media
+  return media.filter((p) => {
+    const mood = moodLookup.get(p)
+    return !mood || activeMoods.includes(mood)
+  })
+}
+
 /** Config keys that corruption full-permission mode cannot override. */
 export const CORRUPTION_BLOCK = new Set([
   'packPath', 'themeNoConfig', 'showLoadingFlair', 'runOnSaveQuit',

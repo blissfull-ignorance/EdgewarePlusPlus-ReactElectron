@@ -127,7 +127,10 @@ export const useCorruptionStore = create<CorruptionState>((set, get) => ({
 
   applyLevelEffects: () => {
     const state = get()
-    if (state.corruptionLevels.length === 0) return
+    if (state.corruptionLevels.length === 0) {
+      set({ initialized: true })
+      return
+    }
 
     const moods = resolveActiveMoods(
       state.baseMoods,

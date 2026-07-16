@@ -2,7 +2,7 @@
 
 ## Current Status
 
-**Last Session:** Fix audio popup spawn coupling bug — decouple audio from visual eligibility
+**Last Session:** Fix corruption mode — level progression stuck at 1, audio/image/video not coupled to moods
 
 **Date:** July 16, 2026
 
@@ -32,7 +32,7 @@
 - **Prompt modal** — Mantine modal with Levenshtein distance validation
 - **Hibernate runtime** — Activity loop scheduling with 6 types (Original/Spaced/Glitch/Ramp/Pump-Scare/Chaos), sleep timer, pump-scare auto-close, tray skip button, reactive wallpaper reset, config validation (fixWallpaper forced off when hibernate disabled)
 - **Hibernate panel** — hibernate activation with type selection
-- **297 Vitest tests** — movement (47) + movement.runtime (6) + movement.flow (17) + hypno (11) + hypno.runtime (34) + corruption (44) + hibernate (38) + panic (32) + audio (33) + wallpaper rotation (19) + timeout (16) + spawn (25), all passing
+- **297 Vitest tests** — movement (47) + movement.runtime (6) + movement.flow (17) + hypno (11) + hypno.runtime (34) + corruption (55) + hibernate (38) + panic (32) + audio (33) + wallpaper rotation (19) + timeout (16) + spawn (25), all passing
 - **Fengari scripting wired** — Lua VM lifecycle, IPC bridge (script:start/stop/execute), scriptStore dispatches Lua callbacks to popupStore, corruptionStore, moodStore, promptStore, and appStore
 - **Notifications** — `electron.Notification` API wired via IPC, preload exposes `showNotification`, Lua `sendNotification` triggers native desktop notification
 - **Discord presence** — `discord-rpc` integrated via IPC, preload, Zustand store; updates on popup count/pack changes; respects `showDiscord` config toggle; destroys on panic/quit
@@ -40,7 +40,7 @@
 - **Audio playback** — volume config (`audioVolume` 0–100), `maxAudio` limit enforcement, `audioMod` probability for spawning independently alongside visual popups (not coupled to visual eligibility), fade in/out (`fadeInDuration`/`fadeOutDuration`), panic cleanup (pause on unmount)
 - **Web open** — `shell.openExternal()` wired via IPC (`web:openExternal`), preload exposes `openExternal(url)`, opens URLs in default browser
 - **Feature parity audit** — All 97 Python config options verified present; 11 runtime gaps identified and documented in FEATURE_PARITY_AUDIT.md
-- **Corruption runtime** — Level progression with timed/popup/launch/script triggers; mood cycling via cumulative add/remove; config overrides per level (respecting CORRUPTION_BLOCK); pack corruption.json loading; ConfigPanel shows corruption level and override count; 44 unit tests
+- **Corruption runtime** — Level progression with timed/popup/launch/script triggers; mood cycling via cumulative add/remove; config overrides per level (respecting CORRUPTION_BLOCK); pack corruption.json loading; ConfigPanel shows corruption level and override count; mood-based media filtering (images/videos/audio filtered by active corruption moods via pack index mood tags); 55 unit tests
 
 ### Known Issues
 
@@ -49,6 +49,7 @@
 ### Recent Commits
 
 ```
+fix: corruption mode — init guard sets initialized=true with empty levels, mood-based media filtering for images/videos/audio
 fix: decouple audio spawn from visual eligibility — audio now spawns independently alongside image/video popups
 fix: Save Configuration button — exclude updateConfig function from IPC to prevent clone error
 fix: popupMod/vidMod chance filtering — images and videos now respect spawn probability, 20 new tests
@@ -104,7 +105,7 @@ f9477ae fix: restrict video formats to Chromium-supported codecs
 ```bash
 npm run check            # TypeScript type checking (tsc --noEmit)
 npm run lint             # ESLint
-npm run test             # Vitest (348 tests)
+npm run test             # Vitest (365 tests)
 npm run test:e2e         # Playwright Electron integration tests (6 tests)
 npm run dev              # Vite dev server
 npm run electron:dev     # Dev with Electron
@@ -204,8 +205,8 @@ See **TASK.md** for the current highest-priority task.
 ### Next Session Priority Order
 
 1. ~~**BUGFIX**: Audio popup spawn coupling bug — audio now spawns independently alongside visual popups~~ ✅ DONE
-2. **BUGFIX**: The corruption mode starts and overwrites the configuration as expected. However, the corruption mode guided audio coupling didn't work properly.
-3. **BUGFIX**: The corruption mode starts and overwrites the configuration as expected. However, the corruption mode phase transitioning logic didn't work. The mode was stuck on corruption level 1.
+2. ~~**BUGFIX**: Corruption mode audio/image/video not coupled to moods — mood-based media filtering now active~~ ✅ DONE
+3. ~~**BUGFIX**: Corruption mode level progression stuck at 1 — init guard fixed, level advances correctly~~ ✅ DONE
 4. **LOW**: Implement single mode weighted random spawn selection
 5. **LOW**: Add mood-based media filtering (requires pack loader mood tagging)
 6. **MEDIUM**: Explore the original Python source (edgeware): Is there a distinction in "caption" and "subliminal" handling? Prepare a plan on how to implement proper behaviour. Check in with the plan before producing the TASK.md.

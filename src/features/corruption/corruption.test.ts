@@ -7,6 +7,7 @@ import {
   computeFadeMoods,
   getConfigOverrides,
   computeCorruptionProgress,
+  filterMediaByMood,
   CORRUPTION_BLOCK,
 } from './corruption'
 import type { CorruptionLevelData } from './corruption'
@@ -278,5 +279,48 @@ describe('computeCorruptionProgress', () => {
     expect(computeCorruptionProgress('Popup', 0, 0, 0, 5, 0, 0, 0, 1)).toBe(0)
     expect(computeCorruptionProgress('Timed', 5000, 0, 0, 0, 0, 0, 0, 1)).toBe(0)
     expect(computeCorruptionProgress('Launch', 0, 0, 0, 0, 0, 5, 0, 1)).toBe(0)
+  })
+})
+
+describe('filterMediaByMood', () => {
+  const media = ['/a.png', '/b.mp3', '/c.jpg', '/d.ogg', '/e.webm']
+  const lookup = new Map([
+    ['/a.png', 'furry'],
+    ['/b.mp3', 'goon'],
+    ['/c.jpg', 'scare'],
+    ['/d.ogg', 'denial'],
+  ])
+
+  it('returns all media when activeMoods is empty', () => {
+    expect(filterMediaByMood(media, [], lookup)).toEqual(media)
+  })
+
+  it('filters to matching moods only (includes untagged)', () => {
+    const result = filterMediaByMood(media, ['furry', 'goon'], lookup)
+    expect(result).toEqual(['/a.png', '/b.mp3', '/e.webm'])
+  })
+
+  it('includes media with no mood tag', () => {
+    const result = filterMediaByMood(media, ['hypno'], lookup)
+    expect(result).toEqual(['/e.webm'])
+  })
+
+  it('includes untagged media when mood matches', () => {
+    const result = filterMediaByMood(media, ['furry'], lookup)
+    expect(result).toContain('/a.png')
+    expect(result).toContain('/e.webm')
+  })
+
+  it('returns empty when no moods match', () => {
+    const result = filterMediaByMood(media, ['nonexistent'], lookup)
+    expect(result).toEqual(['/e.webm'])
+  })
+
+  it('returns empty for empty media array', () => {
+    expect(filterMediaByMood([], ['furry'], lookup)).toEqual([])
+  })
+
+  it('includes all media when lookup is empty (all untagged)', () => {
+    expect(filterMediaByMood(media, ['furry'], new Map())).toEqual(media)
   })
 })

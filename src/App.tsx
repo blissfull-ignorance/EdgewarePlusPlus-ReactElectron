@@ -18,6 +18,8 @@ import { planActivity, hibernateDelay, shouldResetWallpaper } from '@/features/h
 import type { HibernateType } from '@/features/hibernate/hibernate'
 import { shouldMove, randomDirection, tickPopups, computeSpawnPosition } from '@/features/popup/movement'
 import { computeSpawnPools } from '@/features/popup/spawn'
+import { filterMediaByMood } from '@/features/corruption/corruption'
+import type { PackAsset } from '@/features/corruption/corruption'
 import type { OccupiedZone } from '@/features/popup/movement'
 import { getExpiredPopupIds } from '@/features/popup/timeout'
 import { logMovementEvent } from '@/features/popup/debug'
@@ -301,13 +303,22 @@ export default function App() {
         }
       }
 
-      // Filter media pools by chance values (popupMod, vidMod, audioMod).
-      // Each type is independently rolled, matching the Python original's
-      // RollTarget.roll() behavior. Audio spawns alongside visual popups.
+      const corruptionMoods = useCorruptionStore.getState().activeMoods
+      const moodLookup = new Map<string, string>()
+      for (const assets of Object.values(pack.index)) {
+        for (const asset of assets as PackAsset[]) {
+          if (asset.mood) moodLookup.set(asset.path, asset.mood)
+        }
+      }
+
+      const filteredImages = filterMediaByMood(pack.media.images, corruptionMoods, moodLookup)
+      const filteredVideos = filterMediaByMood(pack.media.videos, corruptionMoods, moodLookup)
+      const filteredAudio = filterMediaByMood(pack.media.audio, corruptionMoods, moodLookup)
+
       const pools = computeSpawnPools({
-        images: pack.media.images,
-        videos: pack.media.videos,
-        audio: pack.media.audio,
+        images: filteredImages,
+        videos: filteredVideos,
+        audio: filteredAudio,
         popupMod: cfg.popupMod,
         vidMod: cfg.vidMod,
         audioMod: cfg.audioMod,
