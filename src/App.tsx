@@ -302,8 +302,8 @@ export default function App() {
       }
 
       // Filter media pools by chance values (popupMod, vidMod, audioMod).
-      // Each type is independently rolled against its chance, matching the
-      // Python original's RollTarget.roll() behavior.
+      // Each type is independently rolled, matching the Python original's
+      // RollTarget.roll() behavior. Audio spawns alongside visual popups.
       const pools = computeSpawnPools({
         images: pack.media.images,
         videos: pack.media.videos,
@@ -316,82 +316,85 @@ export default function App() {
       const { eligibleImages, eligibleVideos, eligibleAudio, hasVisual } = pools
       if (!hasVisual && eligibleAudio.length === 0) return
 
-      const audioPool = hasVisual && eligibleAudio.length > 0 ? eligibleAudio : null
-      const visualPool = hasVisual ? [...eligibleImages, ...eligibleVideos] : eligibleAudio
-      if (visualPool.length === 0) return
-      const path = audioPool ? pickRandom(audioPool) : pickRandom(visualPool)
-      const isVideo = eligibleVideos.includes(path)
-      const isAudio = eligibleAudio.includes(path)
+      // Audio and visual are independently rolled (matching Python original).
+      // Audio spawns alongside visual — not one-or-the-other.
 
-      if (isAudio) {
+      if (eligibleAudio.length > 0) {
         const popups = usePopupStore.getState().popups
         const currentAudio = popups.filter((p) => p.type === 'audio').length
-        if (currentAudio >= cfg.maxAudio) return
-        const id = audioIdCounter++
-        usePopupStore.getState().addPopup({ id, type: 'audio', mediaPath: path, x: 0, y: 0, width: 0, height: 0, moving: false, dx: 0, dy: 0, mitosisSpawned: false, spawnTime: Date.now() })
-      } else {
-        // Enforce per-type popup limits
-        const popups = usePopupStore.getState().popups
-        const currentImages = popups.filter((p) => p.type === 'image').length
-        const currentVideos = popups.filter((p) => p.type === 'video').length
-        if (isVideo && currentVideos >= cfg.maxVideos) return
-        if (!isVideo && currentImages >= cfg.maxImages) return
-
-        // Scale popup dimensions by user-configured popupScale
-        const scale = cfg.popupScale || 1
-        const w = Math.round(randomInt(200, 400) * scale)
-        const h = Math.round(randomInt(150, 300) * scale)
-        const bounds = screenRef.current
-        const occupied: OccupiedZone[] = usePopupStore.getState().popups
-        const { x, y } = computeSpawnPosition(w, h, bounds, occupied)
-
-        if (electronAPI) {
-          // Hypno overlay: only applied to static images (not gifs, not videos)
-          const mediaExt = extOf(path)
-          const isStaticImage = STATIC_IMG_EXTS.has(mediaExt)
-          const hypnoMediaPath = isStaticImage && roll(cfg.subliminalsChance) && pack.media.hypno.length > 0
-            ? pickRandom(pack.media.hypno)
-            : undefined
-          console.log('[spawn:hypno]', {
-            hypnoMediaPath: hypnoMediaPath || '(none)',
-            isStaticImage,
-            subliminalsChance: cfg.subliminalsChance,
-            hypnoPoolSize: pack.media.hypno.length,
-            opacity: cfg.subliminalsAlpha,
-          })
-          electronAPI.createPopup({
-            mediaPath: path,
-            type: isVideo ? 'video' : 'image',
-            width: w,
-            height: h,
-            x,
-            y,
-            opacity: 100,
-            clickthrough: cfg.clickthroughPopups,
-            clicksToClose: cfg.buttonless ? 999 : 1,
-            popupClose: usePackStore.getState().getPopupCloseText(),
-            buttonless: cfg.buttonless,
-            denialFilter: roll(cfg.denialChance) ? pickDenialFilter() : undefined,
-            hypnoMediaPath,
-            hypnoOpacity: cfg.subliminalsAlpha,
-          }).then((popupId) => {
-            // Assign movement parameters: direction is random, moving is probabilistic
-            const dir = randomDirection()
-            const moving = shouldMove(cfg.movingChance)
-            console.log('[spawn]', { popupId, moving, movingChance: cfg.movingChance, x, y, w, h })
-            usePopupStore.getState().addPopup({
-              id: popupId, type: isVideo ? 'video' : 'image',
-              x, y, width: w, height: h,
-              moving,
-              dx: dir.dx, dy: dir.dy,
-              mitosisSpawned: false,
-              spawnTime: Date.now(),
-            })
-            logMovementEvent({ ts: Date.now(), type: 'spawn', popupId, moving, x, y, dx: dir.dx, dy: dir.dy })
-          }).catch((err) => {
-            console.error('createPopup failed', err)
-          })
+        if (currentAudio < cfg.maxAudio) {
+          const audioPath = pickRandom(eligibleAudio)
+          const id = audioIdCounter++
+          usePopupStore.getState().addPopup({ id, type: 'audio', mediaPath: audioPath, x: 0, y: 0, width: 0, height: 0, moving: false, dx: 0, dy: 0, mitosisSpawned: false, spawnTime: Date.now() })
         }
+      }
+
+      const visualPool = [...eligibleImages, ...eligibleVideos]
+      if (visualPool.length === 0) return
+      const path = pickRandom(visualPool)
+      const isVideo = eligibleVideos.includes(path)
+
+      // Enforce per-type popup limits
+      const popups = usePopupStore.getState().popups
+      const currentImages = popups.filter((p) => p.type === 'image').length
+      const currentVideos = popups.filter((p) => p.type === 'video').length
+      if (isVideo && currentVideos >= cfg.maxVideos) return
+      if (!isVideo && currentImages >= cfg.maxImages) return
+
+      // Scale popup dimensions by user-configured popupScale
+      const scale = cfg.popupScale || 1
+      const w = Math.round(randomInt(200, 400) * scale)
+      const h = Math.round(randomInt(150, 300) * scale)
+      const bounds = screenRef.current
+      const occupied: OccupiedZone[] = usePopupStore.getState().popups
+      const { x, y } = computeSpawnPosition(w, h, bounds, occupied)
+
+      if (electronAPI) {
+        // Hypno overlay: only applied to static images (not gifs, not videos)
+        const mediaExt = extOf(path)
+        const isStaticImage = STATIC_IMG_EXTS.has(mediaExt)
+        const hypnoMediaPath = isStaticImage && roll(cfg.subliminalsChance) && pack.media.hypno.length > 0
+          ? pickRandom(pack.media.hypno)
+          : undefined
+        console.log('[spawn:hypno]', {
+          hypnoMediaPath: hypnoMediaPath || '(none)',
+          isStaticImage,
+          subliminalsChance: cfg.subliminalsChance,
+          hypnoPoolSize: pack.media.hypno.length,
+          opacity: cfg.subliminalsAlpha,
+        })
+        electronAPI.createPopup({
+          mediaPath: path,
+          type: isVideo ? 'video' : 'image',
+          width: w,
+          height: h,
+          x,
+          y,
+          opacity: 100,
+          clickthrough: cfg.clickthroughPopups,
+          clicksToClose: cfg.buttonless ? 999 : 1,
+          popupClose: usePackStore.getState().getPopupCloseText(),
+          buttonless: cfg.buttonless,
+          denialFilter: roll(cfg.denialChance) ? pickDenialFilter() : undefined,
+          hypnoMediaPath,
+          hypnoOpacity: cfg.subliminalsAlpha,
+        }).then((popupId) => {
+          // Assign movement parameters: direction is random, moving is probabilistic
+          const dir = randomDirection()
+          const moving = shouldMove(cfg.movingChance)
+          console.log('[spawn]', { popupId, moving, movingChance: cfg.movingChance, x, y, w, h })
+          usePopupStore.getState().addPopup({
+            id: popupId, type: isVideo ? 'video' : 'image',
+            x, y, width: w, height: h,
+            moving,
+            dx: dir.dx, dy: dir.dy,
+            mitosisSpawned: false,
+            spawnTime: Date.now(),
+          })
+          logMovementEvent({ ts: Date.now(), type: 'spawn', popupId, moving, x, y, dx: dir.dx, dy: dir.dy })
+        }).catch((err) => {
+          console.error('createPopup failed', err)
+        })
       }
     }
 

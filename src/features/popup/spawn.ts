@@ -9,7 +9,7 @@
  * chance value via RollTarget.roll(). This module replicates that behavior:
  *   - popupMod: probability (0–100) that images are eligible to spawn
  *   - vidMod: probability (0–100) that videos are eligible to spawn
- *   - audioMod: probability (0–100) that audio spawns alongside visual media
+ *   - audioMod: probability (0–100) that audio is eligible to spawn independently
  */
 
 /** Returns true with `percent` probability (0–100). Injectable for testing. */
@@ -37,8 +37,9 @@ export interface SpawnPoolResult {
  * Filters media pools by their respective chance values.
  *
  * Each type is independently rolled: an image/video is only included if
- * its chance value is > 0 AND the random roll succeeds. Audio is included
- * if any visual media is eligible AND audioMod > 0 AND the roll succeeds.
+ * its chance value is > 0 AND the random roll succeeds. Audio is also
+ * rolled independently — it does not depend on visual eligibility.
+ * This matches the Python original where audio is a separate RollTarget.
  *
  * @returns Filtered pools and a flag indicating whether any visual media is eligible.
  */
@@ -56,7 +57,7 @@ export function computeSpawnPools(
 
   const hasVisual = eligibleImages.length + eligibleVideos.length > 0
 
-  const eligibleAudio = hasVisual && input.audioMod > 0 && roll(input.audioMod, randomFn)
+  const eligibleAudio = input.audioMod > 0 && roll(input.audioMod, randomFn)
     ? input.audio
     : []
 

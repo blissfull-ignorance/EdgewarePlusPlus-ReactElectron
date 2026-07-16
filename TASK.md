@@ -1,42 +1,49 @@
-# TASK.md — Highest Priority Task
+# TASK — Fix Audio Popup Spawn Coupling Bug
 
-## Task: Fix Save Configuration Button (IPC Clone Error)
+## Problem
 
-**Priority:** BUGFIX (Highest)
-**Date:** July 16, 2026
+Audio popup chance is incorrectly coupled to image/video popup chance. In the Python original (`edgeware/src/roll.py`), **every type is rolled independently** — audio, images, and videos can all spawn on the same tick. In the TypeScript port, audio is gated on visual eligibility (`hasVisual && audioMod > 0 && roll(audioMod)`) and competes with visual popups for a single spawn slot per tick.
 
-### Problem
+This means:
+- If `popupMod=0` and `vidMod=0`, audio can **never** spawn (even with `audioMod=100`)
+- Audio never spawns alongside an image/video — it's one-or-the-other
 
-Clicking "Save Configuration" in the Config Panel throws:
+## Root Cause
+
+1. **`src/features/popup/spawn.ts:59`** — `hasVisual &&` guard on audio eligibility
+2. **`src/App.tsx:319-322`** — audio and visual compete in a single-selection ternary
+
+## Steps
+
+### 1. Fix audio eligibility in `src/features/popup/spawn.ts`
+- Remove the `hasVisual &&` guard from the `eligibleAudio` computation (line 59)
+- Audio should be eligible whenever `audioMod > 0 && roll(audioMod)`, regardless of visual pool
+
+### 2. Fix spawn selection in `src/App.tsx`
+- Change the single-selection model so audio spawns independently alongside visual
+- The spawn tick should produce: optional visual popup + optional audio, not one-or-the-other
+- Audio should NOT consume the visual spawn slot
+
+### 3. Update tests in `src/features/popup/spawn.test.ts`
+- Fix "audio not eligible when no visual media is eligible" — audio **should** be eligible independently
+- Fix "audio fallback works when hasVisual is false" — audio should spawn regardless of visual state
+- Add tests: audio+visual spawn on same tick, audio alone, visual alone, neither
+
+### 4. Cross-check `src/features/popup/AudioPopup.test.ts`
+- This file already has a `shouldSpawnAudio` helper with the correct model — verify consistency
+
+### 5. Update `FEATURE_PARITY_AUDIT.md` section 3.6
+- Mark audio independence as implemented after fix
+
+### 6. Run verification
+```bash
+npm run check
+npm run lint
+npm run test
 ```
-ConfigPanel.tsx:68 Uncaught (in promise) Error: An object could not be cloned.
-```
 
-### Root Cause
+### 7. Improve comments/documentation where appropriate.
 
-`handleSave` in `ConfigPanel.tsx:67` passes the entire Zustand store state to `electronAPI.saveConfig(config)`. This state includes the `updateConfig` function, which is not serializable by Electron's structured clone algorithm (used by IPC).
+### 8. Commit all changes with a meaningful commit message.
 
-### Fix
-
-In `ConfigPanel.tsx`, destructure to extract only the config data (excluding `updateConfig`) before sending it over IPC.
-
-```typescript
-const handleSave = useCallback(async () => {
-  if (!electronAPI) return
-  const { updateConfig: _fn, ...configData } = config
-  await electronAPI.saveConfig(configData as Config)
-}, [electronAPI, config])
-```
-
-### Steps
-
-1. Read `ConfigPanel.tsx` and confirm `handleSave` passes full store state (including `updateConfig`).
-2. Edit `handleSave` to destructure out `updateConfig` and pass only the data portion to `electronAPI.saveConfig()`.
-3. Verify the `Config` type from `@/types/pack` matches what's being sent (add `maxImages` if missing).
-4. Run `npm run check` — zero TypeScript errors.
-5. Run `npm run lint` — zero ESLint errors.
-6. Run `npm run test` — all tests pass.
-7. Run `npm run electron:dev`, open Config Panel, click Save Configuration, and verify no error occurs and `config.json` is written to `userData/`.
-8. Improve comments/documentation where appropriate.
-9. Commit all changes with a meaningful commit message.
-10. Update HANDOVER.md to describe the current project state and recommend the next highest-priority task.
+### 9. Update HANDOVER.md to describe the current project state and recommend the next highest-priority task.

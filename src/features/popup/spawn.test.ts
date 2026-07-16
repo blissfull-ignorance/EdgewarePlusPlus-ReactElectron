@@ -86,12 +86,12 @@ describe('computeSpawnPools', () => {
     expect(result.eligibleVideos).toEqual([])
   })
 
-  it('audio not eligible when no visual media is eligible', () => {
+  it('audio eligible independently of visual media', () => {
     const result = computeSpawnPools(
       makeInput({ popupMod: 0, vidMod: 0, audioMod: 100 }),
       always(),
     )
-    expect(result.eligibleAudio).toEqual([])
+    expect(result.eligibleAudio).toEqual(['aud1.mp3', 'aud2.wav'])
     expect(result.hasVisual).toBe(false)
   })
 
@@ -160,9 +160,50 @@ describe('computeSpawnPools', () => {
     expect(result.eligibleImages).toEqual([])
   })
 
-  it('audio fallback works when hasVisual is false', () => {
+  it('audio spawns alone when no visual media and audioMod > 0', () => {
     const result = computeSpawnPools(
       makeInput({ popupMod: 0, vidMod: 0, audioMod: 100 }),
+      always(),
+    )
+    expect(result.hasVisual).toBe(false)
+    expect(result.eligibleAudio).toEqual(['aud1.mp3', 'aud2.wav'])
+  })
+
+  it('audio and visual spawn on same tick', () => {
+    const result = computeSpawnPools(
+      makeInput({ popupMod: 100, vidMod: 100, audioMod: 100 }),
+      always(),
+    )
+    expect(result.hasVisual).toBe(true)
+    expect(result.eligibleImages).toHaveLength(3)
+    expect(result.eligibleVideos).toHaveLength(2)
+    expect(result.eligibleAudio).toEqual(['aud1.mp3', 'aud2.wav'])
+  })
+
+  it('audio alone when visual roll fails but audioMod > 0', () => {
+    const rolls = [0.99, 0.99, 0.99, 0.99, 0.99, 0.5]
+    let i = 0
+    const randomFn = () => rolls[i++ % rolls.length]
+    const result = computeSpawnPools(
+      makeInput({ popupMod: 50, vidMod: 50, audioMod: 100 }),
+      randomFn,
+    )
+    expect(result.hasVisual).toBe(false)
+    expect(result.eligibleAudio).toEqual(['aud1.mp3', 'aud2.wav'])
+  })
+
+  it('visual alone when audioMod = 0', () => {
+    const result = computeSpawnPools(
+      makeInput({ popupMod: 100, vidMod: 100, audioMod: 0 }),
+      always(),
+    )
+    expect(result.hasVisual).toBe(true)
+    expect(result.eligibleAudio).toEqual([])
+  })
+
+  it('neither when all chances are 0', () => {
+    const result = computeSpawnPools(
+      makeInput({ popupMod: 0, vidMod: 0, audioMod: 0 }),
       always(),
     )
     expect(result.hasVisual).toBe(false)

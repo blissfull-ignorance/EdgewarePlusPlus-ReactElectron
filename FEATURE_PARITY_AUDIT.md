@@ -243,7 +243,7 @@ These features have config options and UI controls but **lack runtime implementa
 ### 3.6 Spawn Tick Logic
 
 - **Python**: Each type rolled independently via `RollTarget.chance()`. In single mode, one type chosen via `random.choices` weighted by chances.
-- **TypeScript**: Single combined pool of images+videos, one random pick per tick. Audio, web, prompt, subliminal, and notification types not included in main spawn tick.
+- **TypeScript**: Each type rolled independently via `computeSpawnPools()`. Audio spawns alongside visual popups, not one-or-the-other. In single mode, one type chosen via `random.choices` weighted by chances.
 
 ### 3.7 Corruption Mode
 
