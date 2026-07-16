@@ -17,6 +17,7 @@ import { useHibernateStore } from '@/stores/hibernateStore'
 import { planActivity, hibernateDelay, shouldResetWallpaper } from '@/features/hibernate/hibernate'
 import type { HibernateType } from '@/features/hibernate/hibernate'
 import { shouldMove, randomDirection, tickPopups, computeSpawnPosition } from '@/features/popup/movement'
+import { computeSpawnPools } from '@/features/popup/spawn'
 import type { OccupiedZone } from '@/features/popup/movement'
 import { getExpiredPopupIds } from '@/features/popup/timeout'
 import { logMovementEvent } from '@/features/popup/debug'
@@ -300,22 +301,27 @@ export default function App() {
         }
       }
 
-      const images = pack.media.images
-      const videos = pack.media.videos
-      const audio = pack.media.audio
+      // Filter media pools by chance values (popupMod, vidMod, audioMod).
+      // Each type is independently rolled against its chance, matching the
+      // Python original's RollTarget.roll() behavior.
+      const pools = computeSpawnPools({
+        images: pack.media.images,
+        videos: pack.media.videos,
+        audio: pack.media.audio,
+        popupMod: cfg.popupMod,
+        vidMod: cfg.vidMod,
+        audioMod: cfg.audioMod,
+      })
 
-      const hasNonAudio = images.length + videos.length > 0
-      if (!hasNonAudio && audio.length === 0) return
+      const { eligibleImages, eligibleVideos, eligibleAudio, hasVisual } = pools
+      if (!hasVisual && eligibleAudio.length === 0) return
 
-      // DISCUSSION: audioMod controls whether audio can spawn alongside visual
-      // media. When audioMod > 0, audio gets a probability-based chance to be
-      // selected instead of visual media. When audioMod is 0, audio only spawns
-      // as a fallback when no visual media exists.
-      const audioPool = hasNonAudio && cfg.audioMod > 0 && roll(cfg.audioMod) ? audio : null
-      const visualPool = hasNonAudio ? [...images, ...videos] : audio
+      const audioPool = hasVisual && eligibleAudio.length > 0 ? eligibleAudio : null
+      const visualPool = hasVisual ? [...eligibleImages, ...eligibleVideos] : eligibleAudio
+      if (visualPool.length === 0) return
       const path = audioPool ? pickRandom(audioPool) : pickRandom(visualPool)
-      const isVideo = videos.includes(path)
-      const isAudio = audio.includes(path)
+      const isVideo = eligibleVideos.includes(path)
+      const isAudio = eligibleAudio.includes(path)
 
       if (isAudio) {
         const popups = usePopupStore.getState().popups

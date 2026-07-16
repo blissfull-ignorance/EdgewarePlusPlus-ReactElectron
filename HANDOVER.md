@@ -2,9 +2,9 @@
 
 ## Current Status
 
-**Last Session:** Popup timeout auto-close timer — configurable timeout with edge case handling, 16 new tests
+**Last Session:** Fix popupMod/vidMod bug — images and videos now respect chance filtering, 20 new tests
 
-**Date:** July 15, 2026
+**Date:** July 16, 2026
 
 **Branch:** `macos-cross-platform`
 
@@ -17,6 +17,7 @@
 - **Grid-based popup positioning** — 4×3 grid weighted by occupancy, avoids overlap with existing popups, handles oversized popups and all-cells-full fallback
 - **Popup timeout (auto-close)** — configurable duration (1–300s) via `timeoutPopups`/`popupTimeout` config; skips audio popups and panic mode; checked each movement tick
 - **Per-type limits** — separate `maxImages` and `maxVideos` caps (default 10 each)
+- **Image/video chance filtering** — `popupMod` and `vidMod` control spawn probability per media type (0 = disabled); extracted to pure `computeSpawnPools` function with 20 unit tests
 - **Hypno overlays** — .gif only, applied to static images (png/jpg/bmp/webp), not gifs or videos
 - **Denial filters** — CSS blur/saturate/brightness applied randomly based on `denialChance`
 - **Click-to-close** — close button with pack-defined text (popupClose from index.json); buttonless mode allows body-click to close
@@ -31,7 +32,7 @@
 - **Prompt modal** — Mantine modal with Levenshtein distance validation
 - **Hibernate runtime** — Activity loop scheduling with 6 types (Original/Spaced/Glitch/Ramp/Pump-Scare/Chaos), sleep timer, pump-scare auto-close, tray skip button, reactive wallpaper reset, config validation (fixWallpaper forced off when hibernate disabled)
 - **Hibernate panel** — hibernate activation with type selection
-- **297 Vitest tests** — movement (47) + movement.runtime (6) + movement.flow (17) + hypno (11) + hypno.runtime (34) + corruption (44) + hibernate (38) + panic (32) + audio (33) + wallpaper rotation (19) + timeout (16), all passing
+- **297 Vitest tests** — movement (47) + movement.runtime (6) + movement.flow (17) + hypno (11) + hypno.runtime (34) + corruption (44) + hibernate (38) + panic (32) + audio (33) + wallpaper rotation (19) + timeout (16) + spawn (20), all passing
 - **Fengari scripting wired** — Lua VM lifecycle, IPC bridge (script:start/stop/execute), scriptStore dispatches Lua callbacks to popupStore, corruptionStore, moodStore, promptStore, and appStore
 - **Notifications** — `electron.Notification` API wired via IPC, preload exposes `showNotification`, Lua `sendNotification` triggers native desktop notification
 - **Discord presence** — `discord-rpc` integrated via IPC, preload, Zustand store; updates on popup count/pack changes; respects `showDiscord` config toggle; destroys on panic/quit
@@ -48,6 +49,7 @@
 ### Recent Commits
 
 ```
+fix: popupMod/vidMod chance filtering — images and videos now respect spawn probability, 20 new tests
 feat: popup auto-close timer — configurable timeout with edge case handling, 16 new tests
 feat: popup overlap avoidance — grid-based weighted positioning, 12 tests
 feat: wallpaper rotation — timer-based cycling with random variance, panic cleanup, 19 tests
@@ -100,7 +102,7 @@ f9477ae fix: restrict video formats to Chromium-supported codecs
 ```bash
 npm run check            # TypeScript type checking (tsc --noEmit)
 npm run lint             # ESLint
-npm run test             # Vitest (297 tests)
+npm run test             # Vitest (344 tests)
 npm run test:e2e         # Playwright Electron integration tests (6 tests)
 npm run dev              # Vite dev server
 npm run electron:dev     # Dev with Electron
@@ -195,24 +197,23 @@ EdgewarePlusPlus/
 
 ### Active Task
 
-See **TASK.md** for the current highest-priority task: Popup Timeout (Auto-Close Timer).
+See **TASK.md** for the current highest-priority task: Popup Image/Video Chance (popupMod/vidMod) Bugfix.
 
 ### Next Session Priority Order
 
-1. **BUGFIX**: Setting image or video popup to 0.0 does not stop images and videos from popping up.
-2. **BUGFIX**: The Save Configuration button should save a config to file somewhere in the project files. Currently leads to an error: ConfigPanel.tsx:68 Uncaught (in promise) Error: An object could not be cloned.
-3. **BUGFIX**: The Audio popup logic seems buggy. The audio popup chance seems to be coupled to the image and video popup chance. Analyse the original Python source (edgeware) first, if this is intentional. Prepare a plan on how to implement proper behaviour. Check in with the plan before producing the TASK.md.
-4. **BUGFIX**: The corruption mode starts and overwrites the configuration as expected. However, the corruption mode guided audio coupling didn't work properly.
-5. **BUGFIX**: The corruption mode starts and overwrites the configuration as expected. However, the corruption mode phase transitioning logic didn't work. The mode was stuck on corruption level 1.
-6. **LOW**: Implement single mode weighted random spawn selection
-7. **LOW**: Add mood-based media filtering (requires pack loader mood tagging)
-8. **MEDIUM**: Explore the original Python source (edgeware): Is there a distinction in "caption" and "subliminal" handling? Prepare a plan on how to implement proper behaviour. Check in with the plan before producing the TASK.md.
-9. **MEDIUM**: Explore the original Python source (edgeware): Do hypno overlays have the size and ratio of the hypno overlay or is the overlay cut to the original image/video size? Are there differences in which hypno images are overlaid over what images & videos compared to the current implementation?  Prepare a plan on how to implement proper behaviour. Check in with the plan before producing the TASK.md.
-8. **LOW**: Add corruption danger check dialog (warns when full-perm enables dangerous settings)
-9. **LOW**: Add launch count persistence for corruption (via Electron IPC)
-10. **LOW**: Cross-platform verification (Windows, Linux)
-11. **LOW**: Tray icon assets (.icns, .ico, .png)
-12. **MEDIUM**: Based on FEATURE_PARITY_AUDIT.md, ARCHITECTURE.md and general project analysis, overhaul the README.md completely. Make sure the README.md explains a transition from the original project to the cross platform react project, include some reasoning behind it. Make sure to include the previous information and expand
+1. **BUGFIX**: The Save Configuration button should save a config to file somewhere in the project files. Currently leads to an error: ConfigPanel.tsx:68 Uncaught (in promise) Error: An object could not be cloned.
+2. **BUGFIX**: The Audio popup logic seems buggy. The audio popup chance seems to be coupled to the image and video popup chance. Analyse the original Python source (edgeware) first, if this is intentional. Prepare a plan on how to implement proper behaviour. Check in with the plan before producing the TASK.md.
+3. **BUGFIX**: The corruption mode starts and overwrites the configuration as expected. However, the corruption mode guided audio coupling didn't work properly.
+4. **BUGFIX**: The corruption mode starts and overwrites the configuration as expected. However, the corruption mode phase transitioning logic didn't work. The mode was stuck on corruption level 1.
+5. **LOW**: Implement single mode weighted random spawn selection
+6. **LOW**: Add mood-based media filtering (requires pack loader mood tagging)
+7. **MEDIUM**: Explore the original Python source (edgeware): Is there a distinction in "caption" and "subliminal" handling? Prepare a plan on how to implement proper behaviour. Check in with the plan before producing the TASK.md.
+8. **MEDIUM**: Explore the original Python source (edgeware): Do hypno overlays have the size and ratio of the hypno overlay or is the overlay cut to the original image/video size? Are there differences in which hypno images are overlaid over what images & videos compared to the current implementation?  Prepare a plan on how to implement proper behaviour. Check in with the plan before producing the TASK.md.
+9. **LOW**: Add corruption danger check dialog (warns when full-perm enables dangerous settings)
+10. **LOW**: Add launch count persistence for corruption (via Electron IPC)
+11. **LOW**: Cross-platform verification (Windows, Linux)
+12. **LOW**: Tray icon assets (.icns, .ico, .png)
+13. **MEDIUM**: Based on FEATURE_PARITY_AUDIT.md, ARCHITECTURE.md and general project analysis, overhaul the README.md completely. Make sure the README.md explains a transition from the original project to the cross platform react project, include some reasoning behind it. Make sure to include the previous information and expand
 
 
 ### Important Notes
