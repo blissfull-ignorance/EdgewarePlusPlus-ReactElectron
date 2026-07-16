@@ -2,7 +2,7 @@
 
 ## Current Status
 
-**Last Session:** Fix corruption mode — level progression stuck at 1, audio/image/video not coupled to moods
+**Last Session:** Implement single mode weighted random spawn selection
 
 **Date:** July 16, 2026
 
@@ -18,6 +18,7 @@
 - **Popup timeout (auto-close)** — configurable duration (1–300s) via `timeoutPopups`/`popupTimeout` config; skips audio popups and panic mode; checked each movement tick
 - **Per-type limits** — separate `maxImages` and `maxVideos` caps (default 10 each)
 - **Image/video chance filtering** — `popupMod` and `vidMod` control spawn probability per media type (0 = disabled); extracted to pure `computeSpawnPools` function with 20 unit tests
+- **Single mode spawn** — when `singleMode` is enabled, one media type selected via weighted random (matching Python `random.choices` with k=1); `pickSingleType` pure function with 6 tests
 - **Hypno overlays** — .gif only, applied to static images (png/jpg/bmp/webp), not gifs or videos
 - **Denial filters** — CSS blur/saturate/brightness applied randomly based on `denialChance`
 - **Click-to-close** — close button with pack-defined text (popupClose from index.json); buttonless mode allows body-click to close
@@ -32,7 +33,7 @@
 - **Prompt modal** — Mantine modal with Levenshtein distance validation
 - **Hibernate runtime** — Activity loop scheduling with 6 types (Original/Spaced/Glitch/Ramp/Pump-Scare/Chaos), sleep timer, pump-scare auto-close, tray skip button, reactive wallpaper reset, config validation (fixWallpaper forced off when hibernate disabled)
 - **Hibernate panel** — hibernate activation with type selection
-- **297 Vitest tests** — movement (47) + movement.runtime (6) + movement.flow (17) + hypno (11) + hypno.runtime (34) + corruption (55) + hibernate (38) + panic (32) + audio (33) + wallpaper rotation (19) + timeout (16) + spawn (25), all passing
+- **371 Vitest tests** — movement (47) + movement.runtime (6) + movement.flow (17) + hypno (11) + hypno.runtime (34) + corruption (55) + hibernate (38) + panic (32) + audio (33) + wallpaper rotation (19) + timeout (16) + spawn (31), all passing
 - **Fengari scripting wired** — Lua VM lifecycle, IPC bridge (script:start/stop/execute), scriptStore dispatches Lua callbacks to popupStore, corruptionStore, moodStore, promptStore, and appStore
 - **Notifications** — `electron.Notification` API wired via IPC, preload exposes `showNotification`, Lua `sendNotification` triggers native desktop notification
 - **Discord presence** — `discord-rpc` integrated via IPC, preload, Zustand store; updates on popup count/pack changes; respects `showDiscord` config toggle; destroys on panic/quit
@@ -49,6 +50,7 @@
 ### Recent Commits
 
 ```
+feat: implement singleMode weighted random spawn selection
 fix: corruption mode — init guard sets initialized=true with empty levels, mood-based media filtering for images/videos/audio
 fix: decouple audio spawn from visual eligibility — audio now spawns independently alongside image/video popups
 fix: Save Configuration button — exclude updateConfig function from IPC to prevent clone error
@@ -91,7 +93,7 @@ f9477ae fix: restrict video formats to Chromium-supported codecs
 - **Popup overlap avoidance** — ✅ Implemented: 4×3 grid-based weighted positioning, occupancy-aware cell selection, oversized popup handling, 12 unit tests
 - **Lowkey corner positioning** — Config exists but no corner-based positioning logic
 - **Popup timeout (auto-close)** — ✅ Implemented: configurable duration, audio/panic skip, 16 unit tests
-- **Single mode spawn logic** — Config exists but spawn tick doesn't use weighted random selection
+- **Single mode spawn logic** — ✅ Implemented: weighted random type selection, `pickSingleType` pure function, spawn tick branches on `cfg.singleMode`, 6 unit tests
 - **Booru download** — Config exists but no download logic wired
 - **Run at startup** — Config exists but no OS-level auto-start registration
 - **Media blacklist** — Not ported (Alt+click to blacklist media)
@@ -105,7 +107,7 @@ f9477ae fix: restrict video formats to Chromium-supported codecs
 ```bash
 npm run check            # TypeScript type checking (tsc --noEmit)
 npm run lint             # ESLint
-npm run test             # Vitest (365 tests)
+npm run test             # Vitest (371 tests)
 npm run test:e2e         # Playwright Electron integration tests (6 tests)
 npm run dev              # Vite dev server
 npm run electron:dev     # Dev with Electron
@@ -207,7 +209,7 @@ See **TASK.md** for the current highest-priority task.
 1. ~~**BUGFIX**: Audio popup spawn coupling bug — audio now spawns independently alongside visual popups~~ ✅ DONE
 2. ~~**BUGFIX**: Corruption mode audio/image/video not coupled to moods — mood-based media filtering now active~~ ✅ DONE
 3. ~~**BUGFIX**: Corruption mode level progression stuck at 1 — init guard fixed, level advances correctly~~ ✅ DONE
-4. **LOW**: Implement single mode weighted random spawn selection
+4. ~~**LOW**: Implement single mode weighted random spawn selection~~ ✅ DONE
 5. **LOW**: Add mood-based media filtering (requires pack loader mood tagging)
 6. **MEDIUM**: Explore the original Python source (edgeware): Is there a distinction in "caption" and "subliminal" handling? Prepare a plan on how to implement proper behaviour. Check in with the plan before producing the TASK.md.
 7. **MEDIUM**: Explore the original Python source (edgeware): Do hypno overlays have the size and ratio of the hypno overlay or is the overlay cut to the original image/video size? Are there differences in which hypno images are overlaid over what images & videos compared to the current implementation?  Prepare a plan on how to implement proper behaviour. Check in with the plan before producing the TASK.md.
