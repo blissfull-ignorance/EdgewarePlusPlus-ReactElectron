@@ -199,13 +199,15 @@ See **TASK.md** for the current highest-priority task: Popup Timeout (Auto-Close
 
 ### Next Session Priority Order
 
-1. ~~**HIGH**: Implement panic lockout runtime~~ ✅ Done
-2. ~~**MEDIUM**: Audio playback~~ ✅ Done
-3. ~~**MEDIUM**: Implement wallpaper rotation~~ ✅ Done
-4. ~~**MEDIUM**: Implement popup overlap avoidance positioning~~ ✅ Done
-5. ~~**LOW**: Implement popup timeout (auto-close timer)~~ ✅ Done
+1. **BUGFIX**: Setting image or video popup to 0.0 does not stop images and videos from popping up.
+2. **BUGFIX**: The Save Configuration button should save a config to file somewhere in the project files. Currently leads to an error: ConfigPanel.tsx:68 Uncaught (in promise) Error: An object could not be cloned.
+3. **BUGFIX**: The Audio popup logic seems buggy. The audio popup chance seems to be coupled to the image and video popup chance. Analyse the original Python source (edgeware) first, if this is intentional. Prepare a plan on how to implement proper behaviour. Check in with the plan before producing the TASK.md.
+4. **BUGFIX**: The corruption mode starts and overwrites the configuration as expected. However, the corruption mode guided audio coupling didn't work properly.
+5. **BUGFIX**: The corruption mode starts and overwrites the configuration as expected. However, the corruption mode phase transitioning logic didn't work. The mode was stuck on corruption level 1.
 6. **LOW**: Implement single mode weighted random spawn selection
 7. **LOW**: Add mood-based media filtering (requires pack loader mood tagging)
+8. **MEDIUM**: Explore the original Python source (edgeware): Is there a distinction in "caption" and "subliminal" handling? Prepare a plan on how to implement proper behaviour. Check in with the plan before producing the TASK.md.
+9. **MEDIUM**: Explore the original Python source (edgeware): Do hypno overlays have the size and ratio of the hypno overlay or is the overlay cut to the original image/video size? Are there differences in which hypno images are overlaid over what images & videos compared to the current implementation?  Prepare a plan on how to implement proper behaviour. Check in with the plan before producing the TASK.md.
 8. **LOW**: Add corruption danger check dialog (warns when full-perm enables dangerous settings)
 9. **LOW**: Add launch count persistence for corruption (via Electron IPC)
 10. **LOW**: Cross-platform verification (Windows, Linux)
