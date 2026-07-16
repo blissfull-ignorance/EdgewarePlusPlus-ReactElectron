@@ -197,7 +197,7 @@ export function loadPackFromDirectory(packPath: string): ScannedPack {
     captions: getIndexTexts(index, 'captions'),
     denials: getIndexTexts(index, 'denial'),
     prompts: getIndexTexts(index, 'prompts'),
-    subliminals: getIndexTexts(index, 'subliminals'),
+    subliminals: getIndexTexts(index, 'captions'),
     notifications: getIndexTexts(index, 'notifications'),
     web: getIndexTexts(index, 'web'),
   }
