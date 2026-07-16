@@ -17,7 +17,7 @@ import { useHibernateStore } from '@/stores/hibernateStore'
 import { planActivity, hibernateDelay, shouldResetWallpaper } from '@/features/hibernate/hibernate'
 import type { HibernateType } from '@/features/hibernate/hibernate'
 import { shouldMove, randomDirection, tickPopups, computeSpawnPosition } from '@/features/popup/movement'
-import { computeSpawnPools } from '@/features/popup/spawn'
+import { computeSpawnPools, pickSingleType } from '@/features/popup/spawn'
 import { filterMediaByMood } from '@/features/corruption/corruption'
 import type { PackAsset } from '@/features/corruption/corruption'
 import type { OccupiedZone } from '@/features/popup/movement'
@@ -324,26 +324,52 @@ export default function App() {
         audioMod: cfg.audioMod,
       })
 
-      const { eligibleImages, eligibleVideos, eligibleAudio, hasVisual } = pools
-      if (!hasVisual && eligibleAudio.length === 0) return
+      const { eligibleImages, eligibleVideos, eligibleAudio } = pools
+      let visualPath: string
+      let isVideo: boolean
 
-      // Audio and visual are independently rolled (matching Python original).
-      // Audio spawns alongside visual — not one-or-the-other.
+      if (cfg.singleMode) {
+        const selected = pickSingleType({
+          images: cfg.popupMod,
+          videos: cfg.vidMod,
+          audio: cfg.audioMod,
+        })
 
-      if (eligibleAudio.length > 0) {
-        const popups = usePopupStore.getState().popups
-        const currentAudio = popups.filter((p) => p.type === 'audio').length
-        if (currentAudio < cfg.maxAudio) {
-          const audioPath = pickRandom(eligibleAudio)
-          const id = audioIdCounter++
-          usePopupStore.getState().addPopup({ id, type: 'audio', mediaPath: audioPath, x: 0, y: 0, width: 0, height: 0, moving: false, dx: 0, dy: 0, mitosisSpawned: false, spawnTime: Date.now() })
+        if (selected === 'audio') {
+          if (eligibleAudio.length > 0) {
+            const popups = usePopupStore.getState().popups
+            const currentAudio = popups.filter((p) => p.type === 'audio').length
+            if (currentAudio < cfg.maxAudio) {
+              const audioPath = pickRandom(eligibleAudio)
+              const id = audioIdCounter++
+              usePopupStore.getState().addPopup({ id, type: 'audio', mediaPath: audioPath, x: 0, y: 0, width: 0, height: 0, moving: false, dx: 0, dy: 0, mitosisSpawned: false, spawnTime: Date.now() })
+            }
+          }
+          return
         }
-      }
 
-      const visualPool = [...eligibleImages, ...eligibleVideos]
-      if (visualPool.length === 0) return
-      const path = pickRandom(visualPool)
-      const isVideo = eligibleVideos.includes(path)
+        const eligibleVisual = selected === 'images' ? eligibleImages : eligibleVideos
+        if (eligibleVisual.length === 0) return
+        visualPath = pickRandom(eligibleVisual)
+        isVideo = selected === 'videos'
+      } else {
+        if (eligibleImages.length + eligibleVideos.length === 0 && eligibleAudio.length === 0) return
+
+        if (eligibleAudio.length > 0) {
+          const popups = usePopupStore.getState().popups
+          const currentAudio = popups.filter((p) => p.type === 'audio').length
+          if (currentAudio < cfg.maxAudio) {
+            const audioPath = pickRandom(eligibleAudio)
+            const id = audioIdCounter++
+            usePopupStore.getState().addPopup({ id, type: 'audio', mediaPath: audioPath, x: 0, y: 0, width: 0, height: 0, moving: false, dx: 0, dy: 0, mitosisSpawned: false, spawnTime: Date.now() })
+          }
+        }
+
+        const visualPool = [...eligibleImages, ...eligibleVideos]
+        if (visualPool.length === 0) return
+        visualPath = pickRandom(visualPool)
+        isVideo = eligibleVideos.includes(visualPath)
+      }
 
       // Enforce per-type popup limits
       const popups = usePopupStore.getState().popups
@@ -362,7 +388,7 @@ export default function App() {
 
       if (electronAPI) {
         // Hypno overlay: only applied to static images (not gifs, not videos)
-        const mediaExt = extOf(path)
+        const mediaExt = extOf(visualPath)
         const isStaticImage = STATIC_IMG_EXTS.has(mediaExt)
         const hypnoMediaPath = isStaticImage && roll(cfg.subliminalsChance) && pack.media.hypno.length > 0
           ? pickRandom(pack.media.hypno)
@@ -375,7 +401,7 @@ export default function App() {
           opacity: cfg.subliminalsAlpha,
         })
         electronAPI.createPopup({
-          mediaPath: path,
+          mediaPath: visualPath,
           type: isVideo ? 'video' : 'image',
           width: w,
           height: h,

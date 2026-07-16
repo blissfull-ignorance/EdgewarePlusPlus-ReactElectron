@@ -10,11 +10,45 @@
  *   - popupMod: probability (0–100) that images are eligible to spawn
  *   - vidMod: probability (0–100) that videos are eligible to spawn
  *   - audioMod: probability (0–100) that audio is eligible to spawn independently
+ *
+ * When singleMode is enabled, pickSingleType selects exactly one media type
+ * via weighted random (matching Python's random.choices with k=1).
  */
+
+export type MediaKind = 'images' | 'videos' | 'audio'
 
 /** Returns true with `percent` probability (0–100). Injectable for testing. */
 export function roll(percent: number, randomFn: () => number = Math.random): boolean {
   return randomFn() * 100 < percent
+}
+
+/**
+ * Weighted random selection of a single media type (singleMode).
+ *
+ * Equivalent to Python's `random.choices(types, weights, k=1)[0]`.
+ * Types with chance = 0 are excluded from the pool. Returns null when
+ * all chances are 0 (nothing to spawn).
+ */
+export function pickSingleType(
+  chances: { images: number; videos: number; audio: number },
+  randomFn: () => number = Math.random,
+): MediaKind | null {
+  const all: [MediaKind, number][] = [
+    ['images', chances.images],
+    ['videos', chances.videos],
+    ['audio', chances.audio],
+  ]
+  const entries = all.filter((e): e is [MediaKind, number] => e[1] > 0)
+
+  const totalWeight = entries.reduce((sum, [, w]) => sum + w, 0)
+  if (totalWeight <= 0) return null
+
+  let r = randomFn() * totalWeight
+  for (const [kind, weight] of entries) {
+    r -= weight
+    if (r < 0) return kind
+  }
+  return entries[entries.length - 1][0]
 }
 
 export interface SpawnPoolInput {

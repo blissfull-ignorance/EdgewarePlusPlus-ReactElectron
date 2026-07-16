@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { roll, computeSpawnPools } from './spawn'
+import { roll, computeSpawnPools, pickSingleType } from './spawn'
 import type { SpawnPoolInput } from './spawn'
 
 function makeInput(overrides: Partial<SpawnPoolInput> = {}): SpawnPoolInput {
@@ -216,5 +216,56 @@ describe('computeSpawnPools', () => {
     const randomFn = () => rolls[i++ % rolls.length]
     const result = computeSpawnPools(makeInput({ popupMod: 50, vidMod: 0 }), randomFn)
     expect(result.eligibleImages).toEqual(['img1.png', 'img3.bmp'])
+  })
+})
+
+describe('pickSingleType', () => {
+  it('returns the only non-zero type', () => {
+    expect(pickSingleType({ images: 0, videos: 0, audio: 100 }, () => 0.5)).toBe('audio')
+    expect(pickSingleType({ images: 50, videos: 0, audio: 0 }, () => 0.5)).toBe('images')
+    expect(pickSingleType({ images: 0, videos: 75, audio: 0 }, () => 0.5)).toBe('videos')
+  })
+
+  it('returns null when all chances are 0', () => {
+    expect(pickSingleType({ images: 0, videos: 0, audio: 0 }, () => 0.5)).toBeNull()
+  })
+
+  it('selects proportionally to weights', () => {
+    const rolls = [0.1, 0.5, 0.9, 0.05, 0.6, 0.95, 0.15, 0.4, 0.85, 0.01]
+    let i = 0
+    const randomFn = () => rolls[i++ % rolls.length]
+
+    const results = new Map<string, number>()
+    for (let n = 0; n < 10; n++) {
+      const r = pickSingleType({ images: 25, videos: 50, audio: 25 }, randomFn)
+      results.set(r!, (results.get(r!) ?? 0) + 1)
+    }
+
+    expect(results.size).toBe(3)
+    for (const count of results.values()) {
+      expect(count).toBeGreaterThan(0)
+    }
+  })
+
+  it('excludes zero-chance types from selection', () => {
+    const rolls = [0.1, 0.6, 0.3, 0.8, 0.4]
+    let i = 0
+    const randomFn = () => rolls[i++ % rolls.length]
+
+    for (let trial = 0; trial < 20; trial++) {
+      const result = pickSingleType({ images: 0, videos: 50, audio: 50 }, randomFn)
+      expect(result).not.toBe('images')
+    }
+  })
+
+  it('single type wins even with low random value', () => {
+    expect(pickSingleType({ images: 0, videos: 0, audio: 1 }, () => 0.0)).toBe('audio')
+    expect(pickSingleType({ images: 0, videos: 0, audio: 1 }, () => 0.99)).toBe('audio')
+  })
+
+  it('boundary: random at exact boundary of first weight picks that type', () => {
+    expect(pickSingleType({ images: 50, videos: 50, audio: 0 }, () => 0.0)).toBe('images')
+    expect(pickSingleType({ images: 50, videos: 50, audio: 0 }, () => 0.49)).toBe('images')
+    expect(pickSingleType({ images: 50, videos: 50, audio: 0 }, () => 0.5)).toBe('videos')
   })
 })
