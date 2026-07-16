@@ -8,14 +8,15 @@
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
-    "electron:dev": "tsc -p tsconfig.electron.json && concurrently \"vite\" \"wait-on http://localhost:5173 && electron .\"",
-    "electron:build": "tsc -p tsconfig.electron.json && electron-builder",
+    "build:preload": "esbuild electron/preload.ts --platform=node --format=cjs --outfile=electron/preload.cjs",
+    "electron:dev": "npm run build:preload && tsc -p tsconfig.electron.json && concurrently \"vite\" \"wait-on http://localhost:5173 && electron .\"",
+    "electron:build": "npm run build:preload && tsc -p tsconfig.electron.json && electron-builder",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "check": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:e2e": "tsc -p tsconfig.electron.json && vite build && playwright test",
-    "test:e2e:ui": "tsc -p tsconfig.electron.json && vite build && playwright test --ui"
+    "test:e2e": "npm run build:preload && tsc -p tsconfig.electron.json && vite build && playwright test",
+    "test:e2e:ui": "npm run build:preload && tsc -p tsconfig.electron.json && vite build && playwright test --ui"
   },
   "dependencies": {
     "@mantine/core": "^7",

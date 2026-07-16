@@ -132,3 +132,4 @@ ruffruff.bat
 config.json
 *.cfg
 *.pyc
+electron/preload.cjs
