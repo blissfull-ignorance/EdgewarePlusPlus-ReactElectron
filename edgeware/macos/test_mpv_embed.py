@@ -188,7 +188,7 @@ def test_mpv_render_with_overlay(root: tk.Tk) -> dict:
     overlay_img = Image.open(img_path).resize((w, h), Image.LANCZOS).convert("RGBA")
     overlay_img.putalpha(128)
 
-    player.play(str(video_path), overlay_img)
+    player.play(str(video_path), overlays=[(overlay_img, (0, 0))])
 
     best_pct = 0
     for i in range(40):
@@ -249,7 +249,7 @@ def test_hypno_overlay(root: tk.Tk) -> dict:
     overlay_img = Image.open(img_path).resize((w, h), Image.LANCZOS).convert("RGBA")
     overlay_img.putalpha(int((1 - 0.20) * 255))  # 20% hypno_opacity default
 
-    player.play(str(hypno_path), overlay_img)
+    player.play(str(hypno_path), overlays=[(overlay_img, (0, 0))])
 
     best_pct = 0
     for i in range(40):
