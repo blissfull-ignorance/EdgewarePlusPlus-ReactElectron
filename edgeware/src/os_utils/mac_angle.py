@@ -450,12 +450,6 @@ class RenderVideoPlayer(Label):
         if self._player:
             self._player.stop()
 
-        if self._renderer:
-            try:
-                self._renderer.free()
-            except Exception:
-                pass
-            self._renderer = None
-
+        self._renderer = None
         self._player = None
         self._render_ctx = None
