@@ -35,10 +35,19 @@ import mpv
 log = logging.getLogger(__name__)
 
 if getattr(sys, "frozen", False):
-    _FROZEN_ANGLE_DIR = str(
+    # Check Contents/Frameworks/ first (copy placed there by build script for
+    # @rpath resolution), then fall back to the original datas location.
+    _ANGLE_FW = (
+        Path(sys.executable).parent.parent / "Frameworks"
+    )
+    _ANGLE_DATA = (
         Path(sys.executable).parent.parent / "Resources"
         / "src" / "os_utils" / "angle_libs"
     )
+    if (_ANGLE_FW / "libEGL.dylib").is_file():
+        _FROZEN_ANGLE_DIR = str(_ANGLE_FW)
+    else:
+        _FROZEN_ANGLE_DIR = str(_ANGLE_DATA)
 else:
     _FROZEN_ANGLE_DIR = os.path.join(
         os.path.dirname(os.path.abspath(__file__)), "angle_libs"

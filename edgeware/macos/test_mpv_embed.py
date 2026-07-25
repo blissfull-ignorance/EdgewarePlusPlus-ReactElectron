@@ -14,7 +14,7 @@ import time
 import tkinter as tk
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).parent / "src"))
+sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 SCREENSHOT_DIR = Path("/tmp/mpv_test")
 TEST_PACK = Path("data/packs/Edgeware++ Test Pack V2")
