@@ -5,7 +5,7 @@ import { launchApp, listRealPacks, parseRGB } from "./helpers";
 // dark color scheme, where `filled` controls resolve to ramp index 8. See src/theme/themeConfig.ts.
 const EMBER_8 = { r: 136, g: 19, b: 55 };
 
-test.describe("Visual Regression — styled app (Task 18)", () => {
+test.describe("Visual Regression — styled app", () => {
   test.describe.configure({ timeout: 90_000 });
 
   test("A18.1 Mantine CSS is loaded: ≥50 --mantine-* vars on :root and mantine- component rules", async ({

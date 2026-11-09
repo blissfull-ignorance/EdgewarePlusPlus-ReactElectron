@@ -2,8 +2,8 @@ import { Button, Group, Select, Stack, Text } from "@mantine/core";
 import { IconDeviceFloppy, IconFileStack } from "@tabler/icons-react";
 import { SectionCard } from "../../../SectionCard";
 
-// FUTUREWORK: preset save/load (profile persistence) is not wired yet —
-// keep the affordances disabled until the preset store exists.
+// Profile persistence is not implemented; the preset affordances stay
+// disabled until a preset store exists.
 const availablePresets: { name: string; path: string }[] = [];
 
 export function PresetsPanel() {

@@ -5,7 +5,7 @@
  * self-playing `<audio>` element streams the pack file through the `packmedia://`
  * protocol and loops until the popup is closed (Stop or closeAll). Exposed with
  * stable data-testids so playback state can be asserted at the element level in
- * the Electron E2E layer (task 21 A21.4).
+ * the Electron E2E layer.
  */
 
 export interface AudioPopupProps {
@@ -26,7 +26,7 @@ export function AudioPopup({ audioUrl, onClose }: AudioPopupProps) {
         loop
         ref={(el) => {
           // Close the popup if the source fails hard, so a bad file can't leave a
-          // zombie window open (task 21 A21.6).
+          // zombie window open.
           if (!el || el.dataset.errorHandled === "true") return;
           el.addEventListener("error", () => {
             el.dataset.errorHandled = "true";

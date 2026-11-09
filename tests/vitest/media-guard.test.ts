@@ -8,7 +8,7 @@ import {
 
 const PACK = "/data/packs/Real Test Pack";
 
-describe("resolvePackMediaPath (task 21 A21.5 media scope guard)", () => {
+describe("resolvePackMediaPath (media scope guard)", () => {
   it("resolves a valid in-pack media file", () => {
     expect(resolvePackMediaPath(PACK, "img", "seed.png")).toBe(
       path.resolve(PACK, "img", "seed.png")

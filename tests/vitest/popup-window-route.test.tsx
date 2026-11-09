@@ -42,7 +42,7 @@ describe("parsePopupRoute", () => {
     expect(parsePopupRoute("#/popup/flash/foo/1")).toBeNull();
   });
 
-  it("parses an audio popup route (task 21: real audio pops)", () => {
+  it("parses an audio popup route", () => {
     expect(parsePopupRoute("#/popup/audio/think.wav/1")).toEqual({
       type: "audio",
       mediaId: "think.wav",

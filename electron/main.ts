@@ -6,7 +6,7 @@ if (process.env.EDGWARE_USER_DATA_DIR && path.isAbsolute(process.env.EDGWARE_USE
 }
 
 // Privilege the pack-media scheme before the app is ready — must precede any
-// window load so popup overlays can stream real pack media (task 21).
+// window load so popup overlays can stream real pack media.
 import {
   configurePackMediaScheme,
   registerPackMediaProtocol,

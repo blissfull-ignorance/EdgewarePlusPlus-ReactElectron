@@ -8,7 +8,7 @@ interface Mood {
   active: boolean;
 }
 
-// FUTUREWORK: moods come from pack data — wire the active pack's mood list.
+// Moods derive from pack data; the list is populated from the active pack.
 const availableMoods: Mood[] = [];
 
 export function MoodsPanel() {

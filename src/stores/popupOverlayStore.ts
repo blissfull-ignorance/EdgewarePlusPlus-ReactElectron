@@ -8,8 +8,8 @@
 import { create } from "zustand";
 import { devtools } from "zustand/middleware";
 
-// REMOVABLE: "caption" and "subliminal" are unreachable from current dispatch;
-// kept until the spawn-type unions are cleaned up (hypno is an overlay, not a popup).
+// "caption" and "subliminal" are unreachable from spawn dispatch; kept in the
+// union so persisted data parses (hypno is an overlay, not a popup).
 export type InAppPopupType = "image" | "video" | "audio" | "prompt" | "caption" | "subliminal";
 
 export interface InAppPopupPosition {

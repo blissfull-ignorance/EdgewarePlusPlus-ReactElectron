@@ -158,7 +158,7 @@ const DEFAULT_SETTINGS: SettingsValues = {
   clickthroughPopups: 0,
   rotateWallpaper: 0,
   wallpaperDat: "{}",
-  // FUTUREWORK: legacy stores seconds (s_to_ms on read); value matches legacy config.json.
+  // Stored in seconds, matching the legacy config.json format; convert on read.
   wallpaperTimer: 30,
   wallpaperVariance: 0,
   downloadEnabled: 0,
@@ -190,8 +190,8 @@ const DEFAULT_SETTINGS: SettingsValues = {
   corruptionFullPerm: 1,
   corruptionTrigger: "Timed",
   corruptionFadeType: "Normal",
-  // FUTUREWORK: legacy stores this in seconds (items.py s_to_ms converts on read);
-  // dormant in the port — future consumption should treat as ms-equivalent like hibernate*.
+  // Stored in seconds, matching the legacy config format; currently dormant —
+  // consumers should interpret the value as seconds.
   corruptionTime: 60,
   corruptionPopups: 5,
   corruptionLaunches: 2,
