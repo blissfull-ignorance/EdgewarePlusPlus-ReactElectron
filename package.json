@@ -1,0 +1,83 @@
+{
+  "name": "edgewareplusplus",
+  "version": "0.1.0",
+  "description": "Edgeware++ cross-platform rewrite (React + Vite + Electron)",
+  "private": true,
+  "main": "dist-electron/main.js",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build && electron-builder",
+    "preview": "vite preview",
+    "check": "tsc --noEmit",
+    "lint": "eslint . --ext .ts,.tsx --report-unused-disable-directives --max-warnings 0",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:e2e": "playwright test",
+    "electron:dev": "vite --config vite.config.ts"
+  },
+  "dependencies": {
+    "@emotion/react": "^11.14.0",
+    "@emotion/styled": "^11.14.0",
+    "@mantine/core": "^7.17.0",
+    "@mantine/dropzone": "^7.17.8",
+    "@mantine/hooks": "^7.17.0",
+    "@tabler/icons-react": "^2.47.0",
+    "@testing-library/dom": "^10.4.1",
+    "@testing-library/jest-dom": "^6.9.1",
+    "fengari": "^0.1.4",
+    "fengari-interop": "^0.1.4",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "yauzl": "^3.4.0",
+    "zod": "^4.4.3",
+    "zustand": "^5.0.14"
+  },
+  "devDependencies": {
+    "@electron/notarize": "^3.0.0",
+    "@playwright/test": "^1.50.1",
+    "@testing-library/react": "^16.2.0",
+    "@types/archiver": "^8.0.0",
+    "@types/node": "^22.13.10",
+    "@types/react": "^19.0.10",
+    "@types/react-dom": "^19.0.4",
+    "@types/yauzl": "^3.4.0",
+    "@typescript-eslint/eslint-plugin": "^8.26.0",
+    "@typescript-eslint/parser": "^8.26.0",
+    "@vitejs/plugin-react": "^4.3.4",
+    "@vitest/coverage-v8": "^3.0.8",
+    "archiver": "^8.0.0",
+    "concurrently": "^9.1.2",
+    "cross-env": "^7.0.3",
+    "electron": "^33.0.0",
+    "electron-builder": "^25.1.8",
+    "eslint": "^9.22.0",
+    "jsdom": "^29.1.1",
+    "typescript": "^5.7.0",
+    "vite": "^6.2.0",
+    "vite-plugin-electron": "^0.29.1",
+    "vite-plugin-electron-renderer": "^0.14.2",
+    "vitest": "^3.0.8"
+  },
+  "build": {
+    "appId": "com.edgewareplusplus.app",
+    "productName": "Edgeware++",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist-electron/**/*",
+      "dist/**/*",
+      "package.json"
+    ],
+    "mac": {
+      "category": "public.app-category.entertainment",
+      "target": "dmg"
+    },
+    "win": {
+      "target": "nsis"
+    },
+    "linux": {
+      "target": "AppImage"
+    }
+  }
+}
