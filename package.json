@@ -84,5 +84,11 @@
     "linux": {
       "target": "AppImage"
     }
+  },
+  "allowScripts": {
+    "electron@33.4.11": true,
+    "esbuild@0.25.12": true,
+    "fsevents@2.3.2": true,
+    "fsevents@2.3.3": true
   }
 }
