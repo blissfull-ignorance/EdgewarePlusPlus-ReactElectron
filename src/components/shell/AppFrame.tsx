@@ -1,0 +1,131 @@
+import type { ReactNode } from "react";
+import { Group, Title, Badge, Text, UnstyledButton } from "@mantine/core";
+import { IconEyeFilled, IconLayoutDashboard, IconSettings } from "@tabler/icons-react";
+
+export type MainView = "status" | "config";
+
+interface NavItemProps {
+  active: boolean;
+  label: string;
+  icon: ReactNode;
+  testId: string;
+  onClick: () => void;
+}
+
+function NavItem({ active, label, icon, testId, onClick }: NavItemProps) {
+  return (
+    <UnstyledButton
+      data-testid={testId}
+      className={`ewpp-nav-item${active ? " ewpp-nav-item-active" : ""}`}
+      onClick={onClick}
+    >
+      {icon}
+      <span>{label}</span>
+    </UnstyledButton>
+  );
+}
+
+interface AppFrameProps {
+  view: MainView;
+  onViewChange: (view: MainView) => void;
+  actions?: ReactNode;
+  children: ReactNode;
+}
+
+export function AppFrame({ view, onViewChange, actions, children }: AppFrameProps) {
+  return (
+    <div style={{ height: "100vh", display: "flex", flexDirection: "column", overflow: "hidden" }}>
+      <header
+        style={{
+          flexShrink: 0,
+          height: 60,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 16,
+          padding: "0 20px",
+          backgroundColor: "var(--mantine-color-dark-8)",
+          borderBottom: "1px solid var(--mantine-color-dark-5)",
+          position: "relative",
+          // Keep the top toolbar (incl. Start/Stop) above in-app popups (zIndex 1100),
+          // so a popup overlapping the header can never trap the user unable to Stop.
+          zIndex: 1200,
+        }}
+      >
+        <Group gap="sm" align="center" wrap="nowrap">
+          <div
+            style={{
+              width: 32,
+              height: 32,
+              borderRadius: 9,
+              backgroundColor: "var(--mantine-primary-color-filled)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              flexShrink: 0,
+            }}
+          >
+            <IconEyeFilled size={18} color="var(--mantine-primary-color-contrast)" />
+          </div>
+          <Title order={1} data-testid="app-title" style={{ lineHeight: 1.1 }}>
+            Edgeware++
+          </Title>
+          <Badge variant="subtle" size="sm" fw={500} style={{ marginLeft: 2 }}>
+            cross-platform
+          </Badge>
+        </Group>
+        {actions}
+      </header>
+
+      <div style={{ flex: 1, display: "flex", minHeight: 0 }}>
+        <nav
+          data-testid="main-tabs"
+          aria-label="Main navigation"
+          style={{
+            flexShrink: 0,
+            width: 212,
+            display: "flex",
+            flexDirection: "column",
+            gap: 4,
+            padding: 12,
+            backgroundColor: "var(--mantine-color-dark-8)",
+            borderRight: "1px solid var(--mantine-color-dark-5)",
+          }}
+        >
+          <NavItem
+            active={view === "status"}
+            label="Status"
+            icon={<IconLayoutDashboard size={18} />}
+            testId="main-tab-status"
+            onClick={() => onViewChange("status")}
+          />
+          <NavItem
+            active={view === "config"}
+            label="Config"
+            icon={<IconSettings size={18} />}
+            testId="main-tab-config"
+            onClick={() => onViewChange("config")}
+          />
+          <div style={{ marginTop: "auto", padding: "0 4px" }}>
+            <Text size="xs" c="dimmed">
+              Settings autosave in the background.
+            </Text>
+          </div>
+        </nav>
+
+        <main
+          data-testid="app-content"
+          style={{
+            flex: 1,
+            minWidth: 0,
+            overflowY: "auto",
+            overflowX: "hidden",
+            padding: 24,
+          }}
+        >
+          {children}
+        </main>
+      </div>
+    </div>
+  );
+}

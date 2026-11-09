@@ -1,0 +1,162 @@
+/* Global reset and base styles — loaded after the Mantine stylesheets so it
+   can deepen the base surface and add app-level chrome. */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  font-size: 16px;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  scrollbar-width: thin;
+  scrollbar-color: var(--mantine-color-dark-5) transparent;
+}
+
+body {
+  font-family: var(--mantine-font-family);
+  background-color: var(--mantine-color-dark-8);
+  color: var(--mantine-color-dark-0);
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+#root {
+  min-height: 100vh;
+  background-color: var(--mantine-color-dark-8);
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background-color: var(--mantine-color-dark-5);
+  border-radius: 8px;
+  border: 2px solid var(--mantine-color-dark-8);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background-color: var(--mantine-color-dark-4);
+}
+
+::selection {
+  background-color: var(--mantine-primary-color-filled);
+  color: var(--mantine-primary-color-contrast);
+}
+
+/* ── Shell navigation ─────────────────────────────────────────────────────── */
+.ewpp-nav-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 9px 12px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--mantine-color-dark-2);
+  text-align: left;
+  cursor: pointer;
+  user-select: none;
+  transition:
+    background-color 120ms ease,
+    color 120ms ease,
+    border-color 120ms ease;
+}
+
+.ewpp-nav-item:hover {
+  background-color: var(--mantine-color-dark-6);
+  color: var(--mantine-color-dark-0);
+}
+
+.ewpp-nav-item:focus-visible {
+  outline: 2px solid var(--mantine-primary-color-filled);
+  outline-offset: 2px;
+}
+
+.ewpp-nav-item-active,
+.ewpp-nav-item-active:hover {
+  background-color: var(--mantine-color-dark-5);
+  border-color: var(--mantine-color-dark-4);
+  color: var(--mantine-color-dark-0);
+  font-weight: 600;
+}
+
+/* ── Cards ────────────────────────────────────────────────────────────────── */
+.ewpp-card-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  flex-shrink: 0;
+  border-radius: 8px;
+  background-color: var(--mantine-color-dark-5);
+  color: var(--mantine-primary-color-filled);
+}
+
+/* ── Running indicator ────────────────────────────────────────────────────── */
+.ewpp-status-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.ewpp-status-dot-pulse {
+  animation: ewpp-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes ewpp-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.3;
+  }
+}
+
+.ewpp-toast {
+  animation: ewpp-toast-in 150ms ease;
+}
+
+@keyframes ewpp-toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ── Pack import dropzone ─────────────────────────────────────────────────── */
+.ewpp-dropzone .mantine-Dropzone-label {
+  background-color: transparent;
+}
+
+.ewpp-dropzone .mantine-Dropzone-inner {
+  background-color: var(--mantine-color-dark-7);
+  border: 1.5px dashed var(--mantine-color-dark-4);
+  transition:
+    border-color 120ms ease,
+    background-color 120ms ease;
+}
+
+.ewpp-dropzone:hover .mantine-Dropzone-inner,
+.ewpp-dropzone[data-active] .mantine-Dropzone-inner {
+  border-color: var(--mantine-primary-color-filled);
+  background-color: var(--mantine-color-dark-6);
+}
