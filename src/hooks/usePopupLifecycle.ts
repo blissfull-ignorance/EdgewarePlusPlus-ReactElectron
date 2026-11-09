@@ -18,8 +18,8 @@ export interface PopupInstance {
 }
 
 export interface UsePopupLifecycleOptions {
-  // FUTUREWORK: render-time invocation is fragile — prefer the effect-based
-  // useMitosis trigger; remove this option once no caller needs it
+  // Invoked at render time, which is fragile — prefer the effect-based
+  // useMitosis trigger for new code.
   /** Called when mitosis should spawn additional popups after all popups close */
   onMitosisSpawn?: () => void;
 }

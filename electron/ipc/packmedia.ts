@@ -4,10 +4,10 @@
  * Popup windows and in-app overlays reference pack media (image/video/audio) by a
  * bare filename. This module registers a privileged standard scheme plus a
  * `protocol.handle` route that resolves each request strictly inside the active
- * pack's media subdirectory, so a file outside the pack can never be served
- * (task 21 A21.5). Pack-relative paths are confined by `resolvePackMediaPath`;
+ * pack's media subdirectory, so a file outside the pack can never be served.
+ * Pack-relative paths are confined by `resolvePackMediaPath`;
  * missing/unreadable files yield 404 rather than a crash so a bad file cannot take
- * down the popup loop (A21.6).
+ * down the popup loop.
  */
 import { protocol } from "electron";
 import fs from "node:fs";

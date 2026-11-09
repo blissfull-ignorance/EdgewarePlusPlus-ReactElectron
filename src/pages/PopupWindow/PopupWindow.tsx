@@ -38,7 +38,7 @@ function usePopupViewport() {
 }
 
 export interface PopupRoute {
-  // REMOVABLE: "subliminal" is no longer spawned (hypno is an overlay on image/video pops).
+  // "subliminal" remains for route compatibility; hypno is an overlay on image/video pops.
   type: "image" | "video" | "audio" | "subliminal" | "prompt";
   mediaId: string;
   popupId: string;

@@ -114,7 +114,7 @@ export function createTempState(opts: CreateTempStateOptions = {}): TempState {
   let source: string;
   if (opts.kind === "media") {
     // Fast & reproducible: the committed trimmed copy of the real V2 test pack's
-    // media (img/vid/aud) — endorses task 21's "trim copies ... preferred for speed".
+    // media (img/vid/aud), kept small for speed.
     source = REAL_MEDIA_PACK_FIXTURE;
     if (!existsSync(source)) throw new Error(`Media fixture pack missing: ${source}`);
   } else {

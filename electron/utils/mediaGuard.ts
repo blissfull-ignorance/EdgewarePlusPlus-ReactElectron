@@ -2,7 +2,7 @@
  * @file mediaGuard — Pure, dependency-free helpers for the pack-media protocol.
  *
  * Keeping the path-confinement logic free of any Electron import lets it be unit
- * tested in isolation (task 21 A21.5) and reused by the main-process handler. The
+ * tested in isolation and reused by the main-process handler. The
  * single source of truth is `resolvePackMediaPath`: a request only resolves to a
  * real file when it stays strictly inside `<packRoot>/<subdir>`.
  */

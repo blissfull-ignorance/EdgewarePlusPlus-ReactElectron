@@ -3,8 +3,8 @@ import { useSettingsStore } from "../stores/settingsStore";
 import { useAppStore } from "../stores/appStore";
 import { roll } from "../utils/roll";
 
-// REMOVABLE: "subliminal" is no longer a spawn type (hypno is an overlay now);
-// kept so persisted settings/mood data still parse until the unions are cleaned up.
+// "caption" and "subliminal" remain in the union so persisted settings and
+// mood data still parse; they are never rolled as spawn types.
 export type PopupType = "image" | "video" | "audio" | "prompt" | "caption" | "subliminal" | "web";
 
 export interface RollTarget {
