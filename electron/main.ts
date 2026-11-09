@@ -20,6 +20,8 @@ import { registerHandlers as registerPopupHandlers } from "./ipc/popup";
 import { registerHandlers as registerHibernateHandlers } from "./ipc/hibernate";
 import { registerHandlers as registerScriptingHandlers } from "./ipc/scripting";
 import { registerHandlers as registerSystemHandlers } from "./ipc/system";
+import { registerHandlers as registerPanicHandlers } from "./ipc/panic";
+import { registerHandlers as registerBooruHandlers } from "./ipc/booru";
 
 let win: BrowserWindow | null;
 
@@ -30,6 +32,8 @@ function registerAllHandlers(): void {
   registerHibernateHandlers();
   registerScriptingHandlers();
   registerSystemHandlers();
+  registerPanicHandlers();
+  registerBooruHandlers();
 }
 
 function createWindow(): void {

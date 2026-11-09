@@ -161,5 +161,5 @@ function registerHandlers(): void {
   });
 }
 
-export { registerHandlers };
+export { registerHandlers, closeAllPopups };
 export { popupWindows };

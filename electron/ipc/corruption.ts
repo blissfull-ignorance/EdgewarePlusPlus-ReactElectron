@@ -1,46 +1,57 @@
 import { ipcMain, BrowserWindow } from "electron";
 import { logger } from "../utils/logger";
 
-function getMainWin(): BrowserWindow | null {
-  const wins = BrowserWindow.getAllWindows();
-  return wins[0] ?? null;
+/**
+ * Main-process mirror of the renderer's corruption runtime. The Lua scripting
+ * API and status readers consume this; the runtime hook publishes to it on
+ * every transition.
+ */
+interface CorruptionMirror {
+  level: number;
+  nextLevelTime: number | null;
 }
 
-async function evaluateInRenderer(win: BrowserWindow, code: string): Promise<unknown> {
-  // Electron 33 runtime accepts { userWorld: true } but TS types don't reflect it.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return (win.webContents.executeJavaScript as any)(code, { userWorld: true });
+const mirror: CorruptionMirror = { level: 0, nextLevelTime: null };
+
+function broadcast(channel: string, payload: unknown): void {
+  for (const win of BrowserWindow.getAllWindows()) {
+    if (!win.isDestroyed()) win.webContents.send(channel, payload);
+  }
+}
+
+function injectLevel(level: number): boolean {
+  const value = Number(level);
+  if (!Number.isFinite(value) || value < 1) {
+    logger.warn(`[Corruption] Rejected inject level ${JSON.stringify(level)}`);
+    return false;
+  }
+  broadcast("corruption:inject", Math.floor(value));
+  return true;
 }
 
 function registerHandlers(): void {
-  ipcMain.handle("corruption:getCurrentLevel", async (): Promise<number> => {
-    const win = getMainWin();
-    if (!win) return 0;
-    try {
-      const level = await evaluateInRenderer(win,
-        "typeof useCorruptionStore !== 'undefined' ? useCorruptionStore.getState().currentLevel : 0"
-      );
-      return Number(level) || 0;
-    } catch {
-      return 0;
-    }
-  });
+  ipcMain.handle("corruption:getCurrentLevel", async (): Promise<number> => mirror.level);
 
-  ipcMain.handle("corruption:getNextLevelTime", async (): Promise<number | null> => {
-    const win = getMainWin();
-    if (!win) return null;
-    try {
-      const time = await evaluateInRenderer(win,
-        "typeof useCorruptionStore !== 'undefined' ? useCorruptionStore.getState().nextLevelTime : null"
-      );
-      return time != null ? Number(time) : null;
-    } catch {
-      return null;
+  ipcMain.handle("corruption:getNextLevelTime", async (): Promise<number | null> =>
+    mirror.nextLevelTime
+  );
+
+  ipcMain.handle(
+    "corruption:setLevel",
+    (_event, level: number, nextLevelTime: number | null): void => {
+      mirror.level = Number(level) || 0;
+      mirror.nextLevelTime = nextLevelTime != null ? Number(nextLevelTime) : null;
     }
-  });
+  );
+
+  /**
+   * Script-driven level change: relay to the renderer runtime, which owns
+   * level application (moods, overrides, wallpaper).
+   */
+  ipcMain.handle("corruption:injectLevel", (_event, level: number): boolean => injectLevel(level));
 
   ipcMain.handle("corruption:applyLevelChanges", async (_event, changes: Record<string, unknown>): Promise<void> => {
-    const win = getMainWin();
+    const win = BrowserWindow.getAllWindows()[0];
     if (!win) return;
 
     const serialized = JSON.stringify(changes);
@@ -50,18 +61,11 @@ function registerHandlers(): void {
     }
 
     try {
-      await evaluateInRenderer(win, `
-        (function() {
-          var changes = ${serialized};
-          if (typeof useSettingsStore !== 'undefined') {
-            useSettingsStore.getState().setRaw(changes);
-          }
-        })()
-      `);
+      win.webContents.send("corruption:applyChanges", JSON.parse(serialized));
     } catch (err) {
-      logger.error("[Corruption] Failed to apply level changes:", err);
+      logger.error("[Corruption] Failed to relay level changes:", err);
     }
   });
 }
 
-export { registerHandlers };
+export { registerHandlers, injectLevel };

@@ -9,8 +9,9 @@
  * missing/unreadable files yield 404 rather than a crash so a bad file cannot take
  * down the popup loop.
  */
-import { protocol } from "electron";
+import { app, protocol } from "electron";
 import fs from "node:fs";
+import path from "node:path";
 import { Readable } from "node:stream";
 import { logger } from "../utils/logger";
 import {
@@ -63,7 +64,16 @@ export function registerPackMediaProtocol(): void {
         return notFound();
       }
 
-      const filePath = resolvePackMediaPath(packRoot, url.host, rel);
+      // The booru downloader caches fetched images outside the pack; serve
+      // that host from the cache root instead of the pack directory.
+      let filePath: string | null;
+      if (url.host === "booru-cache") {
+        const cacheRoot = path.join(app.getPath("userData"), "data", "booru-cache");
+        const candidate = path.join(cacheRoot, rel);
+        filePath = candidate.startsWith(cacheRoot + path.sep) ? candidate : null;
+      } else {
+        filePath = resolvePackMediaPath(packRoot, url.host, rel);
+      }
       if (!filePath) return notFound();
 
       let stat: fs.Stats;

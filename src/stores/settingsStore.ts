@@ -388,6 +388,9 @@ export const useSettingsStore = create<SettingsStore>()(
           set({ saveStatus: "saving", saveErrorMessage: null });
           try {
             await window.api?.system.saveSettings(stateAsRecord);
+            // The panic hotkey is registered in the main process; re-read it
+            // whenever settings land so globalPanicButton changes apply live.
+            void window.api?.panic.refreshShortcut().catch(() => undefined);
             set({ saveStatus: "saved", dirty: false });
             setTimeout(() => {
               const current = useSettingsStore.getState().saveStatus;

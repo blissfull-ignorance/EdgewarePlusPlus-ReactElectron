@@ -49,6 +49,8 @@ export default [
         // Runtime globals available in both Electron main (node ≥18) and the browser layer.
         Response: "readonly",
         URL: "readonly",
+        URLSearchParams: "readonly",
+        AbortSignal: "readonly",
         ReadableStream: "readonly",
         fetch: "readonly",
         globalThis: "readonly",

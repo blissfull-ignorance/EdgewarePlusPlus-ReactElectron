@@ -15,12 +15,31 @@ const electronAPI: ElectronAPI = {
     randomHypnoGif: () => ipcRenderer.invoke("pack:randomHypnoGif"),
     randomSubliminalText: () => ipcRenderer.invoke("pack:randomSubliminalText"),
     blacklist: (fileName) => ipcRenderer.invoke("pack:blacklistMedia", fileName),
+    loadCorruption: () => ipcRenderer.invoke("pack:loadCorruption"),
+    discord: () => ipcRenderer.invoke("pack:discord"),
   },
   corruption: {
     getCurrentLevel: () => ipcRenderer.invoke("corruption:getCurrentLevel"),
     getNextLevelTime: () => ipcRenderer.invoke("corruption:getNextLevelTime"),
     applyLevelChanges: (changes) =>
       ipcRenderer.invoke("corruption:applyLevelChanges", changes),
+    setLevel: (level, nextLevelTime) =>
+      ipcRenderer.invoke("corruption:setLevel", level, nextLevelTime),
+    onInject: (callback: (level: number) => void) => {
+      const handler = (_event: IpcRendererEvent, level: number) => callback(level);
+      ipcRenderer.on("corruption:inject", handler);
+      return () => {
+        ipcRenderer.removeListener("corruption:inject", handler);
+      };
+    },
+    onApplyChanges: (callback: (changes: Record<string, unknown>) => void) => {
+      const handler = (_event: IpcRendererEvent, changes: Record<string, unknown>) =>
+        callback(changes);
+      ipcRenderer.on("corruption:applyChanges", handler);
+      return () => {
+        ipcRenderer.removeListener("corruption:applyChanges", handler);
+      };
+    },
   },
   popup: {
     create: (type, mediaId, hypnoGif) => ipcRenderer.invoke("popup:create", type, mediaId, hypnoGif),
@@ -83,6 +102,23 @@ const electronAPI: ElectronAPI = {
     sendNotification: (title, message, attachmentPath) =>
       ipcRenderer.invoke("system:sendNotification", title, message, attachmentPath),
     openExternal: (url) => ipcRenderer.invoke("system:openExternal", url),
+    corruptionLaunches: () => ipcRenderer.invoke("system:corruptionLaunches"),
+  },
+  booru: {
+    fetchImage: (tags) => ipcRenderer.invoke("booru:fetchImage", tags),
+  },
+  panic: {
+    trigger: (opts) => ipcRenderer.invoke("panic:trigger", opts),
+    status: () => ipcRenderer.invoke("panic:status"),
+    unlock: (password) => ipcRenderer.invoke("panic:unlock", password),
+    refreshShortcut: () => ipcRenderer.invoke("panic:refreshShortcut"),
+    onBlocked: (callback: () => void) => {
+      const handler = () => callback();
+      ipcRenderer.on("panic:blocked", handler);
+      return () => {
+        ipcRenderer.removeListener("panic:blocked", handler);
+      };
+    },
   },
 };
 

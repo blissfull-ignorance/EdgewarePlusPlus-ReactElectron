@@ -262,12 +262,17 @@ describe("isConfigBlocked", () => {
   it("returns true for blocked keys", () => {
     expect(isConfigBlocked("safeMode")).toBe(true);
     expect(isConfigBlocked("drivePath")).toBe(true);
-    expect(isConfigBlocked("panicDisabled")).toBe(true);
+    expect(isConfigBlocked("timerMode")).toBe(true);
+    expect(isConfigBlocked("safeword")).toBe(true);
+    expect(isConfigBlocked("startOnLogon")).toBe(true);
+    expect(isConfigBlocked("start_on_logon")).toBe(true);
   });
 
   it("returns false for unblocked keys", () => {
     expect(isConfigBlocked("popupMod")).toBe(false);
     expect(isConfigBlocked("audioMod")).toBe(false);
+    expect(isConfigBlocked("panicDisabled")).toBe(false);
+    expect(isConfigBlocked("fill")).toBe(false);
     expect(isConfigBlocked("delay")).toBe(false);
   });
 });
