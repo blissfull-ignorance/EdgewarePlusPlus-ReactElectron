@@ -24,6 +24,7 @@
     "@tabler/icons-react": "^2.47.0",
     "@testing-library/dom": "^10.4.1",
     "@testing-library/jest-dom": "^6.9.1",
+    "@xhayper/discord-rpc": "^1.5.1",
     "fengari": "^0.1.4",
     "fengari-interop": "^0.1.4",
     "react": "^19.0.0",

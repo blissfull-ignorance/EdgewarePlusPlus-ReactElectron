@@ -41,21 +41,41 @@ export interface ParsedCorruptionData {
 
 /**
  * Config keys that are blocked from corruption-level modification
- * (corresponds to block=True in legacy config/items.py).
+ * (corresponds to block=True/block=BROKEN in legacy config/items.py).
+ * `startOnLogon` is included for both spellings: the legacy item registry
+ * stores the config.json key as "start_on_logon".
  */
 const BLOCKED_CONFIG_KEYS = new Set([
-  "rotateWallpaper",
-  "replaceImages",
-  "panicLockout",
-  "panicLockoutTime",
-  "driveAvoidList",
+  "avoidList",
+  "corruptionDevMode",
+  "corruptionFullPerm",
+  "corruptionMode",
+  "desktopIcons",
+  "disabledMonitors",
   "drivePath",
-  "runAtStartup",
-  "themeIgnoreConfig",
+  "globalPanicButton",
+  "hibernateMode",
+  "messageOff",
+  "mitosisMode",
+  "mpvSubprocess",
+  "panicButton",
+  "presetsDanger",
+  "replace",
+  "replaceThresh",
+  "rotateWallpaper",
+  "runOnSaveQuit",
   "safeMode",
-  "fillDrive",
-  "panicDisabled",
+  "safeword",
+  "showDiscord",
+  "showLoadingFlair",
+  "start_on_logon",
   "startOnLogon",
+  "themeNoConfig",
+  "timerMode",
+  "timerSetupTime",
+  "toggleHibSkip",
+  "toggleInternet",
+  "toggleMoodSet",
 ]);
 
 // ── Parsing ───────────────────────────────────────────────────────────────────

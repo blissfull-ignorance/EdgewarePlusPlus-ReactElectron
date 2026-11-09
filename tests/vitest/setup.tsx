@@ -77,11 +77,26 @@ if (typeof window !== "undefined") {
       randomHypnoGif: vi.fn().mockResolvedValue(null),
       randomSubliminalText: vi.fn().mockResolvedValue(null),
       blacklist: vi.fn().mockResolvedValue({ ok: true }),
+      loadCorruption: vi.fn().mockResolvedValue(null),
+      discord: vi.fn().mockResolvedValue(null),
+    },
+    booru: {
+      fetchImage: vi.fn().mockResolvedValue(null),
+    },
+    panic: {
+      trigger: vi.fn().mockResolvedValue({ ok: true }),
+      status: vi.fn().mockResolvedValue({ lockoutActive: false, accelerator: "Escape" }),
+      unlock: vi.fn().mockResolvedValue({ ok: true }),
+      refreshShortcut: vi.fn().mockResolvedValue({ lockoutActive: false, accelerator: "Escape" }),
+      onBlocked: vi.fn().mockReturnValue(() => {}),
     },
     corruption: {
       getCurrentLevel: vi.fn().mockResolvedValue(0),
       getNextLevelTime: vi.fn().mockResolvedValue(null),
       applyLevelChanges: vi.fn().mockResolvedValue(undefined),
+      setLevel: vi.fn().mockResolvedValue(undefined),
+      onInject: vi.fn().mockReturnValue(() => {}),
+      onApplyChanges: vi.fn().mockReturnValue(() => {}),
     },
     popup: {
       create: vi.fn().mockImplementation((_type, _mediaId, _hypnoGif) =>
@@ -127,6 +142,7 @@ if (typeof window !== "undefined") {
       saveSettings: vi.fn().mockResolvedValue(undefined),
       sendNotification: vi.fn().mockResolvedValue(undefined),
       openExternal: vi.fn().mockResolvedValue(false),
+      corruptionLaunches: vi.fn().mockResolvedValue(0),
     },
   };
 }

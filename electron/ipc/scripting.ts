@@ -2,6 +2,7 @@ import { ipcMain } from "electron";
 import fs from "node:fs";
 import path from "node:path";
 import { initLuaVM, getLuaVM, LuaExecResult } from "../scripting/fengariAdapter";
+import { injectLevel } from "./corruption";
 import { app } from "electron";
 import { logger } from "../utils/logger";
 
@@ -69,6 +70,7 @@ function registerHandlers(): void {
 
     vm.setCurrentLevel(level);
     const results = vm.triggerTransition(level);
+    injectLevel(level);
     logger.info(`[Scripting] Injected corruption level ${level}, callbacks fired: ${results.length}`);
     return true;
   });

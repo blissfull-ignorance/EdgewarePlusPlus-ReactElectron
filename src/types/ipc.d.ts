@@ -83,6 +83,10 @@ export interface ElectronAPI {
     randomSubliminalText: () => Promise<string | null>;
     /** Move a pack media file into the blacklist so it never spawns again. */
     blacklist: (fileName: string) => Promise<{ ok: boolean; movedTo?: string; reason?: string }>;
+    /** The pack's raw corruption.json, or null when the pack ships none. */
+    loadCorruption: () => Promise<Record<string, unknown> | null>;
+    /** The pack's Discord presence payload (resource/discord.dat), or null. */
+    discord: () => Promise<{ text: string; image: string | null } | null>;
   };
   corruption: {
     /** Get the current corruption (guided mode) level number */
@@ -91,6 +95,12 @@ export interface ElectronAPI {
     getNextLevelTime: () => Promise<number | null>;
     /** Apply config changes from a corruption level definition */
     applyLevelChanges: (changes: Record<string, unknown>) => Promise<void>;
+    /** Publish the runtime's level + next-transition time to the main process */
+    setLevel: (level: number, nextLevelTime: number | null) => Promise<void>;
+    /** Script-driven level change relayed from the main process */
+    onInject: (callback: (level: number) => void) => () => void;
+    /** Config changes relayed from the main process (scripting API) */
+    onApplyChanges: (callback: (changes: Record<string, unknown>) => void) => () => void;
   };
   popup: {
     /** Create a new popup window of the given type and media ID */
@@ -155,6 +165,22 @@ export interface ElectronAPI {
     sendNotification: (title: string, message: string, attachmentPath?: string) => Promise<void>;
     /** Open a URL in the OS default browser (http/https only). Returns success. */
     openExternal: (url: string) => Promise<boolean>;
+    /** Corruption launch counter: returns the count before this launch. */
+    corruptionLaunches: () => Promise<number>;
+  };
+  booru: {
+    /** Search + download one Gelbooru image; null on miss/failure (fall back to pack media). */
+    fetchImage: (tags: string) => Promise<string | null>;
+  };
+  panic: {
+    /** Run panic; the hotkey path honors panicDisabled, the tray path forces. */
+    trigger: (opts?: { respectDisabled?: boolean }) => Promise<{ ok: boolean; reason?: "disabled" | "lockout" }>;
+    status: () => Promise<{ lockoutActive: boolean; accelerator: string }>;
+    /** Complete a lockout-gated panic with the safeword. */
+    unlock: (password: string) => Promise<{ ok: boolean }>;
+    refreshShortcut: () => Promise<{ lockoutActive: boolean; accelerator: string }>;
+    /** Fires when a panic attempt was blocked by an active lockout. */
+    onBlocked: (callback: () => void) => () => void;
   };
 }
 

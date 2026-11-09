@@ -16,6 +16,9 @@ export const FIXTURE_SEED_PACK = path.join(REPO_ROOT, "tests", "e2e", "fixtures"
 /** Committed trimmed copy of the real V2 test pack's media (img+vid+aud) — fast & reproducible on clean checkouts. */
 export const REAL_MEDIA_PACK_FIXTURE = path.join(REPO_ROOT, "tests", "e2e", "fixtures", "Real Test Pack");
 
+/** Minimal pack with a corruption.json whose level 2 flips dangerous settings. */
+export const CORRUPTION_PACK_FIXTURE = path.join(REPO_ROOT, "tests", "e2e", "fixtures", "Corruption Test Pack");
+
 export interface PackListing {
   name: string;
   path: string;
@@ -101,8 +104,10 @@ export interface CreateTempStateOptions {
    - "default": prefer the real V2 pack if present, else the minimal seed fixture.
    - "media": install a real-media pack (preferring the genuine V2 pack when it is
      available locally) that has img/vid/aud for runtime media verification.
+   - "corruption": install the minimal corruption fixture pack (corruption.json
+     whose level 2 flips dangerous settings).
    */
-  kind?: "default" | "media";
+  kind?: "default" | "media" | "corruption";
 }
 
 export function createTempState(opts: CreateTempStateOptions = {}): TempState {
@@ -112,7 +117,10 @@ export function createTempState(opts: CreateTempStateOptions = {}): TempState {
 
   const cleanupReal: Array<() => void> = [];
   let source: string;
-  if (opts.kind === "media") {
+  if (opts.kind === "corruption") {
+    source = CORRUPTION_PACK_FIXTURE;
+    if (!existsSync(source)) throw new Error(`Corruption fixture pack missing: ${source}`);
+  } else if (opts.kind === "media") {
     // Fast & reproducible: the committed trimmed copy of the real V2 test pack's
     // media (img/vid/aud), kept small for speed.
     source = REAL_MEDIA_PACK_FIXTURE;

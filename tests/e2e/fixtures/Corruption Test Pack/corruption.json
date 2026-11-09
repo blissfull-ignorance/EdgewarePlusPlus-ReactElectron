@@ -1,0 +1,10 @@
+{
+  "moods": {
+    "1": { "add": [], "remove": [] },
+    "2": { "add": [], "remove": [] }
+  },
+  "config": {
+    "1": { "delay": 5000 },
+    "2": { "delay": 500, "panicDisabled": 1 }
+  }
+}

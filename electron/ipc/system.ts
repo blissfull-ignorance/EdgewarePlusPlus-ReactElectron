@@ -1,10 +1,14 @@
-import { app, ipcMain, Tray, Menu, BrowserWindow, Notification, dialog, shell } from "electron";
+import { app, ipcMain, Tray, Menu, BrowserWindow, Notification, dialog, shell, nativeImage } from "electron";
 import fs from "fs";
 import path from "path";
 import { exec } from "child_process";
 import { promisify } from "util";
 import { logger } from "../utils/logger";
 import { skipHibernate } from "./hibernate";
+import { panicFromTray } from "./panic";
+import { setDiscordPresence as discordSetPresence } from "./discord";
+import { setWallpaper } from "../utils/wallpaper";
+import { autostartFilePath, buildAutostartEntry } from "../utils/autostart";
 import {
   extractPackZip,
   parsePackInfo,
@@ -78,58 +82,6 @@ function packIdentityFor(packPath: string, fallbackName: string): PackListing {
 
 let trayIcon: Tray | null = null;
 
-function setWallpaperDarwin(filepath: string): Promise<void> {
-  const script = `osascript -e 'tell application "Finder" to set desktop picture to POSIX file "${filepath}"'`;
-  return execAsync(script).then(() => {}).catch((err) => {
-    logger.error("[System] Failed to set wallpaper (macOS):", err.message);
-  });
-}
-
-function setWallpaperLinux(filepath: string): Promise<void> {
-  const desktop = process.env.XDG_CURRENT_DESKTOP || "";
-  let command: string;
-
-  if (desktop.toLowerCase().includes("gnome") || desktop.toLowerCase().includes("ubuntu")) {
-    command = `gsettings set org.gnome.desktop.background picture-uri "file://${filepath}"`;
-  } else if (desktop.toLowerCase().includes("kde") || desktop.toLowerCase().includes("plasma")) {
-    command = `qdbus org.kde.plasmashell /PlasmaShell org.kde.PlasmaShell.evaluateScript "var root = GetComponent('plasmashell').shell.coreShell; var wallpaper = root.findObject('AllWidgets', 'Containment'); wallpaper.currentConfigGroup.writeEntry('Image', 'file://${filepath}')"`;
-  } else {
-    command = `feh --bg-scale "${filepath}" 2>/dev/null || nitrogen --set-scale "${filepath}" 2>/dev/null || true`;
-  }
-
-  return execAsync(command).then(() => {}).catch((err) => {
-    logger.error("[System] Failed to set wallpaper (Linux):", err.message);
-  });
-}
-
-function setWallpaperWindows(_filepath: string): Promise<void> {
-  const script = "powershell -Command \"Add-Type -AssemblyName System.Runtime.InteropServices; \\$kernel32 = [System.Runtime.InteropServices.Marshal]::GetDelegateForFunctionPointer([System.Runtime.InteropServices.Marshal]::GetFunctionPointerForName([System.IntPtr]::Zero, 'SystemParametersInfoW'), [System.Func[System.UInt32, System.UInt32, System.IntPtr, System.UInt32, System.Boolean]]);\"";
-  return execAsync(script).then(() => {}).catch((err) => {
-    logger.error("[System] Failed to set wallpaper (Windows):", err.message);
-  });
-}
-
-async function setWallpaper(filepath: string): Promise<void> {
-  if (!fs.existsSync(filepath)) {
-    logger.error("[System] Wallpaper file does not exist:", filepath);
-    return;
-  }
-
-  try {
-    if (process.platform === "darwin") {
-      await setWallpaperDarwin(filepath);
-    } else if (process.platform === "linux") {
-      await setWallpaperLinux(filepath);
-    } else if (process.platform === "win32") {
-      await setWallpaperWindows(filepath);
-    } else {
-      logger.warn("[System] Unsupported platform for wallpaper:", process.platform);
-    }
-  } catch (err) {
-    logger.error("[System] Wallpaper set failed:", err);
-  }
-}
-
 function createDesktopIconsDarwin(): void {
   logger.info("[System] Desktop icons on macOS — alias creation not natively supported via Electron. User must manually create shortcuts.");
 }
@@ -187,14 +139,21 @@ oLink.Save
 
 function createTrayIcon(): Tray | null {
   try {
-    const iconPath = path.join(__dirname, "../../assets/icons/icon.png");
+    const iconPath = path.join(app.getAppPath(), "dist", "icon.png");
     if (!fs.existsSync(iconPath)) {
-      logger.warn("[System] Tray icon not found, skipping tray creation");
+      logger.error(`[System] Tray icon asset missing: ${iconPath}`);
       return null;
     }
 
-    const tray = new Tray(iconPath);
+    const image = nativeImage.createFromPath(iconPath).resize({ width: 32, height: 32 });
+    const tray = new Tray(image);
     const contextMenu = Menu.buildFromTemplate([
+      {
+        label: "Panic",
+        click: () => {
+          panicFromTray();
+        },
+      },
       {
         label: "Stop",
         click: () => {
@@ -227,6 +186,17 @@ function createTrayIcon(): Tray | null {
 }
 
 async function toggleRunAtStartup(state: boolean): Promise<void> {
+  if (process.platform === "linux") {
+    const file = autostartFilePath(app.getPath("home"));
+    if (state) {
+      fs.mkdirSync(path.dirname(file), { recursive: true });
+      fs.writeFileSync(file, buildAutostartEntry(app.getPath("exe")), "utf-8");
+    } else if (fs.existsSync(file)) {
+      fs.rmSync(file);
+    }
+    logger.info(`[System] Run at startup (Linux autostart): ${state ? "enabled" : "disabled"} → ${file}`);
+    return;
+  }
   app.setLoginItemSettings({
     openAtLogin: state,
     openAsHidden: true,
@@ -234,8 +204,8 @@ async function toggleRunAtStartup(state: boolean): Promise<void> {
   logger.info(`[System] Run at startup: ${state ? "enabled" : "disabled"}`);
 }
 
-async function setDiscordPresence(_text: string, _imageId: string): Promise<void> {
-  logger.info(`[System] Discord presence: "${_text}" (image: ${_imageId}) — requires discord-rpc native module`);
+async function setDiscordPresence(text: string, imageId: string): Promise<void> {
+  await discordSetPresence(text, imageId);
 }
 
 function sendNotification(title: string, message: string, attachmentPath?: string): void {
@@ -269,7 +239,8 @@ function registerHandlers(): void {
   });
 
   ipcMain.handle("system:setWallpaper", async (_event, filepath: string): Promise<void> => {
-    await setWallpaper(filepath);
+    const expanded = filepath.startsWith("~") ? filepath.replace("~", app.getPath("home")) : filepath;
+    await setWallpaper(expanded);
   });
 
   ipcMain.handle("system:createDesktopIcons", async (): Promise<void> => {
@@ -291,6 +262,24 @@ function registerHandlers(): void {
     }
     trayIcon = createTrayIcon();
     return trayIcon !== null;
+  });
+
+  /**
+   * Read the persisted corruption launch count, then record this launch.
+   * Mirrors legacy `Data.CORRUPTION_LAUNCHES`; returns the count from before
+   * this launch so the runtime can resolve the starting level.
+   */
+  ipcMain.handle("system:corruptionLaunches", async (): Promise<number> => {
+    const file = path.join(dataDir(), "corruption_launches");
+    let previous = 0;
+    try {
+      if (fs.existsSync(file)) previous = parseInt(fs.readFileSync(file, "utf-8"), 10) || 0;
+      fs.mkdirSync(dataDir(), { recursive: true });
+      fs.writeFileSync(file, String(previous + 1));
+    } catch (err) {
+      logger.error("[System] Failed to update corruption launch count:", err);
+    }
+    return previous;
   });
 
   ipcMain.handle("system:toggleRunAtStartup", async (_event, state: boolean): Promise<void> => {

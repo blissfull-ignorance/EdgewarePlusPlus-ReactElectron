@@ -4,6 +4,7 @@ import path from "node:path";
 import { ipcMain } from "electron";
 import { logger } from "../utils/logger";
 import { pickSubliminalText } from "../utils/textPool";
+import { parseDiscordDat } from "../utils/discordDat";
 import { resolveBlacklistSource, computeBlacklistTarget } from "../utils/blacklist";
 
 import { Index, Mood, Web, DEFAULT_INDEX } from "../../src/types/pack";
@@ -401,7 +402,7 @@ function registerHandlers(): void {
     }
   });
 
-  // ── Pop-up content resolvers (task: hypno overlays, prompts, custom close label) ──
+  // ── Pop-up content resolvers ───────────────────────────────────────────────
 
   /** The pack-defined text shown on the image/video close button (e.g. "I submit <3"). */
   ipcMain.handle("pack:closeLabel", async (): Promise<string | null> => {
@@ -516,6 +517,38 @@ function registerHandlers(): void {
       logger.error("[Pack] Failed to read random subliminal text:", err);
       return null;
     }
+  });
+
+  /**
+   * The pack's Discord presence payload from `resource/discord.dat`
+   * (legacy format: line 1 = status text, optional line 2 = artwork key).
+   * Returns null when the pack ships no discord.dat.
+   */
+  ipcMain.handle(
+    "pack:discord",
+    async (): Promise<{ text: string; image: string | null } | null> => {
+      const packDir = currentPackDir();
+      if (!packDir) return null;
+      const file = path.join(packDir, "resource", "discord.dat");
+      if (!fs.existsSync(file)) return null;
+      try {
+        return parseDiscordDat(fs.readFileSync(file, "utf-8"));
+      } catch (err) {
+        logger.error("[Pack] Failed to read discord.dat:", err);
+        return null;
+      }
+    }
+  );
+
+  /**
+   * The pack's raw corruption.json, or null when the pack ships none.
+   * Returned unparsed: the danger audit inspects the raw per-level config
+   * maps, including keys the runtime would refuse to apply.
+   */
+  ipcMain.handle("pack:loadCorruption", async (): Promise<Record<string, unknown> | null> => {
+    const packDir = currentPackDir();
+    if (!packDir) return null;
+    return readJson<Record<string, unknown>>(path.join(packDir, "corruption.json"));
   });
 
   /**

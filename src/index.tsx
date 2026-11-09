@@ -20,11 +20,28 @@ if (typeof window !== "undefined" && !(window as unknown as Record<string, unkno
       randomPrompt: async () => null,
       randomWeb: async () => null,
       randomHypnoGif: async () => null,
+      randomSubliminalText: async () => null,
+      blacklist: async () => ({ ok: true }),
+      loadCorruption: async () => null,
+      discord: async () => null,
+    },
+    booru: {
+      fetchImage: async () => null,
     },
     corruption: {
       getCurrentLevel: async () => 0,
       getNextLevelTime: async () => null,
       applyLevelChanges: async () => undefined,
+      setLevel: async () => undefined,
+      onInject: () => () => {},
+      onApplyChanges: () => () => {},
+    },
+    panic: {
+      trigger: async () => ({ ok: true }),
+      status: async () => ({ lockoutActive: false, accelerator: "Escape" }),
+      unlock: async () => ({ ok: true }),
+      refreshShortcut: async () => ({ lockoutActive: false, accelerator: "Escape" }),
+      onBlocked: () => () => {},
     },
     popup: {
       create: async (_type: string, _mediaId: string, _hypnoGif?: string) => ({ id: `popup-${Date.now()}` }),
@@ -46,6 +63,7 @@ if (typeof window !== "undefined" && !(window as unknown as Record<string, unkno
       createTray: async () => true,
       toggleRunAtStartup: async () => undefined,
       setDiscordPresence: async () => undefined,
+      corruptionLaunches: async () => 0,
       listPacks: async () => [],
       importPack: async (filepath: string) => ({
         path: filepath,
