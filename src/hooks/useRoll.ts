@@ -5,7 +5,7 @@ import { roll } from "../utils/roll";
 
 // "subliminal" remains in the union so persisted settings and mood data still
 // parse; it is never rolled — "caption" is the text popup spawn instead.
-export type PopupType = "image" | "video" | "audio" | "prompt" | "caption" | "subliminal" | "web";
+export type PopupType = "image" | "video" | "audio" | "prompt" | "caption" | "subliminal" | "web" | "notification";
 
 export interface RollTarget {
   type: PopupType;
@@ -27,6 +27,7 @@ function buildRollTargets(settings: ReturnType<typeof useSettingsStore.getState>
     { type: "prompt", chance: settings.promptMod },
     { type: "caption", chance: settings.capPopChance },
     { type: "web", chance: settings.webMod },
+    { type: "notification", chance: settings.notificationChance },
   ];
 }
 

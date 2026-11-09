@@ -16,6 +16,7 @@ describe("duePopups (independent per-type rolls)", () => {
       promptMod: 0,
       capPopChance: 0,
       webMod: 0,
+      notificationChance: 0,
     });
   });
 
@@ -29,12 +30,14 @@ describe("duePopups (independent per-type rolls)", () => {
       promptMod: 100,
       capPopChance: 100,
       webMod: 100,
+      notificationChance: 100,
     });
     const due = duePopups(settings(), (chance) => chance > 0);
     expect(due).toContain("image");
     expect(due).toContain("video");
     expect(due).toContain("audio");
     expect(due).toContain("prompt");
+    expect(due).toContain("notification");
     expect(due).not.toContain("subliminal");
   });
 
@@ -73,6 +76,7 @@ describe("duePopups (legacy single_mode: one weighted pick per tick)", () => {
       promptMod: 0,
       capPopChance: 0,
       webMod: 0,
+      notificationChance: 0,
       singleMode: 0,
     });
   });

@@ -81,6 +81,8 @@ export interface ElectronAPI {
     randomHypnoGif: () => Promise<string | null>;
     /** A random subliminal text (subliminals lists, falling back to captions), or null. */
     randomSubliminalText: () => Promise<string | null>;
+    /** A random notification text (notifications lists, falling back to captions), or null. */
+    randomNotificationText: () => Promise<string | null>;
     /** Move a pack media file into the blacklist so it never spawns again. */
     blacklist: (fileName: string) => Promise<{ ok: boolean; movedTo?: string; reason?: string }>;
     /** The pack's raw corruption.json, or null when the pack ships none. */

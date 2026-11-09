@@ -39,3 +39,25 @@ export function pickSubliminalText(
   const captions = [...usable(idx.default?.captions), ...moods.flatMap((m) => usable(m.captions))];
   return pick(captions, rand);
 }
+
+/**
+ * A random notification text: the `notifications` lists (default + moods),
+ * falling back to captions — mirrors legacy pack.random_notification().
+ */
+export function pickNotificationText(
+  idx: TextIndex | undefined,
+  rand: () => number = Math.random
+): string | null {
+  if (!idx) return null;
+  const moods = Array.isArray(idx.moods) ? idx.moods : [];
+
+  const notifications = [
+    ...usable((idx.default as { notifications?: string[] } | undefined)?.notifications),
+    ...moods.flatMap((m) => usable((m as { notifications?: string[] } | undefined)?.notifications)),
+  ];
+  const fromNotifications = pick(notifications, rand);
+  if (fromNotifications) return fromNotifications;
+
+  const captions = [...usable(idx.default?.captions), ...moods.flatMap((m) => usable(m.captions))];
+  return pick(captions, rand);
+}

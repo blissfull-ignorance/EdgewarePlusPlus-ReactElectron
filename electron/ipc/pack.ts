@@ -3,7 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { ipcMain } from "electron";
 import { logger } from "../utils/logger";
-import { pickSubliminalText } from "../utils/textPool";
+import { pickSubliminalText, pickNotificationText } from "../utils/textPool";
 import { parseDiscordDat } from "../utils/discordDat";
 import { resolveBlacklistSource, computeBlacklistTarget } from "../utils/blacklist";
 
@@ -539,6 +539,22 @@ function registerHandlers(): void {
       }
     }
   );
+
+  /**
+   * A random notification text for the notification popup type, or null.
+   * Pool: pack `notifications` lists (default + moods), falling back to
+   * captions — mirrors legacy pack.random_notification().
+   */
+  ipcMain.handle("pack:randomNotificationText", async (): Promise<string | null> => {
+    const packDir = currentPackDir();
+    if (!packDir) return null;
+    try {
+      return pickNotificationText(loadPackIndex(packDir));
+    } catch (err) {
+      logger.error("[Pack] Failed to read random notification text:", err);
+      return null;
+    }
+  });
 
   /**
    * The pack's raw corruption.json, or null when the pack ships none.

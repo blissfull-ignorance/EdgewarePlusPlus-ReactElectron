@@ -76,6 +76,7 @@ if (typeof window !== "undefined") {
       randomWeb: vi.fn().mockResolvedValue(null),
       randomHypnoGif: vi.fn().mockResolvedValue(null),
       randomSubliminalText: vi.fn().mockResolvedValue(null),
+      randomNotificationText: vi.fn().mockResolvedValue(null),
       blacklist: vi.fn().mockResolvedValue({ ok: true }),
       loadCorruption: vi.fn().mockResolvedValue(null),
       discord: vi.fn().mockResolvedValue(null),

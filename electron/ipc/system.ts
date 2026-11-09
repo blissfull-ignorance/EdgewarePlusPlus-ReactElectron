@@ -209,12 +209,17 @@ async function setDiscordPresence(text: string, imageId: string): Promise<void> 
 }
 
 function sendNotification(title: string, message: string, attachmentPath?: string): void {
+  const expanded =
+    attachmentPath && attachmentPath.startsWith("~")
+      ? attachmentPath.replace("~", app.getPath("home"))
+      : attachmentPath;
   const notification = new Notification({
     title,
     body: message,
-    ...(attachmentPath && fs.existsSync(attachmentPath) ? { icon: attachmentPath } : {}),
+    ...(expanded && fs.existsSync(expanded) ? { icon: expanded } : {}),
   });
   notification.show();
+  logger.info(`[System] Notification shown: "${title}: ${message}"${expanded && fs.existsSync(expanded) ? " (with image)" : ""}`);
 }
 
 function registerHandlers(): void {

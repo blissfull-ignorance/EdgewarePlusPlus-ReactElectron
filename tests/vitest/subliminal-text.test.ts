@@ -1,7 +1,32 @@
 import { describe, expect, it } from "vitest";
-import { pickSubliminalText } from "../../electron/utils/textPool";
+import { pickSubliminalText, pickNotificationText } from "../../electron/utils/textPool";
 
 const rand = (v: number) => () => v;
+
+describe("pickNotificationText", () => {
+  const rand = (v: number) => () => v;
+
+  it("prefers the notifications list", () => {
+    const idx = {
+      default: { notifications: ["good girl"], subliminals: ["obey"], captions: ["cap"] },
+      moods: [],
+    } as unknown as Parameters<typeof pickNotificationText>[0];
+    expect(pickNotificationText(idx, rand(0))).toBe("good girl");
+  });
+
+  it("falls back to captions when notifications are empty", () => {
+    const idx = {
+      default: { notifications: [], captions: ["cap one"] },
+      moods: [{ notifications: [], captions: ["mood cap"] }],
+    } as unknown as Parameters<typeof pickNotificationText>[0];
+    const picked = pickNotificationText(idx, rand(0));
+    expect(["cap one", "mood cap"]).toContain(picked);
+  });
+
+  it("returns null when nothing is defined", () => {
+    expect(pickNotificationText(undefined, rand(0))).toBeNull();
+  });
+});
 
 describe("pickSubliminalText", () => {
   it("prefers the default subliminals list", () => {

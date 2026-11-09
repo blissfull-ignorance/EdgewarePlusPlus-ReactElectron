@@ -119,6 +119,28 @@ export function MainAppPage() {
     if (id) registerOpenPopup(id, "caption");
   }, [spawnPopup, addInAppPopup]);
 
+  const spawnNotification = useCallback(async () => {
+    if (!useAppStore.getState().isRunning) return;
+    try {
+      const text = (await window.api?.pack.randomNotificationText()) ?? null;
+      if (!text) {
+        logger.warn("[MainAppPage] notification skipped: pack defines no notification or caption text");
+        return;
+      }
+      const s = useSettingsStore.getState();
+      const info = (await window.api?.pack.loadInfo()) as { name?: string } | null;
+      const title = info?.name || "Edgeware++";
+      let attachment: string | undefined;
+      if (roll(s.notificationImageChance) && s.packPath) {
+        const img = (await window.api?.pack.randomImage()) ?? null;
+        if (img) attachment = `${String(s.packPath).replace(/\/+$/, "")}/img/${img}`;
+      }
+      await window.api?.system.sendNotification(title, text, attachment);
+    } catch (err) {
+      logger.error("[MainAppPage] notification failed:", err);
+    }
+  }, []);
+
   const onSpawn = useCallback(
     (type: PopupType) => {
       // The legacy subliminal popup carries text, not media: it bypasses
@@ -127,11 +149,15 @@ export function MainAppPage() {
         void spawnTextPopup();
         return;
       }
+      if (type === "notification") {
+        void spawnNotification();
+        return;
+      }
       selectMedia(type)
         .then(dispatchMedia)
         .catch((err) => logger.error("[MainAppPage] Failed to select popup media:", err));
     },
-    [dispatchMedia, spawnTextPopup]
+    [dispatchMedia, spawnTextPopup, spawnNotification]
   );
 
   useRoll({ onSpawn });

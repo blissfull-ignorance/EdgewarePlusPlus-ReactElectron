@@ -14,6 +14,7 @@ const electronAPI: ElectronAPI = {
     randomWeb: () => ipcRenderer.invoke("pack:randomWeb"),
     randomHypnoGif: () => ipcRenderer.invoke("pack:randomHypnoGif"),
     randomSubliminalText: () => ipcRenderer.invoke("pack:randomSubliminalText"),
+    randomNotificationText: () => ipcRenderer.invoke("pack:randomNotificationText"),
     blacklist: (fileName) => ipcRenderer.invoke("pack:blacklistMedia", fileName),
     loadCorruption: () => ipcRenderer.invoke("pack:loadCorruption"),
     discord: () => ipcRenderer.invoke("pack:discord"),
