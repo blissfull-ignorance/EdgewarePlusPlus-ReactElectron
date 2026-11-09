@@ -35,6 +35,7 @@ export function VideoPopup({
   const popupTimeout = useSettingsStore((s) => s.popupTimeout);
   const clickthrough = useSettingsStore((s) => s.clickthroughPopups);
   const lkScaling = useSettingsStore((s) => s.lkScaling);
+  const lkToggle = useSettingsStore((s) => s.lkToggle);
   const movingChance = useSettingsStore((s) => s.movingChance);
   const movingSpeed = useSettingsStore((s) => s.movingSpeed);
   const denialChance = useSettingsStore((s) => s.denialChance);
@@ -108,7 +109,7 @@ export function VideoPopup({
       clicksToClose={clicksToClose}
       clickthroughEnabled={clickthrough > 0}
       timeoutMs={timeoutPopups > 0 ? popupTimeout * 1000 : 0}
-      opacity={lkScaling > 0 ? lkScaling / 100 : 1}
+      opacity={lkToggle === 1 && lkScaling > 0 ? lkScaling / 100 : 1}
     >
       <div
         style={{

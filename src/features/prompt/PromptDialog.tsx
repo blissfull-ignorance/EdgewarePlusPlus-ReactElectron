@@ -63,6 +63,7 @@ export function PromptDialog({
 }: PromptDialogProps) {
   const promptMistakes = useSettingsStore((s) => s.promptMistakes);
   const lkScaling = useSettingsStore((s) => s.lkScaling);
+  const lkToggle = useSettingsStore((s) => s.lkToggle);
   const meta = usePackPromptMeta();
   const [input, setInput] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -104,7 +105,7 @@ export function PromptDialog({
       clicksToClose={0}
       clickthroughEnabled={false}
       timeoutMs={0}
-      opacity={lkScaling > 0 ? lkScaling / 100 : 1}
+      opacity={lkToggle === 1 && lkScaling > 0 ? lkScaling / 100 : 1}
     >
       <Paper
         data-testid="prompt-dialog"

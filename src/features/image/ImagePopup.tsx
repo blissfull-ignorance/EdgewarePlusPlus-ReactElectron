@@ -37,6 +37,7 @@ export function ImagePopup({
   const popupTimeout = useSettingsStore((s) => s.popupTimeout);
   const clickthrough = useSettingsStore((s) => s.clickthroughPopups);
   const lkScaling = useSettingsStore((s) => s.lkScaling);
+  const lkToggle = useSettingsStore((s) => s.lkToggle);
   const mediaFile = imageUrl.split("?")[0].split("/").pop() || undefined;
   const clicksToClose = useRandomClicksToClose(multiClick, mediaFile);
   const movingChance = useSettingsStore((s) => s.movingChance);
@@ -87,7 +88,7 @@ export function ImagePopup({
       clicksToClose={clicksToClose}
       clickthroughEnabled={clickthrough > 0}
       timeoutMs={timeoutPopups > 0 ? popupTimeout * 1000 : 0}
-      opacity={lkScaling > 0 ? lkScaling / 100 : 1}
+      opacity={lkToggle === 1 && lkScaling > 0 ? lkScaling / 100 : 1}
     >
       <div
         style={{

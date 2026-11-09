@@ -261,6 +261,11 @@ function registerHandlers(): void {
     await setWallpaper(expanded);
   });
 
+  // Legacy run_on_save_quit: the app exits once settings have been written.
+  ipcMain.handle("system:quit", async (): Promise<void> => {
+    setTimeout(() => app.quit(), 50);
+  });
+
   ipcMain.handle("system:createDesktopIcons", async (): Promise<void> => {
     if (process.platform === "darwin") {
       createDesktopIconsDarwin();

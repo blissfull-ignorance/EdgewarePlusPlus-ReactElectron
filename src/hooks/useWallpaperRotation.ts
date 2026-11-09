@@ -9,6 +9,7 @@
  */
 import { useEffect, useRef } from "react";
 import { useSettingsStore } from "../stores/settingsStore";
+import { useAppStore } from "../stores/appStore";
 import { nextWallpaperPick, parseWallpaperDat, rotationDelay } from "../features/wallpaper/rotation";
 import { logger } from "../utils/logger";
 
@@ -40,15 +41,23 @@ export function useWallpaperRotation(active: boolean): void {
     const rotate = async () => {
       if (cancelled) return;
       const s = useSettingsStore.getState();
-      const files = parseWallpaperDat(String(s.wallpaperDat ?? ""));
-      const pick = nextWallpaperPick(files, previousRef.current);
-      if (pick && s.packPath) {
-        const root = String(s.packPath).replace(/\/+$/, "");
-        try {
-          await window.api?.system.setWallpaper(`${root}/${pick}`);
-          previousRef.current = pick;
-        } catch (err) {
-          logger.error("[wallpaperRotation] wallpaper change failed:", err);
+      const app = useAppStore.getState();
+      // Legacy fix-wallpaper: with it on, rotation only runs while the
+      // session is actually throwing (hibernate active or popups open), so
+      // the desktop is never left changed by an idle runtime.
+      const gated =
+        s.fixWallpaper === 1 && !app.hibernateActive && app.popupsCount === 0;
+      if (!gated) {
+        const files = parseWallpaperDat(String(s.wallpaperDat ?? ""));
+        const pick = nextWallpaperPick(files, previousRef.current);
+        if (pick && s.packPath) {
+          const root = String(s.packPath).replace(/\/+$/, "");
+          try {
+            await window.api?.system.setWallpaper(`${root}/${pick}`);
+            previousRef.current = pick;
+          } catch (err) {
+            logger.error("[wallpaperRotation] wallpaper change failed:", err);
+          }
         }
       }
       if (!cancelled) scheduleNext();

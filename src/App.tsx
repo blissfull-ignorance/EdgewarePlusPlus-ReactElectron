@@ -72,11 +72,15 @@ function MainSplash() {
 
 function App() {
   const themeType = useSettingsStore((state) => state.themeType);
+  const themeNoConfig = useSettingsStore((state) => state.themeNoConfig);
+  // Legacy themeNoConfig: the app chrome stays on the Original theme no
+  // matter what theme the pack or user selects.
+  const effectiveTheme = themeNoConfig === 1 ? "original" : themeType;
 
   return (
     <MantineProvider
-      theme={getTheme(themeType)}
-      forceColorScheme={isLightTheme(themeType) ? "light" : "dark"}
+      theme={getTheme(effectiveTheme)}
+      forceColorScheme={isLightTheme(effectiveTheme) ? "light" : "dark"}
     >
       <Workspace />
       <ToastStack />

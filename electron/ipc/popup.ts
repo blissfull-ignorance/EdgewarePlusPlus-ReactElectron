@@ -9,6 +9,7 @@
  * on the `"closed"` event.
  */
 import { app, ipcMain, BrowserWindow, screen } from "electron";
+import fs from "node:fs";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { logger } from "../utils/logger";
@@ -59,6 +60,43 @@ function getPrimaryMonitorBounds() {
 }
 
 /**
+ * Lowkey placement (legacy lowkey_mode): the popup hugs the corner chosen by
+ * lowkey_corner — 0 top-right, 1 top-left, 2 bottom-left, 3 bottom-right,
+ * 4 random. Returns null when lowkey mode is off.
+ */
+export function lowkeyPosition(
+  corner: number,
+  bounds: { x: number; y: number; width: number; height: number },
+  winWidth: number,
+  winHeight: number,
+  rand: () => number = Math.random
+): { x: number; y: number } | null {
+  let c = Math.floor(corner);
+  if (c < 0 || c > 4) return null;
+  if (c === 4) c = Math.floor(rand() * 4);
+  const right = c === 0 || c === 3;
+  const bottom = c === 2 || c === 3;
+  return {
+    x: bounds.x + (right ? bounds.width - winWidth : 0),
+    y: bounds.y + (bottom ? bounds.height - winHeight : 0),
+  };
+}
+
+/** Read a raw numeric/boolean setting value from the persisted config. */
+function readSetting(key: string): number {
+  try {
+    const cfg = fs.readFileSync(
+      path.join(app.getPath("userData"), "data", "config.json"),
+      "utf-8"
+    );
+    const parsed = JSON.parse(cfg) as Record<string, unknown>;
+    return Number(parsed[key]) || 0;
+  } catch {
+    return 0;
+  }
+}
+
+/**
  * Create a new popup BrowserWindow and register it in the global map.
  * Returns a unique ID caller can use to close the popup later.
  */
@@ -78,12 +116,19 @@ function createPopupWindow(
   const isSubliminal = type === "subliminal";
   const width = isSubliminal ? Math.floor(bounds.width * 0.66) : defaultWidth;
   const height = isSubliminal ? Math.floor(bounds.height * 0.5) : defaultHeight;
+  const lowkey = !isSubliminal && readSetting("lkToggle") === 1
+    ? lowkeyPosition(readSetting("lkCorner"), bounds, width, height)
+    : null;
   const x = isSubliminal
     ? Math.floor(bounds.x + (bounds.width - width) / 2)
-    : Math.floor(Math.random() * Math.max(0, bounds.width - defaultWidth));
+    : lowkey
+      ? lowkey.x
+      : Math.floor(Math.random() * Math.max(0, bounds.width - defaultWidth));
   const y = isSubliminal
     ? Math.floor(bounds.y + (bounds.height - height) / 2)
-    : Math.floor(Math.random() * Math.max(0, bounds.height - defaultHeight));
+    : lowkey
+      ? lowkey.y
+      : Math.floor(Math.random() * Math.max(0, bounds.height - defaultHeight));
 
   const popupWin = new BrowserWindow({
     x,
