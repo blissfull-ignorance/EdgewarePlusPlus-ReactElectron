@@ -22,6 +22,7 @@ import { registerHandlers as registerScriptingHandlers } from "./ipc/scripting";
 import { registerHandlers as registerSystemHandlers } from "./ipc/system";
 import { registerHandlers as registerPanicHandlers } from "./ipc/panic";
 import { registerHandlers as registerBooruHandlers } from "./ipc/booru";
+import { activePackDir, loadAppIcon, logResolvedIcon } from "./utils/appIcon";
 
 let win: BrowserWindow | null;
 
@@ -41,6 +42,7 @@ function createWindow(): void {
     width: 1024,
     height: 768,
     show: false,
+    icon: loadAppIcon(activePackDir()) ?? undefined,
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
       contextIsolation: true,
@@ -72,6 +74,12 @@ function createWindow(): void {
 app.whenReady().then(() => {
   registerPackMediaProtocol();
   registerAllHandlers();
+  const packDir = activePackDir();
+  logResolvedIcon(packDir);
+  if (process.platform === "darwin" && app.dock) {
+    const dockIcon = loadAppIcon(packDir);
+    if (dockIcon) app.dock.setIcon(dockIcon);
+  }
   createWindow();
 
   app.on("activate", () => {

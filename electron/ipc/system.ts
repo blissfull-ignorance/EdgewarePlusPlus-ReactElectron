@@ -1,4 +1,4 @@
-import { app, ipcMain, Tray, Menu, BrowserWindow, Notification, dialog, shell, nativeImage } from "electron";
+import { app, ipcMain, Tray, Menu, BrowserWindow, Notification, dialog, shell } from "electron";
 import fs from "fs";
 import path from "path";
 import { execFile } from "child_process";
@@ -9,6 +9,7 @@ import { panicFromTray } from "./panic";
 import { setDiscordPresence as discordSetPresence } from "./discord";
 import { setWallpaper } from "../utils/wallpaper";
 import { autostartFilePath, buildAutostartEntry } from "../utils/autostart";
+import { activePackDir, loadAppIcon } from "../utils/appIcon";
 import {
   extractPackZip,
   parsePackInfo,
@@ -139,13 +140,12 @@ oLink.Save
 
 function createTrayIcon(): Tray | null {
   try {
-    const iconPath = path.join(app.getAppPath(), "dist", "icon.png");
-    if (!fs.existsSync(iconPath)) {
-      logger.error(`[System] Tray icon asset missing: ${iconPath}`);
+    const image = loadAppIcon(activePackDir());
+    if (!image) {
+      logger.error("[System] Tray icon asset missing");
       return null;
     }
 
-    const image = nativeImage.createFromPath(iconPath).resize({ width: 32, height: 32 });
     const tray = new Tray(image);
     const contextMenu = Menu.buildFromTemplate([
       {

@@ -141,6 +141,7 @@ export async function launchApp(page: Page, options: LaunchOptions = {}): Promis
           randomSubliminalText: async () => null,
           randomNotificationText: async () => null,
           splashImage: async () => null,
+          iconImage: async () => null,
           blacklist: async () => ({ ok: true }),
           loadCorruption: async () => null,
           discord: async () => null,

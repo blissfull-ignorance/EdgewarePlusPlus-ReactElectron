@@ -85,6 +85,8 @@ export interface ElectronAPI {
     randomNotificationText: () => Promise<string | null>;
     /** The pack's startup splash image as a data URL, or null when the pack ships none. */
     splashImage: () => Promise<string | null>;
+    /** The app icon (pack icon or bundled default) as a data URL, or null. */
+    iconImage: () => Promise<string | null>;
     /** Move a pack media file into the blacklist so it never spawns again. */
     blacklist: (fileName: string) => Promise<{ ok: boolean; movedTo?: string; reason?: string }>;
     /** The pack's raw corruption.json, or null when the pack ships none. */

@@ -1,6 +1,7 @@
-import type { ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { Group, Title, Badge, Text, UnstyledButton } from "@mantine/core";
-import { IconEyeFilled, IconLayoutDashboard, IconSettings } from "@tabler/icons-react";
+import { IconLayoutDashboard, IconSettings } from "@tabler/icons-react";
+import defaultAppIcon from "../../assets/app_icon.png";
 
 export type MainView = "status" | "config";
 
@@ -33,6 +34,21 @@ interface AppFrameProps {
 }
 
 export function AppFrame({ view, onViewChange, actions, children }: AppFrameProps) {
+  const [appIcon, setAppIcon] = useState<string | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    void window.api?.pack
+      .iconImage()
+      .then((url) => {
+        if (alive && url) setAppIcon(url);
+      })
+      .catch(() => undefined);
+    return () => {
+      alive = false;
+    };
+  }, []);
+
   return (
     <div style={{ height: "100vh", display: "flex", flexDirection: "column", overflow: "hidden" }}>
       <header
@@ -53,20 +69,19 @@ export function AppFrame({ view, onViewChange, actions, children }: AppFrameProp
         }}
       >
         <Group gap="sm" align="center" wrap="nowrap">
-          <div
+          <img
+            src={appIcon ? `data:${appIcon}` : defaultAppIcon}
+            alt=""
+            data-testid="app-icon"
             style={{
               width: 32,
               height: 32,
-              borderRadius: 9,
-              backgroundColor: "var(--mantine-primary-color-filled)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
+              borderRadius: 8,
+              objectFit: "contain",
+              display: "block",
               flexShrink: 0,
             }}
-          >
-            <IconEyeFilled size={18} color="var(--mantine-primary-color-contrast)" />
-          </div>
+          />
           <Title order={1} data-testid="app-title" style={{ lineHeight: 1.1 }}>
             Edgeware++
           </Title>

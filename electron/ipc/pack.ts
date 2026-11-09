@@ -4,6 +4,7 @@ import path from "node:path";
 import { ipcMain } from "electron";
 import { logger } from "../utils/logger";
 import { pickSubliminalText, pickNotificationText } from "../utils/textPool";
+import { loadAppIconDataUrl } from "../utils/appIcon";
 import { parseDiscordDat } from "../utils/discordDat";
 import { resolveBlacklistSource, computeBlacklistTarget } from "../utils/blacklist";
 
@@ -554,6 +555,14 @@ function registerHandlers(): void {
       logger.error("[Pack] Failed to read random notification text:", err);
       return null;
     }
+  });
+
+  /**
+   * The app icon (pack icon.ico/icon.png, falling back to the bundled
+   * default) as a data URL for the header logo, or null.
+   */
+  ipcMain.handle("pack:iconImage", async (): Promise<string | null> => {
+    return loadAppIconDataUrl(currentPackDir());
   });
 
   /**

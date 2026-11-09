@@ -23,6 +23,7 @@ if (typeof window !== "undefined" && !(window as unknown as Record<string, unkno
       randomSubliminalText: async () => null,
       randomNotificationText: async () => null,
       splashImage: async () => null,
+      iconImage: async () => null,
       blacklist: async () => ({ ok: true }),
       loadCorruption: async () => null,
       discord: async () => null,
