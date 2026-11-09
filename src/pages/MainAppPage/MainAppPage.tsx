@@ -200,7 +200,7 @@ export function MainAppPage() {
 
   useCorruptionRuntime(isRunning);
   useWallpaperRotation(isRunning);
-  useSchedule();
+  useSchedule(isRunning);
 
   // Legacy corruption_danger_check: full-permission corruption must disclose
   // the dangerous settings the pack can flip before the runtime starts. The
