@@ -1,8 +1,14 @@
 import { SimpleGrid, Stack, Text, Tooltip } from "@mantine/core";
-import { IconPlayerPlay } from "@tabler/icons-react";
+import { IconPlayerPlay, IconClock } from "@tabler/icons-react";
 import { useSettingsStore } from "../../../../stores";
-import { ConfigDropdown, ConfigField } from "../../../Config";
+import { ConfigDropdown, ConfigField, ConfigToggle } from "../../../Config";
 import { SectionCard } from "../../../SectionCard";
+
+const TIME_UNITS = [
+  { label: "Minutes", value: "Minutes" },
+  { label: "Hours", value: "Hours" },
+  { label: "Days", value: "Days" },
+];
 
 export function StartPanel() {
   const setRaw = useSettingsStore((state) => state.setRaw);
@@ -10,6 +16,14 @@ export function StartPanel() {
   const themeType = useSettingsStore((state) => state.themeType);
   const globalPanicButton = useSettingsStore((state) => state.globalPanicButton);
   const lkCorner = useSettingsStore((state) => state.lkCorner);
+  const schedule = useSettingsStore((state) => state.schedule);
+  const scheduleTime = useSettingsStore((state) => state.scheduleTime);
+  const timeType = useSettingsStore((state) => state.timeType);
+  const varianceTime = useSettingsStore((state) => state.varianceTime);
+  const varianceType = useSettingsStore((state) => state.varianceType);
+  const repeatSchedule = useSettingsStore((state) => state.repeatSchedule);
+  const repeatTime = useSettingsStore((state) => state.repeatTime);
+  const repeatType = useSettingsStore((state) => state.repeatType);
 
   const themeData = [
     { label: "Original", value: "Original" },
@@ -29,6 +43,7 @@ export function StartPanel() {
   ];
 
   return (
+    <Stack gap="lg">
     <SectionCard
       icon={<IconPlayerPlay size={16} />}
       title="Start Settings"
@@ -89,5 +104,73 @@ export function StartPanel() {
         )}
       </SimpleGrid>
     </SectionCard>
+
+      <SectionCard
+        icon={<IconClock size={16} />}
+        title="Scheduling"
+        description="Start a session automatically after a delay, optionally repeating. The app must stay running; pair with run-at-startup."
+      >
+        <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="lg" verticalSpacing="lg">
+          <ConfigToggle
+            label="Enable Scheduling"
+            value={schedule}
+            onChange={(val) => setRaw({ schedule: val })}
+            description="Start the runtime automatically after the delay below"
+          />
+          <ConfigToggle
+            label="Repeat Schedule"
+            value={repeatSchedule}
+            onChange={(val) => setRaw({ repeatSchedule: val })}
+            description="Re-arm the session every repeat interval"
+            disabled={schedule !== 1}
+          />
+          <ConfigField
+            label="Run In"
+            type="number"
+            value={scheduleTime}
+            onChange={(val) => setRaw({ scheduleTime: Math.max(0, Number(val) || 0) })}
+            description="Delay before the scheduled session starts"
+            disabled={schedule !== 1}
+          />
+          <ConfigDropdown
+            label="Delay Unit"
+            value={timeType}
+            onChange={(val) => setRaw({ timeType: val })}
+            data={TIME_UNITS}
+            disabled={schedule !== 1}
+          />
+          <ConfigField
+            label="Random Delay Up To"
+            type="number"
+            value={varianceTime}
+            onChange={(val) => setRaw({ varianceTime: Math.max(0, Number(val) || 0) })}
+            description="Jitter the start by up to this much"
+            disabled={schedule !== 1}
+          />
+          <ConfigDropdown
+            label="Variance Unit"
+            value={varianceType}
+            onChange={(val) => setRaw({ varianceType: val })}
+            data={TIME_UNITS}
+            disabled={schedule !== 1}
+          />
+          <ConfigField
+            label="Repeat Every"
+            type="number"
+            value={repeatTime}
+            onChange={(val) => setRaw({ repeatTime: Math.max(0, Number(val) || 0) })}
+            description="Interval between repeated sessions"
+            disabled={schedule !== 1 || repeatSchedule !== 1}
+          />
+          <ConfigDropdown
+            label="Repeat Unit"
+            value={repeatType}
+            onChange={(val) => setRaw({ repeatType: val })}
+            data={TIME_UNITS}
+            disabled={schedule !== 1 || repeatSchedule !== 1}
+          />
+        </SimpleGrid>
+      </SectionCard>
+    </Stack>
   );
 }

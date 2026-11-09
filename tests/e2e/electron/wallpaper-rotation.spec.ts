@@ -1,5 +1,5 @@
 import { expect, test, afterEach } from "@playwright/test";
-import { existsSync, readdirSync, readFileSync, writeFileSync, mkdirSync, copyFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, mkdirSync, copyFileSync } from "node:fs";
 import path from "node:path";
 import {
   cleanupTempState,

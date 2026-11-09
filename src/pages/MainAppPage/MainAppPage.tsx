@@ -18,6 +18,7 @@ import { collectCorruptionDangers, type DangerReport } from "../../features/corr
 import { CorruptionDangerModal } from "../../features/corruption/CorruptionDangerModal";
 import { useCorruptionRuntime } from "../../hooks/useCorruptionRuntime";
 import { useWallpaperRotation } from "../../hooks/useWallpaperRotation";
+import { useSchedule } from "../../hooks/useSchedule";
 import { DEFAULT_HYPNO_ASSET } from "../../features/popup/resolveMediaUrl";
 import { clearOpenPopups, canOpenPopup, registerOpenPopup } from "../../features/popup/openPopups";
 import { roll } from "../../utils/roll";
@@ -199,6 +200,7 @@ export function MainAppPage() {
 
   useCorruptionRuntime(isRunning);
   useWallpaperRotation(isRunning);
+  useSchedule();
 
   // Legacy corruption_danger_check: full-permission corruption must disclose
   // the dangerous settings the pack can flip before the runtime starts. The
