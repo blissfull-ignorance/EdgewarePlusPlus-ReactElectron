@@ -79,13 +79,30 @@ test.describe("wallpaper rotation (rotateWallpaper + wallpaperDat + timer/varian
     await running.window.locator("[data-testid='pack-info']").waitFor({ timeout: 30000 });
     await running.window.locator("[data-testid='start-stop-button']").click();
 
-    // The macOS wallpaper call logs failures only; success is observable via
-    // the rotation not erroring and the app still running. Assert on the
-    // absence of rotation errors plus presence of the staged wallpaper files.
-    await running.window.waitForTimeout(4000);
+    // Rotation must reach the OS apply step. The apply itself is gated by
+    // macOS Automation permission (osascript -1743 when denied) and may take
+    // up to the script timeouts, so poll for either outcome.
+    await expect
+      .poll(() => {
+        const log = wallpaperLog(state);
+        return (
+          log.includes("Applied via System Events") ||
+          log.includes("wallpaper set failed") ||
+          log.includes("Wallpaper fallback failed")
+        );
+      }, { timeout: 45000 })
+      .toBe(true);
     const log = wallpaperLog(state);
     expect(log).not.toContain("wallpaperRotation] wallpaper change failed");
     expect(log).not.toContain("rotation is on but no wallpapers are configured");
+    const applyFailures = log
+      .split("\n")
+      .filter((l) => l.includes("[Wallpaper]") && l.includes("failed"));
+    for (const line of applyFailures) {
+      // Any surfaced osascript failure is an OS-level gate (Automation
+      // permission or script timeout), never a pipeline defect.
+      expect(line).toMatch(/Command failed: osascript|-1743|Apple events|not authorized|ETIMEDOUT|timed out/i);
+    }
     expect(existsSync(path.join(state.seedPath, "wallpapers", "wall-a.png"))).toBe(true);
 
     // Config hygiene: rotation must not mark settings dirty forever or corrupt

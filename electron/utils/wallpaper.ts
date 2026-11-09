@@ -32,10 +32,28 @@ function qtScriptString(filepath: string): string {
 }
 
 function setWallpaperDarwin(filepath: string): Promise<void> {
-  const script = `tell application "Finder" to set desktop picture to POSIX file "${appleScriptString(filepath)}"`;
-  return execFileAsync("osascript", ["-e", script]).then(() => {}).catch((err) => {
-    logger.error("[Wallpaper] Failed to set wallpaper (macOS):", err instanceof Error ? err.message : err);
-  });
+  // System Events is the path that actually applies on modern macOS; the
+  // Finder variant silently no-ops there. First use needs Automation
+  // permission for Edgeware++ (System Events); a denial is logged with the
+  // osascript reason. The timeout keeps a pending permission prompt from
+  // stalling the caller forever.
+  const script = `tell application "System Events" to tell every desktop to set picture to "${appleScriptString(filepath)}"`;
+  return execFileAsync("osascript", ["-e", script], { timeout: 15000 })
+    .then(() => {
+      logger.info(`[Wallpaper] Applied via System Events: ${filepath}`);
+    })
+    .catch((err) => {
+      const e = err as Error & { stderr?: string };
+      const detail = e ? `${e.message}${e.stderr ? ` | ${e.stderr}` : ""}` : String(err);
+      logger.error("[Wallpaper] System Events wallpaper set failed (macOS):", detail);
+      // Older macOS applies through Finder; try it as a fallback.
+      const finder = `tell application "Finder" to set desktop picture to POSIX file "${appleScriptString(filepath)}"`;
+      return execFileAsync("osascript", ["-e", finder], { timeout: 15000 })
+        .then(() => undefined)
+        .catch((err2) => {
+          logger.error("[Wallpaper] Finder wallpaper fallback failed (macOS):", err2 instanceof Error ? err2.message : err2);
+        });
+    });
 }
 
 function setWallpaperLinux(filepath: string): Promise<void> {
