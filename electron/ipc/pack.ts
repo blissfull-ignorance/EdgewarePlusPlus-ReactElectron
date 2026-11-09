@@ -318,6 +318,172 @@ function loadPackIndex(packDir: string): Index {
   return loadIndexFallback(packDir);
 }
 
+// ── Content resolvers (shared by IPC handlers and the Lua scripting host) ────
+
+function pickRandomFile(dirPath: string, pattern: RegExp): string | null {
+  if (!fs.existsSync(dirPath)) return null;
+  const all = fs.readdirSync(dirPath).filter((f) => pattern.test(f));
+  return all.length ? all[Math.floor(Math.random() * all.length)] : null;
+}
+
+/** A random image filename from the active pack's img/ dir, or null. */
+export function resolveRandomImage(): string | null {
+  const packDir = currentPackDir();
+  if (!packDir) return null;
+  try {
+    return pickRandomFile(path.join(packDir, "img"), /\.(png|jpg|jpeg|gif|webp)$/i);
+  } catch (err) {
+    logger.error("[Pack] Failed to read random image:", err);
+    return null;
+  }
+}
+
+/** A random audio filename from the active pack's aud/ dir, or null. */
+export function resolveRandomAudio(): string | null {
+  const packDir = currentPackDir();
+  if (!packDir) return null;
+  try {
+    return pickRandomFile(path.join(packDir, "aud"), /\.(mp3|wav|ogg|flac)$/i);
+  } catch (err) {
+    logger.error("[Pack] Failed to read random audio:", err);
+    return null;
+  }
+}
+
+/** A random video filename from the active pack's vid/ dir, or null. */
+export function resolveRandomVideo(): string | null {
+  const packDir = currentPackDir();
+  if (!packDir) return null;
+  try {
+    return pickRandomFile(path.join(packDir, "vid"), /\.(mp4|webm|mkv)$/i);
+  } catch (err) {
+    logger.error("[Pack] Failed to read random video:", err);
+    return null;
+  }
+}
+
+// Runtime override applied by pack scripts (set_popup_close_text).
+let closeLabelOverride: string | null = null;
+
+export function setCloseLabelOverride(text: string): void {
+  closeLabelOverride = text;
+}
+
+/** The pack-defined popup close-button label, or null. */
+export function resolveCloseLabel(): string | null {
+  if (closeLabelOverride) return closeLabelOverride;
+  const packDir = currentPackDir();
+  if (!packDir) return null;
+  try {
+    const idx = loadPackIndex(packDir);
+    const label = idx.default?.popupClose ?? null;
+    return typeof label === "string" && label.trim() ? label : null;
+  } catch (err) {
+    logger.error("[Pack] Failed to read close label:", err);
+    return null;
+  }
+}
+
+/**
+ * A random prompt phrase from the active pack (default + all moods), or null.
+ * Legacy packs join 1..N random prompt pieces into one phrase, bounded by
+ * index.default.promptMinLength/promptMaxLength (piece counts, not chars).
+ */
+export function resolveRandomPrompt(): string | null {
+  const packDir = currentPackDir();
+  if (!packDir) return null;
+  try {
+    const idx = loadPackIndex(packDir);
+    const pool: string[] = [
+      ...(idx.default?.prompts ?? []).filter((p) => typeof p === "string" && p.trim()),
+      ...(idx.moods ?? []).flatMap((m) =>
+        (m.prompts ?? []).filter((p) => typeof p === "string" && p.trim())
+      ),
+    ];
+    if (!pool.length) return null;
+
+    let min = idx.default?.promptMinLength ?? 1;
+    let max = idx.default?.promptMaxLength ?? min;
+    if (max < min) [min, max] = [max, min];
+    if (min < 1) min = 1;
+
+    const count = min + Math.floor(Math.random() * (max - min + 1));
+    let prompt = "";
+    for (let i = 0; i < count; i++) {
+      prompt += pool[Math.floor(Math.random() * pool.length)] + " ";
+    }
+    return prompt.trim();
+  } catch (err) {
+    logger.error("[Pack] Failed to read random prompt:", err);
+    return null;
+  }
+}
+
+/**
+ * A random web URL from the active pack (default + all moods), or null.
+ * Mirrors legacy open_web(pack) → pack.random_web(): the raw url plus one of
+ * its args (legacy concatenates them, so we do the same).
+ */
+export function resolveRandomWeb(): string | null {
+  const packDir = currentPackDir();
+  if (!packDir) return null;
+  try {
+    const idx = loadPackIndex(packDir);
+    const pool: Array<{ url: string; args: string[] }> = [
+      ...(idx.default?.web ?? []).filter((w) => typeof w?.url === "string" && w.url.trim()),
+      ...(idx.moods ?? []).flatMap((m) =>
+        (m.web ?? []).filter((w) => typeof w?.url === "string" && !!(w.url as string).trim())
+      ),
+    ];
+    if (!pool.length) return null;
+    const entry = pool[Math.floor(Math.random() * pool.length)];
+    const args = Array.isArray(entry.args) && entry.args.length ? entry.args : [""];
+    const arg = args[Math.floor(Math.random() * args.length)];
+    return String(arg) ? entry.url + String(arg) : entry.url;
+  } catch (err) {
+    logger.error("[Pack] Failed to read random web url:", err);
+    return null;
+  }
+}
+
+/** A random notification text from the active pack, or null. */
+export function resolveNotificationText(): string | null {
+  const packDir = currentPackDir();
+  if (!packDir) return null;
+  try {
+    return pickNotificationText(loadPackIndex(packDir));
+  } catch (err) {
+    logger.error("[Pack] Failed to read random notification text:", err);
+    return null;
+  }
+}
+
+/** A random subliminal text from the active pack, or null. */
+export function resolveSubliminalText(): string | null {
+  const packDir = currentPackDir();
+  if (!packDir) return null;
+  try {
+    return pickSubliminalText(loadPackIndex(packDir));
+  } catch (err) {
+    logger.error("[Pack] Failed to read random subliminal text:", err);
+    return null;
+  }
+}
+
+/** The active pack directory, or null. */
+export function activePackPath(): string | null {
+  return currentPackDir();
+}
+
+/** The active pack's display name, or null. */
+export function resolvePackName(): string | null {
+  const packDir = currentPackDir();
+  if (!packDir) return null;
+  const info = readJson<Record<string, unknown>>(path.join(packDir, "info.json"));
+  const name = info?.name;
+  return typeof name === "string" && name.trim() ? name : null;
+}
+
 // ── IPC Handlers ─────────────────────────────────────────────────────────────
 
 function registerHandlers(): void {
@@ -361,123 +527,26 @@ function registerHandlers(): void {
     }
   });
 
-  ipcMain.handle("pack:randomImage", async (): Promise<string | null> => {
-    const packDir = currentPackDir();
-    if (!packDir) return null;
-    try {
-      const imgDir = path.join(packDir, "img");
-      if (!fs.existsSync(imgDir)) return null;
-      const all = fs.readdirSync(imgDir).filter((f) => /\.(png|jpg|jpeg|gif|webp)$/i.test(f));
-      return all.length ? all[Math.floor(Math.random() * all.length)] : null;
-    } catch (err) {
-      logger.error("[Pack] Failed to read random image:", err);
-      return null;
-    }
-  });
+  ipcMain.handle("pack:randomImage", async (): Promise<string | null> => resolveRandomImage());
 
-  ipcMain.handle("pack:randomAudio", async (): Promise<string | null> => {
-    const packDir = currentPackDir();
-    if (!packDir) return null;
-    try {
-      const audDir = path.join(packDir, "aud");
-      if (!fs.existsSync(audDir)) return null;
-      const all = fs.readdirSync(audDir).filter((f) => /\.(mp3|wav|ogg|flac)$/i.test(f));
-      return all.length ? all[Math.floor(Math.random() * all.length)] : null;
-    } catch (err) {
-      logger.error("[Pack] Failed to read random audio:", err);
-      return null;
-    }
-  });
+  ipcMain.handle("pack:randomAudio", async (): Promise<string | null> => resolveRandomAudio());
 
-  ipcMain.handle("pack:randomVideo", async (): Promise<string | null> => {
-    const packDir = currentPackDir();
-    if (!packDir) return null;
-    try {
-      const vidDir = path.join(packDir, "vid");
-      if (!fs.existsSync(vidDir)) return null;
-      const all = fs.readdirSync(vidDir).filter((f) => /\.(mp4|webm|mkv)$/i.test(f));
-      return all.length ? all[Math.floor(Math.random() * all.length)] : null;
-    } catch (err) {
-      logger.error("[Pack] Failed to read random video:", err);
-      return null;
-    }
-  });
+  ipcMain.handle("pack:randomVideo", async (): Promise<string | null> => resolveRandomVideo());
 
   // ── Pop-up content resolvers ───────────────────────────────────────────────
 
   /** The pack-defined text shown on the image/video close button (e.g. "I submit <3"). */
-  ipcMain.handle("pack:closeLabel", async (): Promise<string | null> => {
-    const packDir = currentPackDir();
-    if (!packDir) return null;
-    try {
-      const idx = loadPackIndex(packDir);
-      const label = idx.default?.popupClose ?? null;
-      return typeof label === "string" && label.trim() ? label : null;
-    } catch (err) {
-      logger.error("[Pack] Failed to read close label:", err);
-      return null;
-    }
-  });
+  ipcMain.handle("pack:closeLabel", async (): Promise<string | null> => resolveCloseLabel());
 
   /** A random prompt phrase from the active pack (default + all moods), or null. */
-  ipcMain.handle("pack:randomPrompt", async (): Promise<string | null> => {
-    const packDir = currentPackDir();
-    if (!packDir) return null;
-    try {
-      const idx = loadPackIndex(packDir);
-      const pool: string[] = [
-        ...(idx.default?.prompts ?? []).filter((p) => typeof p === "string" && p.trim()),
-        ...(idx.moods ?? []).flatMap((m) =>
-          (m.prompts ?? []).filter((p) => typeof p === "string" && p.trim())
-        ),
-      ];
-      if (!pool.length) return null;
-
-      // Legacy packs join 1..N random prompt pieces into one phrase, bounded by
-      // index.default.promptMinLength/promptMaxLength (piece counts, not chars).
-      let min = idx.default?.promptMinLength ?? 1;
-      let max = idx.default?.promptMaxLength ?? min;
-      if (max < min) [min, max] = [max, min];
-      if (min < 1) min = 1;
-
-      const count = min + Math.floor(Math.random() * (max - min + 1));
-      let prompt = "";
-      for (let i = 0; i < count; i++) {
-        prompt += pool[Math.floor(Math.random() * pool.length)] + " ";
-      }
-      return prompt.trim();
-    } catch (err) {
-      logger.error("[Pack] Failed to read random prompt:", err);
-      return null;
-    }
-  });
+  ipcMain.handle("pack:randomPrompt", async (): Promise<string | null> => resolveRandomPrompt());
 
   /**
    * A random web URL from the active pack (default + all moods), or null.
    * Mirrors legacy open_web(pack) → pack.random_web(): the raw url plus one of
    * its args (legacy concatenates them, so we do the same).
    */
-  ipcMain.handle("pack:randomWeb", async (): Promise<string | null> => {
-    const packDir = currentPackDir();
-    if (!packDir) return null;
-    try {
-      const idx = loadPackIndex(packDir);
-      const pool: Array<{ url: string; args: string[] }> = [
-        ...(idx.default?.web ?? []).filter((w) => typeof w?.url === "string" && w.url.trim()),
-        ...(idx.moods ?? []).flatMap((m) =>
-          (m.web ?? []).filter((w) => typeof w?.url === "string" && !!(w.url as string).trim())
-        ),
-      ];
-      if (!pool.length) return null;
-      const entry = pool[Math.floor(Math.random() * pool.length)];
-      const args = Array.isArray(entry.args) && entry.args.length ? entry.args : [""];
-      const arg = args[Math.floor(Math.random() * args.length)];
-      return String(arg) ? entry.url + String(arg) : entry.url;
-    } catch (err) {
-      logger.error("[Pack] Failed to read random web url:", err);
-      return null;
-    }
-  });
+  ipcMain.handle("pack:randomWeb", async (): Promise<string | null> => resolveRandomWeb());
 
   /**
    * A random spiral/hypno image from the active pack, or null.
@@ -546,16 +615,9 @@ function registerHandlers(): void {
    * Pool: pack `notifications` lists (default + moods), falling back to
    * captions — mirrors legacy pack.random_notification().
    */
-  ipcMain.handle("pack:randomNotificationText", async (): Promise<string | null> => {
-    const packDir = currentPackDir();
-    if (!packDir) return null;
-    try {
-      return pickNotificationText(loadPackIndex(packDir));
-    } catch (err) {
-      logger.error("[Pack] Failed to read random notification text:", err);
-      return null;
-    }
-  });
+  ipcMain.handle("pack:randomNotificationText", async (): Promise<string | null> =>
+    resolveNotificationText()
+  );
 
   /**
    * The app icon (pack icon.ico/icon.png, falling back to the bundled

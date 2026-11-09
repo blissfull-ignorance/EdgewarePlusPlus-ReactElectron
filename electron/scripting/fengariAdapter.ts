@@ -11,7 +11,7 @@
 import * as lua from "fengari/src/lua";
 import * as lauxlib from "fengari/src/lauxlib";
 import * as lualib from "fengari/src/lualib";
-import { luastring_of } from "fengari";
+import { to_luastring } from "fengari";
 import { logger } from "../utils/logger";
 
 const {
@@ -23,6 +23,7 @@ const {
   lua_tonumber,
   lua_toboolean,
   lua_pushnumber,
+  lua_pushboolean,
   lua_pushcfunction,
   lua_isfunction,
   lua_setfield,
@@ -34,6 +35,7 @@ const {
   lua_rawgeti,
   lua_rawseti,
   lua_pushvalue,
+  lua_pushnil,
   LUA_TNUMBER,
   LUA_TSTRING,
   LUA_TBOOLEAN,
@@ -80,6 +82,26 @@ export interface LuaExecResult {
 }
 
 /**
+ * Host operations behind the `edgeware_v0` Lua API (legacy pack scripting).
+ * Popup-spawning operations return the spawned popup's id, or null when
+ * nothing could be spawned (missing pack media); pending Lua callbacks are
+ * then invoked immediately instead of on popup close.
+ */
+export interface EdgewareHost {
+  corrupt(): void;
+  panic(): void;
+  closePopups(): void;
+  setPopupCloseText(text: string): void;
+  image(file: string | null): string | null;
+  video(file: string | null): string | null;
+  audio(file: string | null): string | null;
+  prompt(text: string | null): string | null;
+  subliminal(text: string | null): string | null;
+  web(url: string | null): void;
+  notification(text: string | null): void;
+}
+
+/**
  * Fengari Lua VM instance with a sandboxed corruption API.
  */
 export class FengariVM {
@@ -88,6 +110,9 @@ export class FengariVM {
   private callbackCounter: number;
   private _currentLevel: number;
   private _initialized: boolean;
+  private host: EdgewareHost | null = null;
+  private timers = new Set<ReturnType<typeof setTimeout>>();
+  private pendingByPopup = new Map<string, number[]>();
 
   constructor() {
     this.L = 0;
@@ -99,11 +124,17 @@ export class FengariVM {
       this.L = luaL_newstate();
       this.openSafeLibraries();
       this.registerCorruptionAPI();
+      this.registerEdgewareV0();
       this._initialized = true;
     } catch {
       this.L = 0;
       this._initialized = false;
     }
+  }
+
+  /** Wire the runtime operations behind the edgeware_v0 globals. */
+  setHost(host: EdgewareHost | null): void {
+    this.host = host;
   }
 
   get initialized(): boolean {
@@ -129,6 +160,9 @@ export class FengariVM {
    * Destroy the Lua state and free resources.
    */
   destroy(): void {
+    for (const timer of this.timers) clearTimeout(timer);
+    this.timers.clear();
+    this.pendingByPopup.clear();
     if (this._initialized && this.L) {
       try {
         lua_close(this.L);
@@ -151,7 +185,7 @@ export class FengariVM {
 
     let loadResult: number;
     try {
-      loadResult = luaL_loadstring(this.L, luastring_of(script));
+      loadResult = luaL_loadstring(this.L, to_luastring(script));
     } catch (err) {
       this._initialized = false;
       return { success: false, error: `Load crash: ${err instanceof Error ? err.message : String(err)}` };
@@ -241,7 +275,7 @@ export class FengariVM {
     lua_pushcfunction(this.L, (L: number): number => {
       const level = lua_tonumber(L, 1);
       if (!lua_isfunction(L, 2)) {
-        luaL_error(L, luastring_of("onTransition: second argument must be a function"));
+        luaL_error(L, to_luastring("onTransition: second argument must be a function"));
         return 0;
       }
       corruptionVm.callbackCounter++;
@@ -300,6 +334,204 @@ export class FengariVM {
     if (this.onLuaEvent) {
       this.onLuaEvent(action, data);
     }
+  }
+
+  // ── Lua callback refs ──────────────────────────────────────────────────────
+
+  /** Keep a Lua function from the stack alive under a fresh registry ref. */
+  private storeRef(stackIndex: number): number {
+    const ref = ++this.callbackCounter;
+    lua_pushvalue(this.L, stackIndex);
+    lua_rawseti(this.L, LUA_REGISTRYINDEX, ref);
+    return ref;
+  }
+
+  /** Call a stored Lua function with no arguments and release the ref. */
+  invokeRef(ref: number): void {
+    if (!this._initialized) return;
+    lua_rawgeti(this.L, LUA_REGISTRYINDEX, ref);
+    if (lua_isfunction(this.L, -1)) {
+      if (lua_pcall(this.L, 0, 0, 0) !== LUA_OK) {
+        const err = lua_tojsstring(this.L, -1);
+        logger.error(`[FengariVM] Lua callback error: ${err ?? "unknown"}`);
+      }
+    }
+    lua_pop(this.L, 1);
+    lua_pushnil(this.L);
+    lua_rawseti(this.L, LUA_REGISTRYINDEX, ref);
+  }
+
+  /** Route a popup-close event to the Lua callbacks waiting on it. */
+  handlePopupClosed(id: string): void {
+    const refs = this.pendingByPopup.get(id);
+    if (!refs) return;
+    this.pendingByPopup.delete(id);
+    for (const ref of refs) this.invokeRef(ref);
+  }
+
+  /** Attach a callback ref to a spawned popup, or fire it when none spawned. */
+  private bindPopupRef(popupId: string | null, ref: number | null): void {
+    if (ref == null) return;
+    if (popupId) {
+      const list = this.pendingByPopup.get(popupId) ?? [];
+      list.push(ref);
+      this.pendingByPopup.set(popupId, list);
+    } else {
+      this.invokeRef(ref);
+    }
+  }
+
+  // ── edgeware_v0 pack scripting API (legacy globals) ────────────────────────
+
+  /**
+   * Register the legacy `edgeware_v0` globals: after, roll, corrupt, panic,
+   * close_popups, set_popup_close_text, image, video, audio, prompt,
+   * subliminal, web, notification. `require` accepts the known module names
+   * so unmodified pack scripts load.
+   */
+  private registerEdgewareV0(): void {
+    // eslint-disable-next-line @typescript-eslint/no-this-alias
+    const vm = this;
+
+    const argString = (L: number, idx: number): string | null => {
+      const t = lua_type(L, idx);
+      if (t === LUA_TNIL || t === LUA_TNONE) return null;
+      return lua_tojsstring(L, idx);
+    };
+
+    // print(...) — legacy routes script output into the app log.
+    lua_pushcfunction(this.L, (L: number): number => {
+      const n = lua_gettop(L);
+      const parts: string[] = [];
+      for (let i = 1; i <= n; i++) {
+        const t = lua_type(L, i);
+        if (t === LUA_TSTRING || t === LUA_TNUMBER) parts.push(lua_tojsstring(L, i) ?? "");
+        else if (t === LUA_TBOOLEAN) parts.push(lua_toboolean(L, i) ? "true" : "false");
+        else if (t === LUA_TNIL || t === LUA_TNONE) parts.push("nil");
+        else parts.push("table");
+      }
+      logger.info(`[Lua] ${parts.join("\t")}`);
+      return 0;
+    });
+    lua_setglobal(this.L, "print");
+
+    // require("edgeware_v0") — the API is pre-registered; accept known modules.
+    lua_pushcfunction(this.L, (L: number): number => {
+      const name = lua_tojsstring(L, 1) ?? "";
+      const known = name === "edgeware_v0" || name === "basic_v1";
+      if (known) {
+        lua_pushboolean(L, 1);
+      } else {
+        logger.warn(`[FengariVM] require("${name}") is not supported`);
+        lua_pushnil(L);
+      }
+      return 1;
+    });
+    lua_setglobal(this.L, "require");
+
+    // after(ms, callback)
+    lua_pushcfunction(this.L, (L: number): number => {
+      const ms = Math.max(0, lua_tonumber(L, 1));
+      if (!lua_isfunction(L, 2)) return 0;
+      const ref = vm.storeRef(2);
+      const timer = setTimeout(() => {
+        vm.timers.delete(timer);
+        vm.invokeRef(ref);
+      }, ms);
+      vm.timers.add(timer);
+      return 0;
+    });
+    lua_setglobal(this.L, "after");
+
+    // roll(chance) — chance is a 0–100 percentage, like the legacy roll.
+    lua_pushcfunction(this.L, (L: number): number => {
+      const chance = lua_tonumber(L, 1);
+      lua_pushboolean(L, Math.random() * 100 < chance ? 1 : 0);
+      return 1;
+    });
+    lua_setglobal(this.L, "roll");
+
+    // corrupt() — advance to the next corruption level.
+    lua_pushcfunction(this.L, (): number => {
+      vm.host?.corrupt();
+      return 0;
+    });
+    lua_setglobal(this.L, "corrupt");
+
+    // panic()
+    lua_pushcfunction(this.L, (): number => {
+      vm.host?.panic();
+      return 0;
+    });
+    lua_setglobal(this.L, "panic");
+
+    // close_popups()
+    lua_pushcfunction(this.L, (): number => {
+      vm.host?.closePopups();
+      return 0;
+    });
+    lua_setglobal(this.L, "close_popups");
+
+    // set_popup_close_text(text)
+    lua_pushcfunction(this.L, (L: number): number => {
+      const text = argString(L, 1);
+      if (text) vm.host?.setPopupCloseText(text);
+      return 0;
+    });
+    lua_setglobal(this.L, "set_popup_close_text");
+
+    // image(filename?) — random pack image when nil.
+    lua_pushcfunction(this.L, (L: number): number => {
+      vm.host?.image(argString(L, 1));
+      return 0;
+    });
+    lua_setglobal(this.L, "image");
+
+    // video(filename?) — random pack video when nil.
+    lua_pushcfunction(this.L, (L: number): number => {
+      vm.host?.video(argString(L, 1));
+      return 0;
+    });
+    lua_setglobal(this.L, "video");
+
+    // audio(filename?, on_stop?) — on_stop fires when the audio popup closes.
+    lua_pushcfunction(this.L, (L: number): number => {
+      const file = argString(L, 1);
+      const ref = lua_isfunction(L, 2) ? vm.storeRef(2) : null;
+      vm.bindPopupRef(vm.host?.audio(file) ?? null, ref);
+      return 0;
+    });
+    lua_setglobal(this.L, "audio");
+
+    // prompt(text?, on_close?) — on_close fires when the prompt popup closes.
+    lua_pushcfunction(this.L, (L: number): number => {
+      const text = argString(L, 1);
+      const ref = lua_isfunction(L, 2) ? vm.storeRef(2) : null;
+      vm.bindPopupRef(vm.host?.prompt(text) ?? null, ref);
+      return 0;
+    });
+    lua_setglobal(this.L, "prompt");
+
+    // subliminal(text?) — legacy full-screen text popup.
+    lua_pushcfunction(this.L, (L: number): number => {
+      vm.host?.subliminal(argString(L, 1));
+      return 0;
+    });
+    lua_setglobal(this.L, "subliminal");
+
+    // web(url?) — random pack url when nil; opens in the system browser.
+    lua_pushcfunction(this.L, (L: number): number => {
+      vm.host?.web(argString(L, 1));
+      return 0;
+    });
+    lua_setglobal(this.L, "web");
+
+    // notification(text?) — random pack notification when nil.
+    lua_pushcfunction(this.L, (L: number): number => {
+      vm.host?.notification(argString(L, 1));
+      return 0;
+    });
+    lua_setglobal(this.L, "notification");
   }
 
   /**

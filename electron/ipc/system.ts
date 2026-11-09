@@ -222,6 +222,26 @@ function sendNotification(title: string, message: string, attachmentPath?: strin
   logger.info(`[System] Notification shown: "${title}: ${message}"${expanded && fs.existsSync(expanded) ? " (with image)" : ""}`);
 }
 
+/**
+ * Open an http(s) url in the system browser (legacy open_web). With
+ * EDGWARE_STUB_BROWSER set the open is only logged, so automated runs never
+ * launch a real browser.
+ */
+async function openExternalUrl(url: unknown): Promise<boolean> {
+  if (typeof url !== "string" || !/^https?:\/\//i.test(url)) return false;
+  if (process.env.EDGWARE_STUB_BROWSER) {
+    logger.info(`[System] Browser open stubbed: ${url}`);
+    return true;
+  }
+  try {
+    await shell.openExternal(url);
+    return true;
+  } catch (err) {
+    logger.error("[System] Failed to open external url:", err);
+    return false;
+  }
+}
+
 function registerHandlers(): void {
   ipcMain.handle("system:sendNotification", async (_event, title: string, message: string, attachmentPath?: string): Promise<void> => {
     sendNotification(title, message, attachmentPath);
@@ -232,16 +252,9 @@ function registerHandlers(): void {
    * web popups). Only http(s) urls are honoured so a pack can never point the
    * OS at local resources via file:// etc.
    */
-  ipcMain.handle("system:openExternal", async (_event, url: unknown): Promise<boolean> => {
-    if (typeof url !== "string" || !/^https?:\/\//i.test(url)) return false;
-    try {
-      await shell.openExternal(url);
-      return true;
-    } catch (err) {
-      logger.error("[System] Failed to open external url:", err);
-      return false;
-    }
-  });
+  ipcMain.handle("system:openExternal", async (_event, url: unknown): Promise<boolean> =>
+    openExternalUrl(url)
+  );
 
   ipcMain.handle("system:setWallpaper", async (_event, filepath: string): Promise<void> => {
     const expanded = filepath.startsWith("~") ? filepath.replace("~", app.getPath("home")) : filepath;
@@ -501,4 +514,4 @@ function registerHandlers(): void {
   });
 }
 
-export { registerHandlers };
+export { registerHandlers, sendNotification as showNotification, openExternalUrl };

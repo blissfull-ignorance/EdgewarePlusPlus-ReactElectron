@@ -23,6 +23,16 @@ function notifyPopupClosed(id: string): void {
   if (mainWin && !mainWin.isDestroyed()) {
     mainWin.webContents.send("popup:closed", id);
   }
+  for (const listener of closeListeners) listener(id);
+}
+
+type PopupCloseListener = (id: string) => void;
+const closeListeners = new Set<PopupCloseListener>();
+
+/** Observe popup closes from any origin (renderer IPC or Lua scripts). */
+function onPopupClosed(listener: PopupCloseListener): () => void {
+  closeListeners.add(listener);
+  return () => closeListeners.delete(listener);
 }
 
 /**
@@ -165,5 +175,6 @@ function registerHandlers(): void {
   });
 }
 
-export { registerHandlers, closeAllPopups };
+export { registerHandlers, closeAllPopups, createPopupWindow, onPopupClosed };
+export type { PopupCloseListener };
 export { popupWindows };
