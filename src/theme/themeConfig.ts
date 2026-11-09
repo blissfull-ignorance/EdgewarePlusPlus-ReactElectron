@@ -107,17 +107,110 @@ const DARK_SURFACE: MantineColorsTuple = [
   "#0e1119",
 ];
 
+/**
+ * Surface ramps, one per legacy theme variant. Every surface in the app is
+ * painted from the `dark` color ramp (index 0 carries body text, 2 dimmed
+ * text, 5 borders, 6 raised surfaces, 7 inputs, 8 the app background), so a
+ * variant changes the whole UI by replacing this ramp — mirroring the legacy
+ * Tk themes: Original light gray, Dark charcoal, The One green-on-black,
+ * Ransom white-on-red, Goth purple-on-charcoal, Bimbo pink.
+ */
+const SURFACES: Record<ThemeName, MantineColorsTuple> = {
+  original: [
+    "#16181d",
+    "#33373f",
+    "#5a5f6a",
+    "#82878f",
+    "#a9adb4",
+    "#c8c8c8",
+    "#ffffff",
+    "#ffffff",
+    "#f0f0f0",
+    "#d9d9d9",
+  ],
+  dark: DARK_SURFACE,
+  "the-one": [
+    "#00ff41",
+    "#33cc55",
+    "#2fae4c",
+    "#277a38",
+    "#1f4d28",
+    "#009a22",
+    "#2f343d",
+    "#1b1d23",
+    "#282c34",
+    "#16181c",
+  ],
+  ransom: [
+    "#ffffff",
+    "#ffe3e3",
+    "#f0bcbc",
+    "#d99a9a",
+    "#b97070",
+    "#5c0d0d",
+    "#9a1f1f",
+    "#5c0d0d",
+    "#841212",
+    "#4a0a0a",
+  ],
+  goth: [
+    "#e3b8ff",
+    "#cfa2f0",
+    "#b98ae0",
+    "#9a6cc4",
+    "#7a54a0",
+    "#4b3757",
+    "#31353f",
+    "#1b1d23",
+    "#282c34",
+    "#16181c",
+  ],
+  bimbo: [
+    "#d6177f",
+    "#c2166f",
+    "#a83a76",
+    "#b56fa0",
+    "#a06090",
+    "#f4a7c3",
+    "#ffe4ef",
+    "#ffd6e8",
+    "#ffc0cb",
+    "#f7a8b8",
+  ],
+};
+
+/** Legacy per-theme UI fonts; unavailable legacy faces fall back per family. */
+const FONTS: Record<ThemeName, string> = {
+  original:
+    "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif",
+  dark: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif",
+  "the-one": "Consolas, ui-monospace, 'SF Mono', Menlo, Monaco, monospace",
+  ransom: "Arial, 'Helvetica Neue', sans-serif",
+  goth: "Constantia, Georgia, 'Times New Roman', serif",
+  bimbo: "Constantia, Georgia, 'Times New Roman', serif",
+};
+
 export const DEFAULT_PRIMARY = THEME_PRIMARY_NAMES.original;
 
-function baseTheme(primary: string): MantineThemeOverride {
+/** Variants whose legacy surfaces are light; they need the light color scheme. */
+const LIGHT_THEMES: ThemeName[] = ["original", "bimbo"];
+
+export function isLightTheme(themeName: string): boolean {
+  const normalized = (themeName || "original").toLowerCase().replace(/\s+/g, "-");
+  const effective: ThemeName = VALID_THEMES.includes(normalized as ThemeName)
+    ? (normalized as ThemeName)
+    : "original";
+  return LIGHT_THEMES.includes(effective);
+}
+
+function baseTheme(primary: string, surface: MantineColorsTuple, font: string): MantineThemeOverride {
   return {
     primaryColor: primary,
     colors: {
       [primary]: PRIMARY_RAMPS[primary],
-      dark: DARK_SURFACE,
+      dark: surface,
     },
-    fontFamily:
-      "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif",
+    fontFamily: font,
     fontFamilyMonospace:
       "ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Monaco, Consolas, monospace",
     headings: {
@@ -139,9 +232,9 @@ function baseTheme(primary: string): MantineThemeOverride {
 
 /**
  * Resolve a legacy theme name ("Original", "Dark", "The One", "Ransom",
- * "Goth", "Bimbo") to a full dark Mantine theme. Unknown names fall back to
- * the "original" variant. All variants share the same surfaces, typography,
- * radii and focus behaviour; only the primary ramp and accents differ.
+ * "Goth", "Bimbo") to a full Mantine theme. Unknown names fall back to the
+ * "original" variant. Each variant paints the app with its legacy surface
+ * ramp, primary accent ramp and UI font.
  */
 export function getTheme(themeName: string): MantineThemeOverride {
   const normalized = (themeName || "original").toLowerCase().replace(/\s+/g, "-");
@@ -149,5 +242,7 @@ export function getTheme(themeName: string): MantineThemeOverride {
     ? (normalized as ThemeName)
     : "original";
 
-  return createTheme(baseTheme(THEME_PRIMARY_NAMES[effective]));
+  return createTheme(
+    baseTheme(THEME_PRIMARY_NAMES[effective], SURFACES[effective], FONTS[effective])
+  );
 }

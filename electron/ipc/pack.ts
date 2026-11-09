@@ -557,6 +557,35 @@ function registerHandlers(): void {
   });
 
   /**
+   * The pack's startup splash image as a data URL, or null when the pack
+   * ships none. Candidates mirror the legacy pack layout: the first existing
+   * resource/loading_splash.{png,gif,jpg,jpeg,bmp}.
+   */
+  ipcMain.handle("pack:splashImage", async (): Promise<string | null> => {
+    const packDir = currentPackDir();
+    if (!packDir) return null;
+    const mime: Record<string, string> = {
+      ".png": "image/png",
+      ".gif": "image/gif",
+      ".jpg": "image/jpeg",
+      ".jpeg": "image/jpeg",
+      ".bmp": "image/bmp",
+    };
+    try {
+      for (const [ext, type] of Object.entries(mime)) {
+        const candidate = path.join(packDir, "resource", `loading_splash${ext}`);
+        if (fs.existsSync(candidate)) {
+          return `${type};base64,${fs.readFileSync(candidate).toString("base64")}`;
+        }
+      }
+      return null;
+    } catch (err) {
+      logger.error("[Pack] Failed to read splash image:", err);
+      return null;
+    }
+  });
+
+  /**
    * The pack's raw corruption.json, or null when the pack ships none.
    * Returned unparsed: the danger audit inspects the raw per-level config
    * maps, including keys the runtime would refuse to apply.

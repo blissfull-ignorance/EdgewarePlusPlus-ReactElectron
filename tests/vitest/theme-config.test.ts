@@ -57,3 +57,50 @@ describe("getTheme", () => {
     expect(colors.dark).toHaveLength(10);
   });
 });
+
+describe("getTheme surfaces", () => {
+  const surface = (name: string) => {
+    const theme = getTheme(name);
+    return (theme.colors as Record<string, string[]>).dark;
+  };
+
+  it("paints Original with the legacy light-gray surfaces", () => {
+    const ramp = surface("original");
+    expect(ramp[8]).toBe("#f0f0f0");
+    expect(ramp[0]).toBe("#16181d");
+  });
+
+  it("paints Bimbo with pink surfaces", () => {
+    const ramp = surface("bimbo");
+    expect(ramp[8]).toBe("#ffc0cb");
+  });
+
+  it("paints Ransom with dark-red surfaces", () => {
+    const ramp = surface("ransom");
+    expect(ramp[8]).toBe("#841212");
+  });
+
+  it("paints The One with green-on-charcoal surfaces", () => {
+    const ramp = surface("the-one");
+    expect(ramp[8]).toBe("#282c34");
+    expect(ramp[0]).toBe("#00ff41");
+  });
+
+  it("keeps Dark and Goth on charcoal backgrounds", () => {
+    expect(surface("dark")[8]).toBe("#171b26");
+    expect(surface("goth")[8]).toBe("#282c34");
+  });
+
+  it("gives every variant a distinct app background", () => {
+    const backgrounds = ["original", "dark", "the-one", "ransom", "goth", "bimbo"].map(
+      (name) => surface(name)[8]
+    );
+    expect(new Set(backgrounds).size).toBeGreaterThanOrEqual(5);
+  });
+
+  it("uses the monospace legacy font for The One and serif faces for Goth and Bimbo", () => {
+    expect(getTheme("the-one").fontFamily).toContain("Consolas");
+    expect(getTheme("goth").fontFamily).toContain("Georgia");
+    expect(getTheme("bimbo").fontFamily).toContain("Constantia");
+  });
+});
