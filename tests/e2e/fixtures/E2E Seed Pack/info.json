@@ -1,0 +1,7 @@
+{
+  "name": "E2E Seed Pack",
+  "id": "E2ESeedPack",
+  "creator": "E2E",
+  "version": "1.0",
+  "description": "Minimal committed pack fixture so the E2E suite is reproducible on clean checkouts where the gitignored packs/ directory is absent."
+}
