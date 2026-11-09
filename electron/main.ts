@@ -23,6 +23,24 @@ import { registerHandlers as registerSystemHandlers } from "./ipc/system";
 import { registerHandlers as registerPanicHandlers } from "./ipc/panic";
 import { registerHandlers as registerBooruHandlers } from "./ipc/booru";
 import { activePackDir, loadAppIcon, logResolvedIcon } from "./utils/appIcon";
+import { logger } from "./utils/logger";
+import fs from "node:fs";
+
+// Legacy video_hardware_acceleration gates media decoding acceleration;
+// the Chromium equivalent must be decided before the app is ready.
+function applyHardwareAccelerationSetting(): void {
+  try {
+    const cfg = fs.readFileSync(path.join(app.getPath("userData"), "data", "config.json"), "utf-8");
+    const parsed = JSON.parse(cfg) as Record<string, unknown>;
+    if (parsed.videoHardwareAcceleration === 0) {
+      app.disableHardwareAcceleration();
+      logger.info("[Main] Hardware acceleration disabled (videoHardwareAcceleration=0)");
+    }
+  } catch {
+    /* no persisted config yet */
+  }
+}
+applyHardwareAccelerationSetting();
 
 let win: BrowserWindow | null;
 

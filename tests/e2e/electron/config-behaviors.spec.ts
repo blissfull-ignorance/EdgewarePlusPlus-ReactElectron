@@ -1,4 +1,6 @@
 import { expect, test, afterEach } from "@playwright/test";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
+import path from "node:path";
 import {
   cleanupTempState,
   createTempState,
@@ -150,5 +152,31 @@ test.describe("config option behaviors", () => {
     await running.window.keyboard.press("F9");
     await new Promise((r) => setTimeout(r, 4000));
     expect(closed).toBe(true);
+  });
+
+  test("videoHardwareAcceleration=0 disables GPU acceleration at startup", async () => {
+    const state = baseSeed({ videoHardwareAcceleration: 0 });
+    cleanup.push(() => cleanupTempState(state));
+    const running = await launchApp(state);
+    cleanup.push(async () => {
+      try {
+        await quitApp(running);
+      } catch {
+        /* noop */
+      }
+    });
+
+    await expect
+      .poll(
+        () => {
+          const logDir = path.join(state.dir, "logs");
+          if (!existsSync(logDir)) return "";
+          return readdirSync(logDir)
+            .map((f) => readFileSync(path.join(logDir, f), "utf-8"))
+            .join("\n");
+        },
+        { timeout: 15000 }
+      )
+      .toContain("Hardware acceleration disabled");
   });
 });
