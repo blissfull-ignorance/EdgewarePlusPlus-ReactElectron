@@ -8,8 +8,9 @@
  * Windows are tracked in an internal Map keyed by a unique ID and cleaned up
  * on the `"closed"` event.
  */
-import { ipcMain, BrowserWindow, screen } from "electron";
+import { app, ipcMain, BrowserWindow, screen } from "electron";
 import path from "node:path";
+import { pathToFileURL } from "node:url";
 import { logger } from "../utils/logger";
 
 // Registry of open popup windows, keyed by popup ID
@@ -32,6 +33,9 @@ function getPopupUrl(): string {
   if (process.env.VITE_DEV_SERVER_URL) {
     return process.env.VITE_DEV_SERVER_URL;
    }
+  if (app.isPackaged) {
+    return pathToFileURL(path.join(__dirname, "../dist/index.html")).href;
+  }
   const port = process.env.VITE_PORT ?? 5173;
   return `http://localhost:${port}`;
 }

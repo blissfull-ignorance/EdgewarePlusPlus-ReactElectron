@@ -191,6 +191,13 @@ test-results/
 playwright-report/
 coverage/
 
+# Release icon assets (tracked despite the generic build/ ignore)
+!build/
+build/*
+!build/icon.icns
+!build/icon.ico
+!build/icon.png
+
 # --- Local development workspace (never pushed) ---
 work/
 
