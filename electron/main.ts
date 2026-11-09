@@ -59,6 +59,10 @@ function createWindow(): void {
 
   if (process.env.VITE_DEV_SERVER_URL) {
     win.loadURL(process.env.VITE_DEV_SERVER_URL);
+  } else if (app.isPackaged) {
+    // Packaged builds ship the built renderer inside the app bundle; there is
+    // no dev server to point at.
+    win.loadFile(path.join(__dirname, "../dist/index.html"));
   } else {
     const port = process.env.VITE_PORT ?? 5173;
     win.loadURL(`http://localhost:${port}`);
