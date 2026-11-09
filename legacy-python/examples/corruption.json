@@ -1,0 +1,39 @@
+{
+  "moods": {
+    "1": {
+      "add": ["angel", "apple", "pyramid"],
+      "remove": []
+    },
+    "2": {
+      "add": ["globe", "guitar", "money"],
+      "remove": ["apple"]
+    },
+    "3": {
+      "add": ["gamble"],
+      "remove": ["angel"]
+    },
+    "4": {
+      "add": ["imp"],
+      "remove": ["gamble", "globe", "pyramid"]
+    },
+    "5": {
+      "add": ["succubus"],
+      "remove": ["guitar"]
+    }
+  },
+  "wallpapers": {
+    "1": "wallpaper.png",
+    "3": "wallpaper2.png",
+    "5": "wallpaper3.png",
+    "default": "wallpaper.png"
+  },
+  "config": {
+    "1": {
+      "promptMod": 0
+    },
+    "4": {
+      "promptMod": 10,
+      "promptMistakes": 10
+    }
+  }
+}

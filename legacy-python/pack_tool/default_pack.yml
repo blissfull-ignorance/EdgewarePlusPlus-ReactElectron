@@ -1,0 +1,155 @@
+info:
+  # Generate info.json, true or false.
+  generate: true
+
+  # Name of your pack. (~20 char max)
+  name: "Pack name"
+
+  # Unique identified for your pack's mood file.
+  id: "PackID"
+
+  # Your name. (~20 char max)
+  creator: "Your name"
+
+  # Version of your pack.
+  version: "1.0"
+
+  # Short description of your pack. (~400 char max)
+  description: >
+    Pack description
+
+discord:
+  # Generate discord.dat, true or false.
+  generate: true
+
+  # Discord status message when running the pack.
+  status: "Discord status"
+
+index:
+  # Generate index.json, true or false.
+  generate: true
+
+  # Default mood and generic runtime configuration for packs. All of the
+  # settings are optional, you may delete any of them to not use them.
+  default:
+    # Text for the close button of a popup window.
+    popup-close: "Close"
+
+    # The maximum number of clicks needed to close a popup with this mood.
+    max-clicks: 1
+
+    # List of captions.
+    captions:
+      - "Caption 1"
+      - "Caption 2"
+
+    # List of captions used in denial overlays.
+    denial:
+      - "Denied"
+
+    # List of captions used in subliminal message popups.
+    subliminal-messages:
+      - "Subliminal message"
+
+    # List of captions used in system notifications.
+    notifications:
+      - "Notification"
+
+    # Text for the command at the top of prompt windows.
+    prompt-command: "Type below"
+
+    # Text for the submit button of a prompt window.
+    prompt-submit: "Submit"
+
+    # The minimum and maximum number of prompt strings in a single prompt
+    # window.
+    prompt-min-length: 1
+    prompt-max-length: 1
+
+    # List of prompts.
+    prompts:
+      - "Prompt 1"
+      - "Prompt 2"
+
+    # List of websites that can be opened by Edgeware.
+    #
+    # URLs contain the following fields:
+    #   url  - The URL. (Required)
+    #   args - List of arguments that can be appended to the URL.
+    web:
+      - url: "https://duckduckgo.com/?q="
+        args:
+          - "edgeware packs"
+          - "rule 34"
+      - url: "https://github.com/"
+
+  # List of moods.
+  #
+  # Moods contain the following fields:
+  #   mood                - Name of the mood. (Required)
+  #   max-clicks          - The maximum number of clicks needed to close a
+  #                         popup with this mood.
+  #   captions            - List of captions.
+  #   denial              - List of captions used in denial overlays.
+  #   subliminal-messages - List of captions used in subliminal message popups.
+  #   notifications       - List of captions used in system notifications.
+  #   prompts             - List of prompts.
+  #   web                 - List of websites that can be opened by Edgeware.
+  moods:
+    - mood: "vanilla"
+      captions:
+        - "Vanilla caption"
+      prompts:
+        - "Vanilla prompt 1"
+        - "Vanilla prompt 2"
+      web:
+        - url: "https://bsky.app/"
+
+    - mood: "kinky"
+      max-clicks: 2
+      captions:
+        - "Kinky caption"
+
+config:
+  # Generate config.json, true or false.
+  generate: false
+
+  # Raw key-value pairs of Edgeware configs.
+  raw:
+    "delay": 5000
+    "popupMod": 100
+
+corruption:
+  # Generate corruption.json, true or false.
+  generate: false
+
+  # List of corruption levels.
+  #
+  # Corruption levels contain the following fields:
+  #   add-moods    - List of moods to add at the level.
+  #   remove-moods - List of moods to remove at the level.
+  #   wallpaper    - The filename of the wallpaper to change to at this level.
+  #   config       - Key-value pairs of configs to use at this level.
+  levels:
+    # Level 1
+    - add-moods:
+        - "first"
+        - "second"
+      wallpaper: "wallpaper-1.png"
+
+    # Level 2
+    - add-moods:
+        - "third"
+      remove-moods:
+        - "first"
+      wallpaper: "wallpaper-2.png"
+      config:
+        "vidMod": 20
+
+    # Level 3
+    - remove-moods:
+        - "second"
+
+    # Level 4
+    - config:
+        "timeoutPopups": 1

@@ -1,0 +1,20 @@
+{
+  "urls": [
+    "https://www.google.com/search?q=",
+    "https://www.youtube.com/",
+    "https://stackoverflow.com/",
+    "https://github.com/"
+  ],
+  "args": [
+    "test+arguments",
+    "",
+    "",
+    ""
+  ],
+  "moods": [
+    "each mood here",
+    "correlates with the order of urls",
+    "and can have duplicates",
+    "and can have duplicates"
+  ]
+}

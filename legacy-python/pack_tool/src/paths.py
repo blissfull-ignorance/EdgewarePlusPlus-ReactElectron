@@ -1,0 +1,68 @@
+# Copyright (C) 2024 Marigold & Araten
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+from pathlib import Path
+
+PACK_TOOL_ROOT = Path(__file__).parent.parent
+TEST_BUILD_ROOT = PACK_TOOL_ROOT.parent / "edgeware" / "data" / "packs" / "Pack Tool test build"
+DEFAULT_PACK = PACK_TOOL_ROOT / "default_pack.yml"
+
+
+class Source:
+    def __init__(self, root: Path) -> None:
+        self.root = root
+
+        # Directories
+        self.media = self.root / "media"
+        self.hypno = self.root / "hypno"
+        self.wallpapers = self.root / "wallpapers"
+
+        # Files
+        self.icon = self.root / "icon.ico"
+        self.pack = self.root / "pack.yml"
+        self.script = self.root / "script.lua"
+        self.splash = self.root / "loading_splash"
+
+        # Legacy
+        self.hypno_legacy = self.root / "subliminals"
+
+
+class Build:
+    def __init__(self, root: Path) -> None:
+        self.root = root
+
+        # Directories
+        self.audio = self.root / "aud"
+        self.hypno = self.root / "hypno"
+        self.image = self.root / "img"
+        self.video = self.root / "vid"
+
+        # Files
+        self.config = self.root / "config.json"
+        self.corruption = self.root / "corruption.json"
+        self.discord = self.root / "discord.dat"
+        self.icon = self.root / "icon.ico"
+        self.index = self.root / "index.json"
+        self.info = self.root / "info.json"
+        self.script = self.root / "script.lua"
+        self.splash = self.root / "loading_splash"
+        self.wallpaper = self.root / "wallpaper.png"
+
+        # Legacy
+        self.hypno_legacy = self.root / "subliminals"
+        self.captions = self.root / "captions.json"
+        self.media = self.root / "media.json"
+        self.prompt = self.root / "prompt.json"
+        self.web = self.root / "web.json"

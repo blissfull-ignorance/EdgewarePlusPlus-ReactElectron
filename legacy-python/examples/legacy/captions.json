@@ -1,0 +1,16 @@
+{
+  "prefix": ["prefix1", "prefix2"],
+  // Prefix Settings are entirely optional, and can be used in place of regular "prefix" as well as a supplement.
+  // For backwards compatability, it is recommended you use it as a supplement, as packs in old edgeware won't load captions otherwise.
+  // NOTE: Delete these comments before using! You might encounter errors, or your program might not run at all! (I spent way too long figuring this out!)
+  "prefix_settings": {
+    // The name of the prefix, if the prefix already exists in the prefix section this will supplement it.
+    "prefix1": {
+      // OPTIONAL: The maximum number of clicks needed to dismiss the popup. If enabled a random number will be selected in the range of 2-max. If omitted will default to 1
+      "max": 5
+    }
+  },
+  "default": ["list of captions for no prefix"],
+  "prefix1": ["list of captions if has prefix1"],
+  "prefix2": ["list of captions if has prefix2"]
+}
