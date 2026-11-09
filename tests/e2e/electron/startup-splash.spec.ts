@@ -91,6 +91,28 @@ test.describe("startup splash screen", () => {
       .toBe(true);
   });
 
+  test("pack loading_splash.png at the pack root overrides the default image", async () => {
+    const state = baseSeed({ showLoadingFlair: 1 });
+    writeFileSync(path.join(state.seedPath, "loading_splash.png"), PNG_1PX);
+    cleanup.push(() => cleanupTempState(state));
+    const running = await launchApp(state);
+    cleanup.push(async () => {
+      try {
+        await quitApp(running);
+      } catch {
+        /* noop */
+      }
+    });
+
+    const image = running.window.locator("[data-testid='splash-image']");
+    await expect(image).toBeAttached({ timeout: 5000 });
+    await expect
+      .poll(async () => (await image.getAttribute("src"))?.startsWith("data:image/png;base64,"), {
+        timeout: 5000,
+      })
+      .toBe(true);
+  });
+
   test("no splash when the startup splash setting is off", async () => {
     const state = baseSeed({ showLoadingFlair: 0 });
     cleanup.push(() => cleanupTempState(state));

@@ -630,7 +630,8 @@ function registerHandlers(): void {
   /**
    * The pack's startup splash image as a data URL, or null when the pack
    * ships none. Candidates mirror the legacy pack layout: the first existing
-   * resource/loading_splash.{png,gif,jpg,jpeg,bmp}.
+   * loading_splash.{png,gif,jpg,jpeg,bmp} at the pack root, then under
+   * resource/.
    */
   ipcMain.handle("pack:splashImage", async (): Promise<string | null> => {
     const packDir = currentPackDir();
@@ -643,10 +644,12 @@ function registerHandlers(): void {
       ".bmp": "image/bmp",
     };
     try {
-      for (const [ext, type] of Object.entries(mime)) {
-        const candidate = path.join(packDir, "resource", `loading_splash${ext}`);
-        if (fs.existsSync(candidate)) {
-          return `${type};base64,${fs.readFileSync(candidate).toString("base64")}`;
+      for (const dir of [packDir, path.join(packDir, "resource")]) {
+        for (const [ext, type] of Object.entries(mime)) {
+          const candidate = path.join(dir, `loading_splash${ext}`);
+          if (fs.existsSync(candidate)) {
+            return `${type};base64,${fs.readFileSync(candidate).toString("base64")}`;
+          }
         }
       }
       return null;
