@@ -30,6 +30,8 @@ export type SettingsValues = {
   vidMod: number;
   maxVideos: number;
   videoVolume: number;
+  videoLoopInf: number;
+  videoLoopCount: number;
   webMod: number;
   webPopup: number;
   promptMod: number;
@@ -132,6 +134,8 @@ const DEFAULT_SETTINGS: SettingsValues = {
   vidMod: 10,
   maxVideos: 10,
   videoVolume: 25,
+  videoLoopInf: 1,
+  videoLoopCount: 1,
   webMod: 0,
   webPopup: 0,
   promptMod: 0,
@@ -245,6 +249,8 @@ export interface SettingsStore {
   vidMod: number;
   maxVideos: number;
   videoVolume: number;
+  videoLoopInf: number;
+  videoLoopCount: number;
   webMod: number;
   webPopup: number;
   promptMod: number;
@@ -333,6 +339,8 @@ export interface SettingsStore {
   validationErrors: ValidationIssue[];
   // Methods
   load: () => Promise<SettingsValues>;
+  /** True once the on-disk settings have been read into the store. */
+  loaded: boolean;
   save: () => Promise<void>;
   setRaw: (values: Partial<Record<string, unknown>>) => void;
 }
@@ -348,6 +356,7 @@ export const useSettingsStore = create<SettingsStore>()(
         saveStatus: "idle",
         saveErrorMessage: null,
         dirty: false,
+        loaded: false,
         validationErrors: [],
 
         load: async (): Promise<SettingsValues> => {
@@ -358,14 +367,14 @@ export const useSettingsStore = create<SettingsStore>()(
               if (validationErrors.length > 0) {
                 logger.warn("[settingsStore] Validation issues on load:", validationErrors);
               }
-              set({ ...loaded, validationErrors, dirty: false } as Partial<SettingsStore>);
+              set({ ...loaded, validationErrors, dirty: false, loaded: true } as Partial<SettingsStore>);
               return { ...DEFAULT_SETTINGS, ...loaded } as SettingsValues;
             }
-            set({ dirty: false });
+            set({ dirty: false, loaded: true });
             return DEFAULT_SETTINGS;
           } catch (err) {
             logger.warn("[settingsStore] Failed to load settings, using defaults:", err);
-            set({ dirty: false });
+            set({ dirty: false, loaded: true });
             return DEFAULT_SETTINGS;
           }
         },
@@ -380,6 +389,7 @@ export const useSettingsStore = create<SettingsStore>()(
               key !== "saveStatus" &&
               key !== "saveErrorMessage" &&
               key !== "dirty" &&
+              key !== "loaded" &&
               key !== "validationErrors"
             ) {
               stateAsRecord[key] = val;
@@ -409,7 +419,17 @@ export const useSettingsStore = create<SettingsStore>()(
           set({ ...values, dirty: true });
         },
       }),
-      { name: "edgeware-settings", version: 1 }
+      {
+        name: "edgeware-settings",
+        version: 1,
+        partialize: (state) =>
+          Object.fromEntries(
+            Object.entries(state).filter(
+              ([key]) =>
+                !["saveStatus", "saveErrorMessage", "dirty", "loaded", "validationErrors"].includes(key)
+            )
+          ) as SettingsStore,
+      }
     ),
     { name: "SettingsStore" }
   )

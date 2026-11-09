@@ -63,6 +63,9 @@ test.describe("media blacklist (alt+click close moves the file out of the pack)"
       }
     });
 
+    // Pack info only appears once the persisted config (render mode, chances)
+    // has loaded — clicking Start before that races the async config hydrate.
+    await running.window.locator("[data-testid='pack-info']").waitFor({ timeout: 30000 });
     await running.window.locator("[data-testid='start-stop-button']").click();
 
     await expect
@@ -124,6 +127,7 @@ test.describe("media blacklist (alt+click close moves the file out of the pack)"
       }
     });
 
+    await running.window.locator("[data-testid='pack-info']").waitFor({ timeout: 30000 });
     await running.window.locator("[data-testid='start-stop-button']").click();
 
     await expect

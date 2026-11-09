@@ -1,6 +1,6 @@
-import { SimpleGrid } from "@mantine/core";
-import { IconPhoto } from "@tabler/icons-react";
-import { ConfigSlider } from "../../../Config";
+import { SimpleGrid, Stack } from "@mantine/core";
+import { IconPhoto, IconMovie } from "@tabler/icons-react";
+import { ConfigSlider, ConfigToggle } from "../../../Config";
 import { useSettingsStore } from "../../../../stores";
 import { SectionCard } from "../../../SectionCard";
 
@@ -15,8 +15,12 @@ export function PopupTypesPanel() {
   const subliminalsChance = useSettingsStore((s) => s.subliminalsChance);
   const denialChance = useSettingsStore((s) => s.denialChance);
   const notificationChance = useSettingsStore((s) => s.notificationChance);
+  const videoVolume = useSettingsStore((s) => s.videoVolume);
+  const videoLoopInf = useSettingsStore((s) => s.videoLoopInf);
+  const videoLoopCount = useSettingsStore((s) => s.videoLoopCount);
 
   return (
+    <Stack gap="lg">
     <SectionCard
       icon={<IconPhoto size={16} />}
       title="Popup Types - Chance Settings"
@@ -105,5 +109,40 @@ export function PopupTypesPanel() {
         />
       </SimpleGrid>
     </SectionCard>
+
+      <SectionCard
+        icon={<IconMovie size={16} />}
+        title="Video Loop"
+        description="How often video popups replay before closing."
+      >
+        <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="lg" verticalSpacing="lg">
+          <ConfigSlider
+            label="Video Volume"
+            value={videoVolume}
+            onChange={(val) => setRaw({ videoVolume: val })}
+            min={0}
+            max={100}
+            description="Playback volume for video popups"
+          />
+
+          <ConfigToggle
+            label="Loop Infinitely"
+            value={videoLoopInf}
+            onChange={(val) => setRaw({ videoLoopInf: val })}
+            description="Play videos on repeat until the popup closes another way"
+          />
+
+          <ConfigSlider
+            label="Play Count"
+            value={videoLoopCount}
+            onChange={(val) => setRaw({ videoLoopCount: Math.max(1, val) })}
+            min={1}
+            max={10}
+            disabled={videoLoopInf === 1}
+            description="Times the video plays before the popup closes (used when infinite looping is off)"
+          />
+        </SimpleGrid>
+      </SectionCard>
+    </Stack>
   );
 }

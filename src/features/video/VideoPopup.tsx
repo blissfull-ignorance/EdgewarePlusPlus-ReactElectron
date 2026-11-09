@@ -6,6 +6,7 @@ import { usePopupMovement } from "../../hooks/usePopupMovement";
 import { useRandomClicksToClose } from "../../hooks/useRandomClicksToClose";
 import { HypnoOverlay } from "../subliminal/HypnoOverlay";
 import { computeContainedFrame } from "../popup/mediaFrame";
+import { nextVideoAction, videoLoopAttribute } from "./loop";
 import { roll } from "../../utils/roll";
 
 export interface VideoPopupProps {
@@ -75,9 +76,22 @@ export function VideoPopup({
   }, []);
 
 
+  const playsRef = useRef(0);
+  const videoLoopInf = useSettingsStore((s) => s.videoLoopInf);
+  const videoLoopCount = useSettingsStore((s) => s.videoLoopCount);
+
   const handleEnded = useCallback(() => {
-    onClose?.();
-  }, [onClose]);
+    playsRef.current += 1;
+    if (nextVideoAction(playsRef.current, videoLoopInf, videoLoopCount) === "close") {
+      onClose?.();
+      return;
+    }
+    const el = videoRef.current;
+    if (el && videoLoopInf !== 1) {
+      el.currentTime = 0;
+      void el.play().catch(() => undefined);
+    }
+  }, [onClose, videoLoopInf, videoLoopCount]);
 
   const { currentPosition: videoPosition } = usePopupMovement({
     enabled: movingEnabled,
@@ -117,7 +131,7 @@ export function VideoPopup({
             ref={videoRef}
             src={videoUrl}
             autoPlay
-            loop
+            loop={videoLoopAttribute(videoLoopInf)}
             muted={false}
             onEnded={handleEnded}
             onLoadedMetadata={handleVideoLoad}

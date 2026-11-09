@@ -184,6 +184,22 @@ export async function launchApp(state: TempState, extraEnv: Record<string, strin
   const window = await app.firstWindow();
   await window.waitForLoadState("domcontentloaded");
   await expect(window.locator("[data-testid='metadata-panel']")).toBeVisible();
+  // Settings hydrate asynchronously; acting before that races persisted
+  // chances/render mode against defaults.
+  await expect
+    .poll(
+      async () =>
+        window.evaluate(
+          () =>
+            (
+              (window as unknown as {
+                __settingsStore?: { getState: () => { loaded?: boolean } };
+              }).__settingsStore?.getState().loaded ?? false
+            ) === true
+        ),
+      { timeout: 30000 }
+    )
+    .toBe(true);
   return { app, window, state };
 }
 
