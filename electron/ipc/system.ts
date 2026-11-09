@@ -1,7 +1,7 @@
 import { app, ipcMain, Tray, Menu, BrowserWindow, Notification, dialog, shell, nativeImage } from "electron";
 import fs from "fs";
 import path from "path";
-import { exec } from "child_process";
+import { execFile } from "child_process";
 import { promisify } from "util";
 import { logger } from "../utils/logger";
 import { skipHibernate } from "./hibernate";
@@ -18,7 +18,7 @@ import {
 } from "../utils/packImport";
 import type { PackListing } from "../../src/types/pack";
 
-const execAsync = promisify(exec);
+const execFileAsync = promisify(execFile);
 
 // System handler — OS-level operations (wallpaper, tray, packs, desktop icons)
 
@@ -128,7 +128,7 @@ oLink.Save
 `;
 
     fs.writeFileSync(vbsPath, vbsContent, "utf-8");
-    execAsync(`cscript //nologo "${vbsPath}"`)
+    execFileAsync("cscript", ["//nologo", vbsPath])
       .then(() => fs.unlinkSync(vbsPath))
       .catch(() => {});
     logger.info("[System] Desktop icon created (Windows)");

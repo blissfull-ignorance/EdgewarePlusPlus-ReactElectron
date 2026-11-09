@@ -26,6 +26,11 @@ function powerShellString(filepath: string): string {
   return filepath.replace(/'/g, "''");
 }
 
+/** Escape a value for embedding inside a QtScript/JS single-quoted string. */
+function qtScriptString(filepath: string): string {
+  return filepath.replace(/\\/g, "\\\\").replace(/'/g, "\\'");
+}
+
 function setWallpaperDarwin(filepath: string): Promise<void> {
   const script = `tell application "Finder" to set desktop picture to POSIX file "${appleScriptString(filepath)}"`;
   return execFileAsync("osascript", ["-e", script]).then(() => {}).catch((err) => {
@@ -53,7 +58,7 @@ function setWallpaperLinux(filepath: string): Promise<void> {
     const js =
       "var root = GetComponent('plasmashell').shell.coreShell; " +
       "var wallpaper = root.findObject('AllWidgets', 'Containment'); " +
-      `wallpaper.currentConfigGroup.writeEntry('Image', 'file://${filepath.replace(/'/g, "''")}')`;
+      `wallpaper.currentConfigGroup.writeEntry('Image', 'file://${qtScriptString(filepath)}')`;
     return execFileAsync("qdbus", [
       "org.kde.plasmashell",
       "/PlasmaShell",
