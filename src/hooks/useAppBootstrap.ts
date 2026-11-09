@@ -14,6 +14,9 @@ export function useAppBootstrap(isPopupRoute: boolean) {
     const init = async () => {
       await useSettingsStore.getState().load();
       if (isPopupRoute) return;
+      if (useSettingsStore.getState().desktopIcons === 1) {
+        void window.api?.system.createDesktopIcons({}).catch(() => undefined);
+      }
       await usePackDiscoveryStore.getState().refreshPacks();
     };
     init();

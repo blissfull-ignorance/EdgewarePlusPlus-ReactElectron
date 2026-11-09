@@ -137,6 +137,8 @@ export interface ElectronAPI {
   system: {
     /** Set desktop wallpaper to the given file path */
     setWallpaper: (filepath: string) => Promise<void>;
+    /** Exit the app once settings are saved (legacy run_on_save_quit). */
+    quit: () => Promise<void>;
     /** Create desktop shortcut icons */
     createDesktopIcons: (options: Record<string, unknown>) => Promise<void>;
     /** Create the system tray icon */

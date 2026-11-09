@@ -124,6 +124,7 @@ if (typeof window !== "undefined") {
     },
     system: {
       setWallpaper: vi.fn().mockResolvedValue(undefined),
+      quit: vi.fn().mockResolvedValue(undefined),
       createDesktopIcons: vi.fn().mockResolvedValue(undefined),
       createTray: vi.fn().mockResolvedValue(true),
       toggleRunAtStartup: vi.fn().mockResolvedValue(undefined),

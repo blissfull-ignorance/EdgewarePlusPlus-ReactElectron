@@ -62,6 +62,7 @@ if (typeof window !== "undefined" && !(window as unknown as Record<string, unkno
     },
     system: {
       setWallpaper: async () => undefined,
+      quit: async () => undefined,
       createDesktopIcons: async () => undefined,
       createTray: async () => true,
       toggleRunAtStartup: async () => undefined,

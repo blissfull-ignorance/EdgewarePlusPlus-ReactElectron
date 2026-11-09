@@ -13,6 +13,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { logger } from "../utils/logger";
+import { lowkeyPosition } from "../../src/features/popup/lowkeyPosition";
 
 // Registry of open popup windows, keyed by popup ID
 const popupWindows = new Map<string, BrowserWindow>();
@@ -57,29 +58,6 @@ function getPopupUrl(): string {
  */
 function getPrimaryMonitorBounds() {
   return screen.getPrimaryDisplay().bounds;
-}
-
-/**
- * Lowkey placement (legacy lowkey_mode): the popup hugs the corner chosen by
- * lowkey_corner — 0 top-right, 1 top-left, 2 bottom-left, 3 bottom-right,
- * 4 random. Returns null when lowkey mode is off.
- */
-export function lowkeyPosition(
-  corner: number,
-  bounds: { x: number; y: number; width: number; height: number },
-  winWidth: number,
-  winHeight: number,
-  rand: () => number = Math.random
-): { x: number; y: number } | null {
-  let c = Math.floor(corner);
-  if (c < 0 || c > 4) return null;
-  if (c === 4) c = Math.floor(rand() * 4);
-  const right = c === 0 || c === 3;
-  const bottom = c === 2 || c === 3;
-  return {
-    x: bounds.x + (right ? bounds.width - winWidth : 0),
-    y: bounds.y + (bottom ? bounds.height - winHeight : 0),
-  };
 }
 
 /** Read a raw numeric/boolean setting value from the persisted config. */

@@ -69,6 +69,7 @@ const electronAPI: ElectronAPI = {
   system: {
     setWallpaper: (filepath) =>
       ipcRenderer.invoke("system:setWallpaper", filepath),
+    quit: () => ipcRenderer.invoke("system:quit"),
     createDesktopIcons: (options) =>
       ipcRenderer.invoke("system:createDesktopIcons", options),
     createTray: () =>

@@ -18,6 +18,7 @@ import { collectCorruptionDangers, type DangerReport } from "../../features/corr
 import { CorruptionDangerModal } from "../../features/corruption/CorruptionDangerModal";
 import { useCorruptionRuntime } from "../../hooks/useCorruptionRuntime";
 import { useWallpaperRotation } from "../../hooks/useWallpaperRotation";
+import { toKeyboardCode } from "../../../electron/utils/panicKeys";
 import { useSchedule } from "../../hooks/useSchedule";
 import { DEFAULT_HYPNO_ASSET } from "../../features/popup/resolveMediaUrl";
 import { clearOpenPopups, canOpenPopup, registerOpenPopup } from "../../features/popup/openPopups";
@@ -197,6 +198,25 @@ export function MainAppPage() {
   }, []);
 
   const [dangerReport, setDangerReport] = useState<DangerReport | null>(null);
+
+  // Legacy panic_key: an in-window panic hotkey (needs app focus), separate
+  // from the globalPanicButton system hotkey handled in the main process.
+  const panicButton = useSettingsStore((s) => s.panicButton);
+  useEffect(() => {
+    const code = toKeyboardCode(panicButton);
+    if (!code) return;
+    const onKey = (e: Event) => {
+      const ke = e as { code?: string; target?: unknown };
+      if (ke.code !== code) return;
+      const t = ke.target as { tagName?: string; isContentEditable?: boolean } | null;
+      if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable === true)) {
+        return;
+      }
+      void window.api?.panic.trigger();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [panicButton]);
 
   useCorruptionRuntime(isRunning);
   useWallpaperRotation(isRunning);

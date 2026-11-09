@@ -180,6 +180,7 @@ export async function launchApp(page: Page, options: LaunchOptions = {}): Promis
         },
         system: {
           setWallpaper: async () => undefined,
+          quit: async () => undefined,
           createDesktopIcons: async () => undefined,
           createTray: async () => true,
           toggleRunAtStartup: async () => undefined,

@@ -114,7 +114,7 @@ export type SettingsValues = {
   [key: string]: unknown;
 } & { [key in never]: never };
 
-const DEFAULT_SETTINGS: SettingsValues = {
+export const DEFAULT_SETTINGS: SettingsValues = {
   packFolders: [],
   themeType: "Original",
   themeNoConfig: 0,
@@ -402,6 +402,11 @@ export const useSettingsStore = create<SettingsStore>()(
             // whenever settings land so globalPanicButton changes apply live.
             void window.api?.panic.refreshShortcut().catch(() => undefined);
             set({ saveStatus: "saved", dirty: false });
+            // Legacy run_on_save_quit: a pack (or the user) can arm the app to
+            // exit as soon as settings land on disk.
+            if (stateAsRecord.runOnSaveQuit === 1) {
+              void window.api?.system.quit().catch(() => undefined);
+            }
             setTimeout(() => {
               const current = useSettingsStore.getState().saveStatus;
               if (current === "saved") {
