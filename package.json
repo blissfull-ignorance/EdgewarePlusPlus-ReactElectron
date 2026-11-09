@@ -58,6 +58,11 @@
     "vite-plugin-electron-renderer": "^0.14.2",
     "vitest": "^3.0.8"
   },
+  "overrides": {
+    "@tabler/icons-react": {
+      "react": "^19.0.0"
+    }
+  },
   "build": {
     "appId": "com.edgewareplusplus.app",
     "productName": "Edgeware++",
