@@ -11,6 +11,7 @@ import { ImagePopup } from "../features/image/ImagePopup";
 import { VideoPopup } from "../features/video/VideoPopup";
 import { AudioPopup } from "../features/audio/AudioPopup";
 import { PromptDialog } from "../features/prompt/PromptDialog";
+import { SubliminalOverlay } from "../features/subliminal/SubliminalOverlay";
 import { resolvePackMediaUrl, type MediaDir } from "../features/popup/resolveMediaUrl";
 import { maybeOpenWebOnClose } from "../features/popup/webOnClose";
 import { unregisterOpenPopup } from "../features/popup/openPopups";
@@ -32,6 +33,11 @@ export function InAppPopupOverlay() {
     maybeOpenWebOnClose();
   };
 
+  const handleBlacklist = (id: string, mediaId: string) => {
+    void window.api?.pack.blacklist(mediaId);
+    handleClose(id);
+  };
+
   return (
     <div
       data-testid="in-app-popup-overlay"
@@ -48,6 +54,16 @@ export function InAppPopupOverlay() {
       {popups.map((popup) => {
         const dir = POPUP_DIR[popup.type];
         const mediaUrl = dir ? resolvePackMediaUrl(popup.mediaId, dir) : popup.mediaId;
+
+        if (popup.type === "caption") {
+          return (
+            <SubliminalOverlay
+              key={popup.id}
+              text={popup.mediaId}
+              onClose={() => handleClose(popup.id)}
+            />
+          );
+        }
 
         if (popup.type === "audio") {
           return (
@@ -81,6 +97,7 @@ export function InAppPopupOverlay() {
               <ImagePopup
                 imageUrl={mediaUrl}
                 onClose={() => handleClose(popup.id)}
+                onBlacklist={() => handleBlacklist(popup.id, popup.mediaId)}
                 mediaWidth={popup.position.width}
                 mediaHeight={popup.position.height}
                 hypnoGif={popup.hypnoGif}
@@ -90,6 +107,7 @@ export function InAppPopupOverlay() {
               <VideoPopup
                 videoUrl={mediaUrl}
                 onClose={() => handleClose(popup.id)}
+                onBlacklist={() => handleBlacklist(popup.id, popup.mediaId)}
                 mediaWidth={popup.position.width}
                 mediaHeight={popup.position.height}
                 hypnoGif={popup.hypnoGif}

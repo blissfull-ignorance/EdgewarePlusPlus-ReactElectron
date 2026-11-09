@@ -14,6 +14,12 @@ import { useCloseLabel } from "../../hooks/useCloseLabel";
 export interface PopupShellProps {
   opacity?: number;
   onClose?: () => void;
+  /**
+   * Called instead of onClose when the closing click is made with Alt held:
+   * the media behind the popup is blacklisted (moved out of the pack) as it
+   * closes. Only provided for popups that show a pack media file.
+   */
+  onBlacklist?: () => void;
   clicksToClose?: number;
   clickthroughEnabled?: boolean;
   timeoutMs?: number;
@@ -24,6 +30,7 @@ export interface PopupShellProps {
 export function PopupShell({
   opacity = 1,
   onClose,
+  onBlacklist,
   clicksToClose = 0,
   clickthroughEnabled = false,
   timeoutMs = 0,
@@ -44,6 +51,15 @@ export function PopupShell({
 
   const handleClose = useCallback(() => {
     closeHandlerRef.current?.();
+  }, []);
+
+  const blacklistRef = useRef(onBlacklist);
+  blacklistRef.current = onBlacklist;
+
+  /** Closing interaction with Alt held blacklists the media when supported. */
+  const finishClose = useCallback((altKey: boolean) => {
+    if (altKey && blacklistRef.current) blacklistRef.current();
+    else closeHandlerRef.current?.();
   }, []);
 
   useEffect(() => {
@@ -116,15 +132,15 @@ export function PopupShell({
         const newRemaining = remainingClicks - 1;
         setRemainingClicks(newRemaining);
         if (newRemaining <= 0) {
-          handleClose();
+          finishClose(e.altKey);
         }
       } else {
-        handleClose();
+        finishClose(e.altKey);
       }
 
       e.stopPropagation();
     },
-    [clicksToClose, remainingClicks, clickthroughEnabled, handleClose]
+    [clicksToClose, remainingClicks, clickthroughEnabled, finishClose]
   );
 
   return (
@@ -180,7 +196,7 @@ export function PopupShell({
             data-testid="close-button"
             onClick={(e) => {
               e.stopPropagation();
-              handleClose();
+              finishClose(e.altKey);
             }}
             style={{
               position: "absolute",

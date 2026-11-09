@@ -3,8 +3,8 @@ import { useSettingsStore } from "../stores/settingsStore";
 import { useAppStore } from "../stores/appStore";
 import { roll } from "../utils/roll";
 
-// "caption" and "subliminal" remain in the union so persisted settings and
-// mood data still parse; they are never rolled as spawn types.
+// "subliminal" remains in the union so persisted settings and mood data still
+// parse; it is never rolled — "caption" is the text popup spawn instead.
 export type PopupType = "image" | "video" | "audio" | "prompt" | "caption" | "subliminal" | "web";
 
 export interface RollTarget {
@@ -13,10 +13,11 @@ export interface RollTarget {
 }
 
 /**
- * The popup "types" that can fire as standalone spawns. "subliminal" (hypno) is NOT
- * here anymore — it's an overlay rendered on top of image/video pops, driven
- * independently by `subliminalsChance` in the dispatch layer, so spirals actually
- * sit over other media instead of competing for a single spawn slot.
+ * The popup "types" that can fire as standalone spawns. "caption" is the
+ * legacy subliminal text popup (capPop* settings, no media). "subliminal"
+ * (hypno) is NOT here — it's an overlay rendered on top of image/video pops,
+ * driven independently by `subliminalsChance` in the dispatch layer, so
+ * spirals actually sit over other media instead of competing for a spawn slot.
  */
 function buildRollTargets(settings: ReturnType<typeof useSettingsStore.getState>): RollTarget[] {
   return [

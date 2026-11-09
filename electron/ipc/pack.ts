@@ -1,8 +1,10 @@
-import { app } from "electron";
+import { app, Notification } from "electron";
 import fs from "node:fs";
 import path from "node:path";
 import { ipcMain } from "electron";
 import { logger } from "../utils/logger";
+import { pickSubliminalText } from "../utils/textPool";
+import { resolveBlacklistSource, computeBlacklistTarget } from "../utils/blacklist";
 
 import { Index, Mood, Web, DEFAULT_INDEX } from "../../src/types/pack";
 
@@ -499,6 +501,61 @@ function registerHandlers(): void {
       return null;
     }
   });
+
+  /**
+   * A random subliminal text for the legacy text popup, or null.
+   * Pool: pack `subliminals` lists (default + moods), falling back to
+   * `captions` — mirrors legacy pack.random_subliminal().
+   */
+  ipcMain.handle("pack:randomSubliminalText", async (): Promise<string | null> => {
+    const packDir = currentPackDir();
+    if (!packDir) return null;
+    try {
+      return pickSubliminalText(loadPackIndex(packDir));
+    } catch (err) {
+      logger.error("[Pack] Failed to read random subliminal text:", err);
+      return null;
+    }
+  });
+
+  /**
+   * Move one pack media file into the blacklist so it can never spawn again,
+   * then confirm with a desktop notification (legacy alt+click close behavior).
+   * The file is located strictly inside the active pack's img/vid/aud dirs.
+   */
+  ipcMain.handle(
+    "pack:blacklistMedia",
+    async (
+      _event,
+      fileName: string
+    ): Promise<{ ok: boolean; movedTo?: string; reason?: string }> => {
+      const packDir = currentPackDir();
+      if (!packDir) return { ok: false, reason: "no active pack" };
+      const source = resolveBlacklistSource(packDir, String(fileName ?? ""));
+      if (!source) return { ok: false, reason: "file not found in pack" };
+
+      try {
+        const info = readJson<{ name?: unknown }>(path.join(packDir, "info.json"));
+        const packName =
+          typeof info?.name === "string" && info.name.trim()
+            ? info.name
+            : path.basename(packDir);
+        const fileName = path.basename(source.src);
+        const target = computeBlacklistTarget(dataDir(), packName, fileName);
+        fs.mkdirSync(path.dirname(target), { recursive: true });
+        fs.renameSync(source.src, target);
+        new Notification({
+          title: packName,
+          body: `${fileName} has been successfully sent to blacklist`,
+        }).show();
+        logger.info(`[Pack] Blacklisted ${fileName} → ${target}`);
+        return { ok: true, movedTo: target };
+      } catch (err) {
+        logger.error("[Pack] Failed to blacklist media:", err);
+        return { ok: false, reason: "move failed" };
+      }
+    }
+  );
 }
 
 export { registerHandlers };

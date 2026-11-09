@@ -11,6 +11,8 @@ import { roll } from "../../utils/roll";
 export interface VideoPopupProps {
   videoUrl: string;
   onClose?: () => void;
+  /** Alt+close handler: blacklist the shown pack file. */
+  onBlacklist?: () => void;
   mediaWidth?: number;
   mediaHeight?: number;
   /** Optional spiral GIF to lay over the video. */
@@ -20,6 +22,7 @@ export interface VideoPopupProps {
 export function VideoPopup({
   videoUrl,
   onClose,
+  onBlacklist,
   mediaWidth = 640,
   mediaHeight = 480,
   hypnoGif,
@@ -86,6 +89,7 @@ export function VideoPopup({
   return (
     <PopupShell
       onClose={onClose}
+      onBlacklist={onBlacklist}
       buttonless={buttonless > 0}
       clicksToClose={clicksToClose}
       clickthroughEnabled={clickthrough > 0}

@@ -45,8 +45,9 @@ export async function selectMedia(type: PopupType): Promise<SelectedMedia | null
       if (!url) logger.warn(`[selectMedia] web roll passed but the pack defines no web urls`);
       return url ? { url, mediaType: "web" } : null;
     }
-    // Hypno is an overlay, not a popup: these types never spawn and resolve to
-    // null until the PopupType unions are cleaned up.
+    // "caption" is dispatched as a text popup before media selection ever runs;
+    // "subliminal" is unreachable (hypno is an overlay, not a popup). Both
+    // resolve to null here as a guard.
     case "caption":
     case "subliminal":
       return null;

@@ -79,6 +79,10 @@ export interface ElectronAPI {
     randomWeb: () => Promise<string | null>;
     /** A random spiral/hypno GIF filename from the pack's `hypno/` dir, or null. */
     randomHypnoGif: () => Promise<string | null>;
+    /** A random subliminal text (subliminals lists, falling back to captions), or null. */
+    randomSubliminalText: () => Promise<string | null>;
+    /** Move a pack media file into the blacklist so it never spawns again. */
+    blacklist: (fileName: string) => Promise<{ ok: boolean; movedTo?: string; reason?: string }>;
   };
   corruption: {
     /** Get the current corruption (guided mode) level number */

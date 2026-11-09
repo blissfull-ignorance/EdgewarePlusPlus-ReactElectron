@@ -59,14 +59,23 @@ function createPopupWindow(
   const defaultWidth = 400;
   const defaultHeight = 300;
 
-  const x = Math.floor(Math.random() * Math.max(0, bounds.width - defaultWidth));
-  const y = Math.floor(Math.random() * Math.max(0, bounds.height - defaultHeight));
+  // The subliminal text popup is large and centered (legacy: label-sized box
+  // at monitor center with wrap at monitor/1.5); media pops get a random spot.
+  const isSubliminal = type === "subliminal";
+  const width = isSubliminal ? Math.floor(bounds.width * 0.66) : defaultWidth;
+  const height = isSubliminal ? Math.floor(bounds.height * 0.5) : defaultHeight;
+  const x = isSubliminal
+    ? Math.floor(bounds.x + (bounds.width - width) / 2)
+    : Math.floor(Math.random() * Math.max(0, bounds.width - defaultWidth));
+  const y = isSubliminal
+    ? Math.floor(bounds.y + (bounds.height - height) / 2)
+    : Math.floor(Math.random() * Math.max(0, bounds.height - defaultHeight));
 
   const popupWin = new BrowserWindow({
     x,
     y,
-    width: defaultWidth,
-    height: defaultHeight,
+    width,
+    height,
     frame: false,
     transparent: true,
     backgroundColor: "#00000000",
