@@ -12,6 +12,8 @@ export interface ImagePopupProps {
   imageUrl: string;
   caption?: string;
   onClose?: () => void;
+  /** Alt+close handler: blacklist the shown pack file. */
+  onBlacklist?: () => void;
   mediaWidth?: number;
   mediaHeight?: number;
   /** Optional spiral GIF to lay over the image. */
@@ -22,6 +24,7 @@ export function ImagePopup({
   imageUrl,
   caption,
   onClose,
+  onBlacklist,
   mediaWidth = 640,
   mediaHeight = 480,
   hypnoGif,
@@ -79,6 +82,7 @@ export function ImagePopup({
   return (
     <PopupShell
       onClose={onClose}
+      onBlacklist={onBlacklist}
       buttonless={buttonless > 0}
       clicksToClose={clicksToClose}
       clickthroughEnabled={clickthrough > 0}

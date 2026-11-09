@@ -31,7 +31,7 @@ export function MainAppPage() {
   const addInAppPopup = useCallback(
     (media: {
       mediaId: string;
-      mediaType: "image" | "video" | "audio" | "prompt";
+      mediaType: "image" | "video" | "audio" | "prompt" | "caption";
       hypnoGif?: string;
     }) => {
       const id = usePopupOverlayStore.getState().addPopup({ type: media.mediaType, mediaId: media.mediaId, hypnoGif: media.hypnoGif });
@@ -83,13 +83,40 @@ export function MainAppPage() {
     [spawnPopup, addInAppPopup]
   );
 
+  const spawnTextPopup = useCallback(async () => {
+    if (!useAppStore.getState().isRunning) return;
+    let text: string | null = null;
+    try {
+      text = (await window.api?.pack.randomSubliminalText()) ?? null;
+    } catch (err) {
+      logger.error("[MainAppPage] Failed to pick subliminal text:", err);
+      return;
+    }
+    if (!text) {
+      logger.warn("[MainAppPage] caption pop skipped: pack defines no subliminal or caption text");
+      return;
+    }
+    const limits = useSettingsStore.getState();
+    const id =
+      limits.popupRenderMode === "electron"
+        ? await spawnPopup("subliminal", text)
+        : addInAppPopup({ mediaId: text, mediaType: "caption" });
+    if (id) registerOpenPopup(id, "caption");
+  }, [spawnPopup, addInAppPopup]);
+
   const onSpawn = useCallback(
     (type: PopupType) => {
+      // The legacy subliminal popup carries text, not media: it bypasses
+      // media selection and the per-type media caps entirely.
+      if (type === "caption") {
+        void spawnTextPopup();
+        return;
+      }
       selectMedia(type)
         .then(dispatchMedia)
         .catch((err) => logger.error("[MainAppPage] Failed to select popup media:", err));
     },
-    [dispatchMedia]
+    [dispatchMedia, spawnTextPopup]
   );
 
   useRoll({ onSpawn });

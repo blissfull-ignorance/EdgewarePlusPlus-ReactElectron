@@ -13,6 +13,8 @@ const electronAPI: ElectronAPI = {
     randomPrompt: () => ipcRenderer.invoke("pack:randomPrompt"),
     randomWeb: () => ipcRenderer.invoke("pack:randomWeb"),
     randomHypnoGif: () => ipcRenderer.invoke("pack:randomHypnoGif"),
+    randomSubliminalText: () => ipcRenderer.invoke("pack:randomSubliminalText"),
+    blacklist: (fileName) => ipcRenderer.invoke("pack:blacklistMedia", fileName),
   },
   corruption: {
     getCurrentLevel: () => ipcRenderer.invoke("corruption:getCurrentLevel"),

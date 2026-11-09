@@ -146,7 +146,10 @@ export function createTempState(opts: CreateTempStateOptions = {}): TempState {
 }
 
 export function cleanupTempState(state: TempState | null): void {
-  if (state) rmSync(state.dir, { recursive: true, force: true });
+  if (!state) return;
+  // The app may still be flushing logs when cleanup runs; retry so a
+  // transient ENOTEMPTY/EBUSY does not fail an otherwise green test.
+  rmSync(state.dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 250 });
 }
 
 export function seedConfig(state: TempState, settings: Record<string, unknown>): string {

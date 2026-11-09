@@ -75,6 +75,8 @@ if (typeof window !== "undefined") {
       randomPrompt: vi.fn().mockResolvedValue(null),
       randomWeb: vi.fn().mockResolvedValue(null),
       randomHypnoGif: vi.fn().mockResolvedValue(null),
+      randomSubliminalText: vi.fn().mockResolvedValue(null),
+      blacklist: vi.fn().mockResolvedValue({ ok: true }),
     },
     corruption: {
       getCurrentLevel: vi.fn().mockResolvedValue(0),
