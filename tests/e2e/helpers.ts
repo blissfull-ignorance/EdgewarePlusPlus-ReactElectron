@@ -194,6 +194,7 @@ export async function launchApp(page: Page, options: LaunchOptions = {}): Promis
             error: "Pack folders can only be added inside the Electron app.",
           }),
           openPackLibrary: async () => undefined,
+          openExternal: async () => true,
           onImportProgress: () => () => undefined,
           getPathForFile: () => null,
           loadSettings: async () => {

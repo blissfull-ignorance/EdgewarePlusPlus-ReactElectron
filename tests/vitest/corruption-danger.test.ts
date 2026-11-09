@@ -49,7 +49,8 @@ describe("collectCorruptionDangers", () => {
     expect(report.groups[0].warnings[0]).toBe("delay");
   });
 
-  it("covers the twelve legacy danger registry entries", () => {
-    expect(Object.keys(DANGER_REGISTRY)).toHaveLength(12);
+  it("covers the twelve legacy danger entries plus the legacy key spelling", () => {
+    expect(Object.keys(DANGER_REGISTRY)).toHaveLength(13);
+    expect(DANGER_REGISTRY.start_on_logon.level).toBe("MAJOR");
   });
 });

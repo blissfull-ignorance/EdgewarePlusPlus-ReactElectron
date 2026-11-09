@@ -37,6 +37,13 @@ export const DANGER_REGISTRY: Record<string, DangerRule> = {
     check: isOn,
     warning: "Launch on PC Startup is enabled! This will run Edgeware when you start your computer!",
   },
+  // The legacy item registry stores this key as "start_on_logon"; packs may
+  // use either spelling.
+  start_on_logon: {
+    level: "MAJOR",
+    check: isOn,
+    warning: "Launch on PC Startup is enabled! This will run Edgeware when you start your computer!",
+  },
   timerMode: {
     level: "MEDIUM",
     check: isOn,
