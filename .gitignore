@@ -181,3 +181,21 @@ edgeware/data/presets/*
 ruffruff.bat
 
 *.zip
+
+# --- Web app (React + Vite + Electron) ---
+node_modules/
+dist-electron/
+release/
+.vite/
+test-results/
+playwright-report/
+coverage/
+
+# --- Local development workspace (never pushed) ---
+work/
+
+# --- OS cruft ---
+.DS_Store
+
+# User-installed content packs (local media, never committed)
+packs/
