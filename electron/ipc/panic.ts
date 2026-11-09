@@ -75,21 +75,13 @@ function lockoutActive(): boolean {
   return isLockoutActive({ enabled: cfg.timerMode === 1, until: lockoutUntil, now: Date.now() });
 }
 
-function panicWallpaperPath(): string {
-  return path.join(app.getAppPath(), "dist", "panic_wallpaper.jpg");
-}
-
 async function doPanic(): Promise<void> {
   if (process.env.EDGWARE_PANIC_SKIP_WALLPAPER !== "1") {
-    const wallpaper = panicWallpaperPath();
-    if (fs.existsSync(wallpaper)) {
-      try {
-        await setWallpaper(wallpaper);
-      } catch (err) {
-        logger.error("[Panic] Failed to set panic wallpaper:", err);
-      }
-    } else {
-      logger.error(`[Panic] Panic wallpaper asset missing: ${wallpaper}`);
+    try {
+      const realPath = materializePanicWallpaper();
+      if (realPath) await setWallpaper(realPath);
+    } catch (err) {
+      logger.error("[Panic] Failed to set panic wallpaper:", err);
     }
   }
   closeAllPopups();
@@ -98,6 +90,28 @@ async function doPanic(): Promise<void> {
   // a graceful quit can be held open by a window created mid-teardown. The
   // legacy panic destroys the Tk root outright — same certainty here.
   app.exit(0);
+}
+
+/**
+ * Copy the bundled panic wallpaper out of the app bundle to a real
+ * filesystem path. Packaged builds keep it inside app.asar, which the
+ * osascript/PowerShell/feh wallpaper commands cannot read.
+ */
+function materializePanicWallpaper(): string | null {
+  const bundled = path.join(app.getAppPath(), "dist", "panic_wallpaper.jpg");
+  if (!fs.existsSync(bundled)) {
+    logger.error(`[Panic] Panic wallpaper asset missing: ${bundled}`);
+    return null;
+  }
+  const target = path.join(app.getPath("userData"), "panic_wallpaper.jpg");
+  try {
+    fs.mkdirSync(path.dirname(target), { recursive: true });
+    fs.copyFileSync(bundled, target);
+    return target;
+  } catch (err) {
+    logger.error("[Panic] Failed to stage panic wallpaper:", err);
+    return fs.existsSync(bundled) && !app.isPackaged ? bundled : null;
+  }
 }
 
 function trigger(opts: { respectDisabled?: boolean } = {}): PanicResult {

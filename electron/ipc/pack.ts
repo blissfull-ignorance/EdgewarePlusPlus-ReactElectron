@@ -576,7 +576,15 @@ function registerHandlers(): void {
         const fileName = path.basename(source.src);
         const target = computeBlacklistTarget(dataDir(), packName, fileName);
         fs.mkdirSync(path.dirname(target), { recursive: true });
-        fs.renameSync(source.src, target);
+        try {
+          fs.renameSync(source.src, target);
+        } catch (moveErr) {
+          // Packs may live on another volume than the user data dir; rename
+          // cannot cross devices, so fall back to copy+delete.
+          if ((moveErr as NodeJS.ErrnoException).code !== "EXDEV") throw moveErr;
+          fs.copyFileSync(source.src, target);
+          fs.rmSync(source.src);
+        }
         new Notification({
           title: packName,
           body: `${fileName} has been successfully sent to blacklist`,
