@@ -1,0 +1,14 @@
+{"prefix": ["low", "medium", "high", "guitar", "pyramid"],
+  "prefix_settings": {
+      "guitar": {
+          "chance": 50,
+          "max": 5
+      }
+  },
+   "default": ["default caption. no mood associated."],
+   "subtext": "Click to close!",
+   "low": ["capmood: \"low\"- c1,2"],
+   "medium": ["capmood: \"medium\"- c2,3,4"],
+   "high": ["capmood: \"high\"- c4,5"],
+   "guitar": ["capmood: \"guitar\"- c2,3,4"],
+   "pyramid": ["capmood: \"pyramid\"- c1,2,3"]}
