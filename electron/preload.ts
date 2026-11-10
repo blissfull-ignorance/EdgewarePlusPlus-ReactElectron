@@ -15,6 +15,10 @@ const electronAPI: ElectronAPI = {
     randomHypnoGif: () => ipcRenderer.invoke("pack:randomHypnoGif"),
     randomSubliminalText: () => ipcRenderer.invoke("pack:randomSubliminalText"),
     randomNotificationText: () => ipcRenderer.invoke("pack:randomNotificationText"),
+    setActiveMoods: (moods) => ipcRenderer.invoke("pack:setActiveMoods", moods),
+    listMoods: () => ipcRenderer.invoke("pack:listMoods"),
+    loadPackConfig: () => ipcRenderer.invoke("pack:loadPackConfig"),
+    hasScript: () => ipcRenderer.invoke("pack:hasScript"),
     splashImage: () => ipcRenderer.invoke("pack:splashImage"),
     iconImage: () => ipcRenderer.invoke("pack:iconImage"),
     blacklist: (fileName) => ipcRenderer.invoke("pack:blacklistMedia", fileName),
@@ -48,6 +52,9 @@ const electronAPI: ElectronAPI = {
     create: (type, mediaId, hypnoGif) => ipcRenderer.invoke("popup:create", type, mediaId, hypnoGif),
     closePopup: (id) => ipcRenderer.invoke("popup:closePopup", id),
     closeAll: () => ipcRenderer.invoke("popup:closeAll"),
+    sizeToMedia: (id, mediaWidth, mediaHeight, lowkey) =>
+      ipcRenderer.invoke("popup:sizeToMedia", id, mediaWidth, mediaHeight, lowkey),
+    startMoving: (id) => ipcRenderer.invoke("popup:startMoving", id),
     onClosed: (callback: (id: string) => void) => {
       const handler = (_event: IpcRendererEvent, id: string) => callback(id);
       ipcRenderer.on("popup:closed", handler);
@@ -63,6 +70,7 @@ const electronAPI: ElectronAPI = {
   },
   scripting: {
     runLua: (scriptName) => ipcRenderer.invoke("scripting:runLua", scriptName),
+    runSelfTest: () => ipcRenderer.invoke("scripting:runSelfTest"),
     injectCorruptionLevel: (level) =>
       ipcRenderer.invoke("scripting:injectCorruptionLevel", level),
   },

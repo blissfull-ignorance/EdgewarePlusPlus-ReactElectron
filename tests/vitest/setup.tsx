@@ -79,6 +79,10 @@ if (typeof window !== "undefined") {
       randomNotificationText: vi.fn().mockResolvedValue(null),
       splashImage: vi.fn().mockResolvedValue(null),
       iconImage: vi.fn().mockResolvedValue(null),
+      setActiveMoods: vi.fn().mockResolvedValue(undefined),
+      listMoods: vi.fn().mockResolvedValue([]),
+      loadPackConfig: vi.fn().mockResolvedValue(null),
+      hasScript: vi.fn().mockResolvedValue(false),
       blacklist: vi.fn().mockResolvedValue({ ok: true }),
       loadCorruption: vi.fn().mockResolvedValue(null),
       discord: vi.fn().mockResolvedValue(null),
@@ -107,6 +111,8 @@ if (typeof window !== "undefined") {
       ),
       closePopup: vi.fn().mockResolvedValue(undefined),
       closeAll: vi.fn().mockResolvedValue(undefined),
+      sizeToMedia: vi.fn().mockResolvedValue({ width: 400, height: 300 }),
+      startMoving: vi.fn().mockResolvedValue(true),
       onClosed: vi.fn().mockImplementation((callback: (id: string) => void) => {
         (window as unknown as Record<string, unknown>).__onPopupClosed = callback;
         return () => {
@@ -120,6 +126,7 @@ if (typeof window !== "undefined") {
     },
     scripting: {
       runLua: vi.fn().mockResolvedValue(false),
+      runSelfTest: vi.fn().mockResolvedValue({ ok: false }),
       injectCorruptionLevel: vi.fn().mockResolvedValue(false),
     },
     system: {

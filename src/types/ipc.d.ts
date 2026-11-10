@@ -83,6 +83,14 @@ export interface ElectronAPI {
     randomSubliminalText: () => Promise<string | null>;
     /** A random notification text (notifications lists, falling back to captions), or null. */
     randomNotificationText: () => Promise<string | null>;
+    /** Mirror the renderer's active corruption moods into the main process. */
+    setActiveMoods: (moods: string[]) => Promise<void>;
+    /** The active pack's mood catalogue (name + content counts). */
+    listMoods: () => Promise<Array<{ name: string; mediaCount: number; captionCount: number }>>;
+    /** The pack's suggested configuration (config.json preset), or null. */
+    loadPackConfig: () => Promise<Record<string, unknown> | null>;
+    /** Whether the active pack ships a script.lua. */
+    hasScript: () => Promise<boolean>;
     /** The pack's startup splash image as a data URL, or null when the pack ships none. */
     splashImage: () => Promise<string | null>;
     /** The app icon (pack icon or bundled default) as a data URL, or null. */
@@ -119,6 +127,15 @@ export interface ElectronAPI {
     closePopup: (id: string) => Promise<void>;
     /** Close all open popup windows */
     closeAll: () => Promise<void>;
+    /** Resize a popup window to fit its media (legacy 30–70% of screen) */
+    sizeToMedia: (
+      id: string,
+      mediaWidth: number,
+      mediaHeight: number,
+      lowkey?: boolean
+    ) => Promise<{ width: number; height: number } | null>;
+    /** Start moving a popup window across its display, bouncing off edges */
+    startMoving: (id: string) => Promise<boolean>;
     /** Subscribe to popup close events. Returns an unsubscribe function. */
     onClosed: (callback: (id: string) => void) => () => void;
   };
@@ -131,6 +148,8 @@ export interface ElectronAPI {
   scripting: {
     /** Execute a Lua script from the pack and return success/failure */
     runLua: (scriptName: string) => Promise<boolean>;
+    /** Run the bundled edgeware_v0 API self-test (visible popups + transitions) */
+    runSelfTest: () => Promise<{ ok: boolean; error?: string }>;
     /** Inject a corruption level into the running Lua VM (fires transition callbacks) */
     injectCorruptionLevel: (level: number) => Promise<boolean>;
   };

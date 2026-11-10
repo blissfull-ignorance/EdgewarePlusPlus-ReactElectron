@@ -142,6 +142,10 @@ export async function launchApp(page: Page, options: LaunchOptions = {}): Promis
           randomNotificationText: async () => null,
           splashImage: async () => null,
           iconImage: async () => null,
+          setActiveMoods: async () => undefined,
+          listMoods: async () => [],
+          loadPackConfig: async () => null,
+          hasScript: async () => false,
           blacklist: async () => ({ ok: true }),
           loadCorruption: async () => null,
           discord: async () => null,
@@ -168,6 +172,8 @@ export async function launchApp(page: Page, options: LaunchOptions = {}): Promis
           create: async (_type: string, _mediaId: string) => ({ id: `popup-${Date.now()}` }),
           closePopup: async () => undefined,
           closeAll: async () => undefined,
+          sizeToMedia: async () => ({ width: 400, height: 300 }),
+          startMoving: async () => true,
           onClosed: () => () => {},
         },
         hibernate: {
@@ -176,6 +182,7 @@ export async function launchApp(page: Page, options: LaunchOptions = {}): Promis
         },
         scripting: {
           runLua: async () => false,
+          runSelfTest: async () => ({ ok: false, error: 'mock bridge' }),
           injectCorruptionLevel: async () => false,
         },
         system: {

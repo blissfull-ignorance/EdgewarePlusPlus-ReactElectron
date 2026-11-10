@@ -24,6 +24,10 @@ if (typeof window !== "undefined" && !(window as unknown as Record<string, unkno
       randomNotificationText: async () => null,
       splashImage: async () => null,
       iconImage: async () => null,
+      setActiveMoods: async () => undefined,
+      listMoods: async () => [],
+      loadPackConfig: async () => null,
+      hasScript: async () => false,
       blacklist: async () => ({ ok: true }),
       loadCorruption: async () => null,
       discord: async () => null,
@@ -50,6 +54,8 @@ if (typeof window !== "undefined" && !(window as unknown as Record<string, unkno
       create: async (_type: string, _mediaId: string, _hypnoGif?: string) => ({ id: `popup-${Date.now()}` }),
       closePopup: async () => undefined,
       closeAll: async () => undefined,
+      sizeToMedia: async (_id: string, _w: number, _h: number, _lowkey?: boolean) => ({ width: 400, height: 300 }),
+      startMoving: async () => true,
       onClosed: () => () => {},
     },
     hibernate: {
@@ -58,6 +64,7 @@ if (typeof window !== "undefined" && !(window as unknown as Record<string, unkno
     },
     scripting: {
       runLua: async () => false,
+      runSelfTest: async () => ({ ok: false, error: 'no lua host in this mode' }),
       injectCorruptionLevel: async () => false,
     },
     system: {
