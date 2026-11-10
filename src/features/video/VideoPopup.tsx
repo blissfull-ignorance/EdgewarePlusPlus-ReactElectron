@@ -90,7 +90,11 @@ export function VideoPopup({
     const el = videoRef.current;
     if (el && videoLoopInf !== 1) {
       el.currentTime = 0;
-      void el.play().catch(() => undefined);
+      try {
+        void el.play().catch(() => undefined);
+      } catch {
+        /* environments without media playback (jsdom) */
+      }
     }
   }, [onClose, videoLoopInf, videoLoopCount]);
 
