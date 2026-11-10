@@ -178,6 +178,39 @@ function registerHandlers(): void {
     return true;
   });
 
+  /**
+   * Run the bundled edgeware_v0 API self-test: spawns visible popups and
+   * corruption transitions so the scripting surface can be verified by hand
+   * from Settings → Troubleshooting. Restarts the Lua session.
+   */
+  ipcMain.handle("scripting:runSelfTest", async (): Promise<{ ok: boolean; error?: string }> => {
+    const candidates = [
+      path.join(__dirname, "../dist/lua/edgeware-api-test.lua"),
+      path.join(__dirname, "../../public/lua/edgeware-api-test.lua"),
+    ];
+    const scriptPath = candidates.find((c) => fs.existsSync(c));
+    if (!scriptPath) {
+      return { ok: false, error: "Bundled self-test script is missing from the app package." };
+    }
+    let scriptContent: string;
+    try {
+      scriptContent = fs.readFileSync(scriptPath, "utf-8");
+    } catch (err) {
+      logger.error(`[Scripting] Failed to read self-test script: ${err}`);
+      return { ok: false, error: `Could not read the self-test script: ${String(err)}` };
+    }
+
+    const vm = initLuaVM();
+    vm.setHost(buildEdgewareHost());
+    const result: LuaExecResult = vm.exec(scriptContent);
+    if (!result.success) {
+      logger.error(`[Scripting] Self-test execution error: ${result.error}`);
+      return { ok: false, error: result.error ?? "Lua execution error" };
+    }
+    logger.info("[Scripting] Self-test script started");
+    return { ok: true };
+  });
+
   ipcMain.handle("scripting:injectCorruptionLevel", async (_event, level: number): Promise<boolean> => {
     const vm = getLuaVM();
     if (!vm) {

@@ -1,5 +1,6 @@
-import { SimpleGrid } from "@mantine/core";
+import { Button, Group, SimpleGrid, Stack, Text } from "@mantine/core";
 import { IconBulb } from "@tabler/icons-react";
+import { useCallback, useState } from "react";
 import { ConfigField, ConfigToggle } from "../../../Config";
 import { useSettingsStore } from "../../../../stores";
 import { SectionCard } from "../../../SectionCard";
@@ -67,6 +68,68 @@ export function TroubleshootingPanel() {
           description="Hotkey to panic (close) application"
         />
       </SimpleGrid>
+
+      <LuaSelfTestCard />
     </SectionCard>
+  );
+}
+
+/**
+ * Runs the bundled edgeware_v0 API self-test in the main-process Lua VM: it
+ * spawns visible popups and corruption transitions so the scripting surface
+ * can be verified without shipping a test pack. Restarts the Lua session.
+ */
+function LuaSelfTestCard() {
+  const [status, setStatus] = useState<"idle" | "running" | "passed" | "failed">("idle");
+  const [error, setError] = useState<string | null>(null);
+
+  const run = useCallback(() => {
+    setStatus("running");
+    setError(null);
+    void window.api?.scripting
+      .runSelfTest()
+      .then((res) => {
+        if (res.ok) {
+          setStatus("passed");
+        } else {
+          setStatus("failed");
+          setError(res.error ?? "Unknown Lua error");
+        }
+      })
+      .catch((err: unknown) => {
+        setStatus("failed");
+        setError(String(err));
+      });
+  }, []);
+
+  return (
+    <Stack gap="xs" mt="md">
+      <Group gap="md">
+        <Button
+          size="xs"
+          variant="light"
+          data-testid="run-lua-self-test"
+          loading={status === "running"}
+          onClick={run}
+        >
+          Run Lua API self-test
+        </Button>
+        {status === "passed" ? (
+          <Text size="sm" c="teal" data-testid="lua-self-test-result">
+            Self-test started — watch for popups and transitions.
+          </Text>
+        ) : null}
+        {status === "failed" ? (
+          <Text size="sm" c="red" data-testid="lua-self-test-result">
+            Self-test failed: {error}
+          </Text>
+        ) : null}
+      </Group>
+      <Text size="xs" c="dimmed">
+        Exercises every edgeware_v0 scripting function with visible popups, a
+        notification and two corruption transitions. Start the runtime first to
+        see the transitions; this restarts the pack script session.
+      </Text>
+    </Stack>
   );
 }
