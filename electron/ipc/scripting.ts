@@ -137,6 +137,10 @@ function registerHandlers(): void {
   });
 
   ipcMain.handle("scripting:runLua", async (_event, scriptName: string): Promise<boolean> => {
+    if (typeof scriptName !== "string" || !scriptName) {
+      logger.warn("[Scripting] Invalid script name");
+      return false;
+    }
     const packDir = currentPackDir();
     if (!packDir) {
       logger.warn("[Scripting] No pack directory set");

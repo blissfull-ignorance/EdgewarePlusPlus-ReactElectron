@@ -22,7 +22,7 @@ const EVIDENCE_DIR = path.join(
   "popups"
 );
 
-/** Border/outline/shadow must be absent on media elements (owner requirement). */
+/** Media elements must carry no border, outline or shadow. */
 async function assertNoBorder(win: RunningApp["window"], selector: string): Promise<void> {
   const style = await win
     .locator(selector)
@@ -63,12 +63,6 @@ async function closeAllPopups(running: RunningApp): Promise<void> {
       timeout: 10000,
     })
     .toBe(0);
-  console.log(
-    "CLOSEALL-DONE total=",
-    running.app.windows().length,
-    "mainClosed=",
-    await running.window.evaluate(() => true).catch(() => false)
-  );
 }
 
 async function waitForPopup(running: RunningApp, routeType: string) {
@@ -112,15 +106,10 @@ async function waitForPopup(running: RunningApp, routeType: string) {
 
 async function poll<T>(fn: () => Promise<T>, timeoutMs = 30000): Promise<T> {
   const start = Date.now();
-  let lastLog = 0;
   for (;;) {
     const value = await fn();
     if (value) return value;
     if (Date.now() - start > timeoutMs) return value;
-    if (Date.now() - lastLog > 5000) {
-      lastLog = Date.now();
-      console.log(`POLL-DIAG t=${Math.round((Date.now() - start) / 1000)}s`, "still waiting");
-    }
     await new Promise((r) => setTimeout(r, 250));
   }
 }
