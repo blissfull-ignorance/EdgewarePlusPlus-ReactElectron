@@ -124,7 +124,7 @@ export const DEFAULT_SETTINGS: SettingsValues = {
   safeMode: 1,
   messageOff: 0,
   presetsDanger: 0,
-  globalPanicButton: "e",
+  globalPanicButton: "Key.esc",
   popupMod: 100,
   audioMod: 0,
   maxAudio: 1,
@@ -208,7 +208,7 @@ export const DEFAULT_SETTINGS: SettingsValues = {
   toggleInternet: 0,
   mpvSubprocess: 1,
   videoHardwareAcceleration: 1,
-  panicButton: "e",
+  panicButton: "Key.esc",
   schedule: 0,
   timeType: "Minutes",
   scheduleTime: 0,
@@ -352,7 +352,7 @@ export const useSettingsStore = create<SettingsStore>()(
         ...DEFAULT_SETTINGS,
         packPath: null,
         packFolders: [],
-        globalPanicButton: "e",
+        globalPanicButton: "Key.esc",
         saveStatus: "idle",
         saveErrorMessage: null,
         dirty: false,
@@ -363,11 +363,24 @@ export const useSettingsStore = create<SettingsStore>()(
           try {
             const loaded = await window.api?.system.loadSettings();
             if (loaded) {
+              // One-time migration: the shipped default panic key "e" held
+              // the letter hostage system-wide via the global shortcut.
+              const migrated = loaded.globalPanicButton === "e" || loaded.panicButton === "e";
+              if (loaded.globalPanicButton === "e") loaded.globalPanicButton = "Key.esc";
+              if (loaded.panicButton === "e") loaded.panicButton = "Key.esc";
               const validationErrors = validateSettings(loaded);
               if (validationErrors.length > 0) {
                 logger.warn("[settingsStore] Validation issues on load:", validationErrors);
               }
               set({ ...loaded, validationErrors, dirty: false, loaded: true } as Partial<SettingsStore>);
+              if (migrated) {
+                // Persist immediately: the main process registers the global
+                // panic shortcut from the stored file, not from this store.
+                void window.api?.system
+                  .saveSettings(loaded)
+                  .then(() => window.api?.panic.refreshShortcut())
+                  .catch(() => undefined);
+              }
               return { ...DEFAULT_SETTINGS, ...loaded } as SettingsValues;
             }
             set({ dirty: false, loaded: true });

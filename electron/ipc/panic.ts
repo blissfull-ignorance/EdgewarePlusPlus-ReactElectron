@@ -136,6 +136,14 @@ function trigger(opts: { respectDisabled?: boolean } = {}): PanicResult {
 
 function registerShortcut(): void {
   const cfg = readPanicConfig();
+  // A disabled panic must not hold the key hostage: an unregistered
+  // accelerator reaches whatever window has focus, like the legacy app.
+  if (cfg.panicDisabled === 1) {
+    globalShortcut.unregisterAll();
+    currentAccelerator = "";
+    logger.info("[Panic] Global panic shortcut disabled (panicDisabled=1)");
+    return;
+  }
   const next = toAccelerator(cfg.globalPanicButton);
   if (next === currentAccelerator && globalShortcut.isRegistered(next)) return;
   globalShortcut.unregisterAll();
