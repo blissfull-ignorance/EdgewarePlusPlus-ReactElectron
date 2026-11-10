@@ -12,78 +12,55 @@ describe("StartupSplash", () => {
     vi.useRealTimers();
   });
 
-  it("renders splash image initially", () => {
-    renderWithMantine(
-      <StartupSplash
-        imageUrl="test.png"
-        onFadeComplete={() => {}}
-      />
-    );
-    const img = screen.getByTestId("splash-image");
-    expect(img).toBeInTheDocument();
+  it("renders the splash image", () => {
+    renderWithMantine(<StartupSplash imageUrl="test.png" onFadeComplete={() => {}} />);
+    expect(screen.getByTestId("splash-image")).toBeInTheDocument();
   });
 
-  it("fades in over 2 seconds", () => {
+  it("is fully opaque from the first frame so the app never shows through", () => {
     const { container } = renderWithMantine(
-      <StartupSplash
-        imageUrl="test.png"
-        onFadeComplete={() => {}}
-      />
+      <StartupSplash imageUrl="test.png" onFadeComplete={() => {}} />
     );
     const splash = container.querySelector("[data-testid='startup-splash']");
-    expect(splash).toHaveStyle({ opacity: 0 });
+    expect(splash).toHaveStyle({ opacity: 1 });
+    expect(splash).toHaveStyle({ backgroundColor: "rgb(0, 0, 0)" });
+  });
+
+  it("holds, then fades out and completes", () => {
+    const onFadeComplete = vi.fn();
+    const { container } = renderWithMantine(
+      <StartupSplash imageUrl="test.png" onFadeComplete={onFadeComplete} />
+    );
+    const splash = container.querySelector("[data-testid='startup-splash']");
 
     act(() => {
       vi.advanceTimersByTime(1000);
     });
-    const midOpacity = parseFloat(splash!.getAttribute("style")?.match(/opacity:\s*([\d.]+)/)?.[1] || "0");
-    expect(midOpacity).toBeGreaterThan(0.3);
-    expect(midOpacity).toBeLessThan(0.7);
-
-    act(() => {
-      vi.advanceTimersByTime(2000);
-    });
     expect(splash).toHaveStyle({ opacity: 1 });
-  });
-
-  it("fades out after holding for 2 seconds and calls onFadeComplete", () => {
-    const onFadeComplete = vi.fn();
-    const { container } = renderWithMantine(
-      <StartupSplash
-        imageUrl="test.png"
-        onFadeComplete={onFadeComplete}
-      />
-    );
-    const splash = container.querySelector("[data-testid='startup-splash']");
-
-    act(() => {
-      vi.advanceTimersByTime(2000);
-    });
-    expect(splash).toHaveStyle({ opacity: 1 });
-
-    act(() => {
-      vi.advanceTimersByTime(2000);
-    });
     expect(onFadeComplete).not.toHaveBeenCalled();
 
     act(() => {
-      vi.advanceTimersByTime(2000);
+      vi.advanceTimersByTime(1000);
     });
-    expect(onFadeComplete).toHaveBeenCalledTimes(1);
-  });
-
-  it("unmounts gracefully without errors", () => {
-    const { unmount } = renderWithMantine(
-      <StartupSplash
-        imageUrl="test.png"
-        onFadeComplete={() => {}}
-      />
-    );
+    expect(splash).toHaveStyle({ opacity: 0 });
+    expect(onFadeComplete).not.toHaveBeenCalled();
 
     act(() => {
-      vi.advanceTimersByTime(3000);
+      vi.advanceTimersByTime(1000);
     });
+    expect(onFadeComplete).toHaveBeenCalledTimes(1);
+    expect(container.querySelector("[data-testid='startup-splash']")).toBeNull();
+  });
 
-    expect(() => unmount()).not.toThrow();
+  it("cancels its timers on unmount without errors", () => {
+    const onFadeComplete = vi.fn();
+    const { unmount } = renderWithMantine(
+      <StartupSplash imageUrl="test.png" onFadeComplete={onFadeComplete} />
+    );
+    unmount();
+    act(() => {
+      vi.advanceTimersByTime(5000);
+    });
+    expect(onFadeComplete).not.toHaveBeenCalled();
   });
 });

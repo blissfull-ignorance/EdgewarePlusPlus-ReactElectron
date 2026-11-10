@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Image } from "@mantine/core";
 
 export interface StartupSplashProps {
@@ -6,74 +6,33 @@ export interface StartupSplashProps {
   onFadeComplete: () => void;
 }
 
-export function StartupSplash({ imageUrl, onFadeComplete }: StartupSplashProps) {
-  const [opacity, setOpacity] = useState(0);
-  const [isFadingOut, setIsFadingOut] = useState(false);
-  const [isDestroyed, setIsDestroyed] = useState(false);
-  const onFadeCompleteRef = useRef(onFadeComplete);
+const HOLD_MS = 1800;
+const FADE_MS = 800;
 
+/**
+ * Startup splash: an opaque full-screen black backdrop with the pack (or
+ * default) image, shown from the very first frame so the app UI behind it is
+ * never visible. After a short hold it fades out to reveal the app.
+ */
+export function StartupSplash({ imageUrl, onFadeComplete }: StartupSplashProps) {
+  const [fadingOut, setFadingOut] = useState(false);
+  const [destroyed, setDestroyed] = useState(false);
+  const onFadeCompleteRef = useRef(onFadeComplete);
   onFadeCompleteRef.current = onFadeComplete;
 
-  const fadeStep = 16;
-  const fadeIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const cleanupTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const cleanup = useCallback(() => {
-    if (fadeIntervalRef.current) {
-      clearInterval(fadeIntervalRef.current);
-      fadeIntervalRef.current = null;
-    }
-    if (cleanupTimeoutRef.current) {
-      clearTimeout(cleanupTimeoutRef.current);
-      cleanupTimeoutRef.current = null;
-    }
+  useEffect(() => {
+    const fadeTimer = setTimeout(() => setFadingOut(true), HOLD_MS);
+    const doneTimer = setTimeout(() => {
+      setDestroyed(true);
+      onFadeCompleteRef.current();
+    }, HOLD_MS + FADE_MS + 60);
+    return () => {
+      clearTimeout(fadeTimer);
+      clearTimeout(doneTimer);
+    };
   }, []);
 
-  useEffect(() => {
-    let mounted = true;
-
-    const fadeDuration = 2000;
-    const steps = fadeDuration / fadeStep;
-    const delta = 1 / steps;
-
-    fadeIntervalRef.current = setInterval(() => {
-      if (!mounted) return;
-      setOpacity((prev) => {
-        const next = Math.min(1, prev + delta);
-        if (next >= 1) {
-          clearInterval(fadeIntervalRef.current!);
-          fadeIntervalRef.current = null;
-
-          cleanupTimeoutRef.current = setTimeout(() => {
-            if (!mounted) return;
-            setIsFadingOut(true);
-
-            fadeIntervalRef.current = setInterval(() => {
-              if (!mounted) return;
-              setOpacity((prev2) => {
-                const next2 = Math.max(0, prev2 - delta);
-                if (next2 <= 0) {
-                  clearInterval(fadeIntervalRef.current!);
-                  fadeIntervalRef.current = null;
-                  onFadeCompleteRef.current();
-                  setIsDestroyed(true);
-                }
-                return next2;
-              });
-            }, fadeStep);
-          }, 2000);
-        }
-        return next;
-      });
-    }, fadeStep);
-
-    return () => {
-      mounted = false;
-      cleanup();
-    };
-  }, [cleanup]);
-
-  if (isDestroyed) return null;
+  if (destroyed) return null;
 
   return (
     <div
@@ -88,8 +47,8 @@ export function StartupSplash({ imageUrl, onFadeComplete }: StartupSplashProps) 
         alignItems: "center",
         justifyContent: "center",
         backgroundColor: "black",
-        opacity,
-        transition: isFadingOut ? "opacity 0.1s linear" : undefined,
+        opacity: fadingOut ? 0 : 1,
+        transition: fadingOut ? `opacity ${FADE_MS}ms ease-out` : undefined,
         zIndex: 9999,
       }}
     >
