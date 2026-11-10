@@ -34,6 +34,12 @@ async function setupPage(page: Page, overrides: Record<string, unknown> = {}) {
 }
 
 test.describe("Popup spawning — hybrid render modes", () => {
+  test("the main app page keeps its opaque surface (transparency is popup-only)", async ({ page }) => {
+    await page.goto("/");
+    const flag = await page.evaluate(() => document.documentElement.dataset.popup ?? null);
+    expect(flag).toBeNull();
+  });
+
   test("popupRenderMode defaults to electron", async ({ page }) => {
     await page.goto("/");
     const mode = await page.evaluate(() => {
@@ -45,6 +51,19 @@ test.describe("Popup spawning — hybrid render modes", () => {
 
   test("electron popup route renders popup content and closes via IPC", async ({ page }) => {
     await page.goto("/#/popup/image/test.png/popup-abc");
+
+    // The popup page must be fully transparent: a painted body/#root surface
+    // shows through the transparent window as a thick border around media.
+    await expect
+      .poll(() =>
+        page.evaluate(() => ({
+          flag: document.documentElement.dataset.popup,
+          body: getComputedStyle(document.body).backgroundColor,
+          root: getComputedStyle(document.getElementById("root")!).backgroundColor,
+        }))
+      )
+      .toEqual({ flag: "1", body: "rgba(0, 0, 0, 0)", root: "rgba(0, 0, 0, 0)" });
+
     await page.evaluate(() => {
       const api = (window as unknown as { api: { popup: Record<string, unknown> } }).api;
       (window as unknown as Record<string, string[]>).__closed = [];

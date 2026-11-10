@@ -119,7 +119,8 @@ describe("PopupWindow", () => {
     expect(screen.queryByTestId("audio-popup-chip")).not.toBeNull();
     expect(screen.queryByTestId("audio-popup-audio")).not.toBeNull();
 
-    screen.getByTestId("close-button").click();
+    // The chip is buttonless: clicking it closes the popup.
+    screen.getByTestId("audio-popup-chip").click();
     expect(window.api.popup.closePopup).toHaveBeenCalledWith("popup-a1");
   });
 });

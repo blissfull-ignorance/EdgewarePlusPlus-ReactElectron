@@ -2,7 +2,6 @@ import { useRef, useCallback, useState, useEffect, useMemo } from "react";
 import { Center } from "@mantine/core";
 import { PopupShell } from "../../components/PopupShell/PopupShell";
 import { useSettingsStore } from "../../stores/settingsStore";
-import { usePopupMovement } from "../../hooks/usePopupMovement";
 import { useRandomClicksToClose } from "../../hooks/useRandomClicksToClose";
 import { HypnoOverlay } from "../subliminal/HypnoOverlay";
 import { computeContainedFrame } from "../popup/mediaFrame";
@@ -18,6 +17,8 @@ export interface VideoPopupProps {
   mediaHeight?: number;
   /** Optional spiral GIF to lay over the video. */
   hypnoGif?: string;
+  /** Popup window ID: the window is resized to fit the video once measured. */
+  popupId?: string;
 }
 
 export function VideoPopup({
@@ -27,6 +28,7 @@ export function VideoPopup({
   mediaWidth = 640,
   mediaHeight = 480,
   hypnoGif,
+  popupId,
 }: VideoPopupProps) {
   const videoVolume = useSettingsStore((s) => s.videoVolume / 100);
   const buttonless = useSettingsStore((s) => s.buttonless);
@@ -36,13 +38,10 @@ export function VideoPopup({
   const clickthrough = useSettingsStore((s) => s.clickthroughPopups);
   const lkScaling = useSettingsStore((s) => s.lkScaling);
   const lkToggle = useSettingsStore((s) => s.lkToggle);
-  const movingChance = useSettingsStore((s) => s.movingChance);
-  const movingSpeed = useSettingsStore((s) => s.movingSpeed);
   const denialChance = useSettingsStore((s) => s.denialChance);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const [denied, setDenied] = useState(false);
-  const [movingEnabled, setMovingEnabled] = useState(false);
   const mediaFile = videoUrl.split("?")[0].split("/").pop() || undefined;
   const clicksToClose = useRandomClicksToClose(multiClick, mediaFile);
 
@@ -52,11 +51,7 @@ export function VideoPopup({
     }
   }, []);
 
-  useEffect(() => {
-    setMovingEnabled(roll(movingChance));
-  }, []);
-
-  const [videoLoaded, setVideoLoaded] = useState(false);
+  const [naturalSize, setNaturalSize] = useState<{ w: number; h: number } | null>(null);
 
   useEffect(() => {
     if (videoRef.current && videoRef.current.volume !== videoVolume) {
@@ -66,16 +61,23 @@ export function VideoPopup({
 
   const frame = useMemo(
     () =>
-      videoLoaded
-        ? computeContainedFrame(mediaWidth, mediaHeight, videoRef.current?.videoWidth ?? 0, videoRef.current?.videoHeight ?? 0)
+      naturalSize
+        ? computeContainedFrame(mediaWidth, mediaHeight, naturalSize.w, naturalSize.h)
         : null,
-    [videoLoaded, mediaWidth, mediaHeight]
+    [naturalSize, mediaWidth, mediaHeight]
   );
 
   const handleVideoLoad = useCallback(() => {
-    setVideoLoaded(true);
-  }, []);
-
+    const el = videoRef.current;
+    if (el && el.videoWidth > 0 && el.videoHeight > 0) {
+      setNaturalSize({ w: el.videoWidth, h: el.videoHeight });
+      if (popupId) {
+        void window.api?.popup
+          .sizeToMedia(popupId, el.videoWidth, el.videoHeight, lkToggle === 1)
+          .catch(() => undefined);
+      }
+    }
+  }, [popupId, lkToggle]);
 
   const playsRef = useRef(0);
   const videoLoopInf = useSettingsStore((s) => s.videoLoopInf);
@@ -98,13 +100,6 @@ export function VideoPopup({
     }
   }, [onClose, videoLoopInf, videoLoopCount]);
 
-  const { currentPosition: videoPosition } = usePopupMovement({
-    enabled: movingEnabled,
-    speed: movingSpeed,
-    popupWidth: mediaWidth,
-    popupHeight: mediaHeight,
-  });
-
   return (
     <PopupShell
       onClose={onClose}
@@ -115,15 +110,7 @@ export function VideoPopup({
       timeoutMs={timeoutPopups > 0 ? popupTimeout * 1000 : 0}
       opacity={lkToggle === 1 && lkScaling > 0 ? lkScaling / 100 : 1}
     >
-      <div
-        style={{
-          position: "absolute",
-          top: videoPosition?.y ?? 0,
-          left: videoPosition?.x ?? 0,
-          width: "100%",
-          height: "100%",
-        }}
-      >
+      <div style={{ width: "100%", height: "100%" }}>
         <Center
           style={{
             width: "100%",

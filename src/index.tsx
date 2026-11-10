@@ -99,6 +99,12 @@ if (typeof window !== "undefined" && !(window as unknown as Record<string, unkno
   };
 }
 
+// Popup windows must be fully transparent: the app body paints a dark surface
+// that would letterbox media as a thick border.
+if (typeof window !== "undefined" && window.location.hash.startsWith("#/popup/")) {
+  document.documentElement.dataset.popup = "1";
+}
+
 // Expose settingsStore for E2E testing
 if (typeof window !== "undefined") {
   (window as unknown as Record<string, unknown>).__settingsStore = useSettingsStore;

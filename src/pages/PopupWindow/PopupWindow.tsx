@@ -6,8 +6,8 @@
  * renders only the popup media (image/video) instead of the main UI,
  * and closing the popup calls popup:closePopup with the window's ID.
  */
-import { useCallback, useEffect, useState } from "react";
-import { Text, Paper } from "@mantine/core";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { Text } from "@mantine/core";
 import { IconMusic } from "@tabler/icons-react";
 import { ImagePopup } from "../../features/image/ImagePopup";
 import { VideoPopup } from "../../features/video/VideoPopup";
@@ -17,6 +17,7 @@ import { SubliminalOverlay } from "../../features/subliminal/SubliminalOverlay";
 import { PopupShell } from "../../components/PopupShell/PopupShell";
 import { resolvePackMediaUrl, type MediaDir } from "../../features/popup/resolveMediaUrl";
 import { useSettingsStore } from "../../stores/settingsStore";
+import { roll } from "../../utils/roll";
 
 /**
  * Popup windows are small fixed-size BrowserWindows; the media inside must be
@@ -88,6 +89,21 @@ export function PopupWindow({ route }: { route: PopupRoute }) {
   const lkScaling = useSettingsStore((s) => s.lkScaling);
   const lkOpacity = lkScaling > 0 ? lkScaling / 100 : 1;
 
+  // Legacy try_move: roll once per media popup whether this window drifts
+  // across the display. The roll waits for loaded settings — the default
+  // movingChance of 0 would otherwise always win the race on startup.
+  const settingsLoaded = useSettingsStore((s) => s.loaded);
+  const movingChance = useSettingsStore((s) => s.movingChance);
+  const moveRolledRef = useRef(false);
+  useEffect(() => {
+    if (!settingsLoaded || moveRolledRef.current) return;
+    if (route.type !== "image" && route.type !== "video") return;
+    moveRolledRef.current = true;
+    if (roll(movingChance)) {
+      void window.api?.popup.startMoving(route.popupId).catch(() => undefined);
+    }
+  }, [settingsLoaded, movingChance, route.type, route.popupId]);
+
   const dir = POPUP_DIR[route.type];
   const mediaUrl = dir ? resolvePackMediaUrl(route.mediaId, dir) : route.mediaId;
 
@@ -102,6 +118,7 @@ export function PopupWindow({ route }: { route: PopupRoute }) {
         onClose={handleClose}
         onBlacklist={handleBlacklist}
         hypnoGif={route.hypnoGif}
+        popupId={route.popupId}
         mediaWidth={viewport.width}
         mediaHeight={viewport.height}
       />
@@ -115,6 +132,7 @@ export function PopupWindow({ route }: { route: PopupRoute }) {
         onClose={handleClose}
         onBlacklist={handleBlacklist}
         hypnoGif={route.hypnoGif}
+        popupId={route.popupId}
         mediaWidth={viewport.width}
         mediaHeight={viewport.height}
       />
@@ -122,30 +140,30 @@ export function PopupWindow({ route }: { route: PopupRoute }) {
   }
 
   if (route.type === "audio") {
-    // Audio pops have no visual of their own; without a shell this would be an
-    // invisible, unclosable always-on-top window — so give the popup a small
-    // visible, closable surface while the file keeps streaming.
+    // Audio pops are a small chip with a music symbol, not a media window;
+    // the shell keeps it closable while the file streams invisibly.
     return (
-      <PopupShell onClose={handleClose} onBlacklist={handleBlacklist} opacity={lkOpacity}>
-        <Paper
+      <PopupShell onClose={handleClose} onBlacklist={handleBlacklist} opacity={lkOpacity} buttonless>
+        <div
           data-testid="audio-popup-chip"
-          withBorder
-          radius="md"
-          p="xs"
           style={{
+            width: "100%",
+            height: "100%",
             display: "flex",
             alignItems: "center",
-            gap: 8,
+            justifyContent: "center",
+            gap: 6,
+            borderRadius: 10,
             backgroundColor: "rgba(14, 17, 25, 0.92)",
-            borderColor: "var(--mantine-color-dark-5)",
+            border: "1px solid rgba(255, 255, 255, 0.18)",
             color: "white",
           }}
         >
           <IconMusic size={16} />
-          <Text size="sm" fw={600}>
+          <Text size="xs" fw={600}>
             Audio
           </Text>
-        </Paper>
+        </div>
         <AudioPopup audioUrl={mediaUrl} onClose={handleClose} />
       </PopupShell>
     );

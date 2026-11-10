@@ -102,8 +102,9 @@ test.describe("A21.4 — real pack audio playback state verified progressing", (
       } catch { /* mid-close */ }
     }
     expect(audioWin).not.toBeNull();
-    await expect(audioWin!.locator('[data-testid="close-button"]')).toBeVisible();
-    await audioWin!.locator('[data-testid="close-button"]').click();
+    // Audio pops are a buttonless chip: clicking the chip itself closes it.
+    await expect(audioWin!.locator('[data-testid="audio-popup-chip"]')).toBeVisible();
+    await audioWin!.locator('[data-testid="audio-popup-chip"]').click();
     await expect
       .poll(async () => {
         try {

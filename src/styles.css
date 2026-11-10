@@ -24,6 +24,13 @@ body {
   overflow-x: hidden;
 }
 
+/* Popup windows float over the desktop: no painted surface anywhere behind
+   the media, or the transparent window shows it as a border. */
+html[data-popup] body,
+html[data-popup] #root {
+  background-color: transparent;
+}
+
 #root {
   min-height: 100vh;
   background-color: var(--mantine-color-dark-8);

@@ -14,9 +14,22 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { logger } from "../utils/logger";
 import { lowkeyPosition } from "../../src/features/popup/lowkeyPosition";
+import { legacyPopupSize } from "../../src/features/popup/legacySize";
+import { initialMoveState, stepMove } from "../../src/features/popup/windowMovement";
 
 // Registry of open popup windows, keyed by popup ID
 const popupWindows = new Map<string, BrowserWindow>();
+
+// Per-popup window movers (legacy try_move loop), stopped when the window closes
+const movers = new Map<string, ReturnType<typeof setInterval>>();
+
+function stopMoving(id: string): void {
+  const timer = movers.get(id);
+  if (timer) {
+    clearInterval(timer);
+    movers.delete(id);
+  }
+}
 
 // Main window that requested popups — used to deliver close notifications
 let mainWin: BrowserWindow | null = null;
@@ -86,12 +99,16 @@ function createPopupWindow(
   const id = `popup-${Date.now()}-${Math.random().toString(36).slice(2)}`;
   const bounds = getPrimaryMonitorBounds();
 
-  const defaultWidth = 400;
-  const defaultHeight = 300;
+  // Audio pops are a small chip, not a media window (owner: no window, just a
+  // symbol). Media pops start at a default frame and resize to the file once
+  // the renderer knows its natural size (popup:sizeToMedia).
+  const isAudio = type === "audio";
+  const isSubliminal = type === "subliminal";
+  const defaultWidth = isAudio ? 140 : 400;
+  const defaultHeight = isAudio ? 44 : 300;
 
   // The subliminal text popup is large and centered (legacy: label-sized box
   // at monitor center with wrap at monitor/1.5); media pops get a random spot.
-  const isSubliminal = type === "subliminal";
   const width = isSubliminal ? Math.floor(bounds.width * 0.66) : defaultWidth;
   const height = isSubliminal ? Math.floor(bounds.height * 0.5) : defaultHeight;
   const lowkey = !isSubliminal && readSetting("lkToggle") === 1
@@ -133,6 +150,7 @@ function createPopupWindow(
   popupWin.loadURL(`${url}#/popup/${type}/${encodeURIComponent(mediaId)}/${id}${hypnoSeg}`);
 
   popupWin.on("closed", () => {
+    stopMoving(id);
     popupWindows.delete(id);
     notifyPopupClosed(id);
   });
@@ -195,6 +213,62 @@ function registerHandlers(): void {
     } catch (err) {
       logger.error("[Popup] Failed to close all popups:", err);
     }
+  });
+
+  /**
+   * Resize a popup window to exactly fit its media, legacy-style: the media's
+   * longest side spans a random 30–70% of the display's shortest side
+   * (20–50% lowkey). The renderer measures the natural media size and calls
+   * this once on load, so no letterbox surface surrounds the media.
+   */
+  ipcMain.handle(
+    "popup:sizeToMedia",
+    async (
+      _event,
+      id: string,
+      mediaWidth: number,
+      mediaHeight: number,
+      lowkey?: boolean
+    ): Promise<{ width: number; height: number } | null> => {
+      const win = popupWindows.get(id);
+      if (!win || win.isDestroyed() || !(mediaWidth > 0) || !(mediaHeight > 0)) return null;
+      try {
+        const display = screen.getDisplayMatching(win.getBounds());
+        const shortSide = Math.min(display.workAreaSize.width, display.workAreaSize.height);
+        const target = legacyPopupSize(mediaWidth, mediaHeight, shortSide, Math.random, lowkey === true);
+        const width = Math.max(32, Math.min(target.width, display.workAreaSize.width));
+        const height = Math.max(32, Math.min(target.height, display.workAreaSize.height));
+        win.setContentSize(width, height);
+        return { width, height };
+      } catch (err) {
+        logger.error("[Popup] Failed to size popup to media:", err);
+        return null;
+      }
+    }
+  );
+
+  /**
+   * Start moving a popup window across its display (legacy try_move): random
+   * velocity of up to ±movingSpeed px per tick, bouncing off display edges.
+   */
+  ipcMain.handle("popup:startMoving", async (_event, id: string): Promise<boolean> => {
+    const win = popupWindows.get(id);
+    if (!win || win.isDestroyed() || movers.has(id)) return false;
+    const speed = readSetting("movingSpeed") || 5;
+    const start = win.getBounds();
+    let state = initialMoveState(start.x, start.y, speed);
+    const timer = setInterval(() => {
+      if (win.isDestroyed()) {
+        stopMoving(id);
+        return;
+      }
+      const display = screen.getDisplayMatching(win.getBounds());
+      const size = win.getBounds();
+      state = stepMove(state, display.bounds, size.width, size.height);
+      win.setPosition(state.x, state.y);
+    }, 16);
+    movers.set(id, timer);
+    return true;
   });
 }
 

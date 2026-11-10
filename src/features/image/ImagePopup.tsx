@@ -1,8 +1,7 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { Text, Center } from "@mantine/core";
 import { PopupShell } from "../../components/PopupShell/PopupShell";
 import { useSettingsStore } from "../../stores/settingsStore";
-import { usePopupMovement } from "../../hooks/usePopupMovement";
 import { useRandomClicksToClose } from "../../hooks/useRandomClicksToClose";
 import { HypnoOverlay } from "../subliminal/HypnoOverlay";
 import { computeContainedFrame } from "../popup/mediaFrame";
@@ -18,6 +17,8 @@ export interface ImagePopupProps {
   mediaHeight?: number;
   /** Optional spiral GIF to lay over the image. */
   hypnoGif?: string;
+  /** Popup window ID: the window is resized to fit the image once measured. */
+  popupId?: string;
 }
 
 export function ImagePopup({
@@ -28,6 +29,7 @@ export function ImagePopup({
   mediaWidth = 640,
   mediaHeight = 480,
   hypnoGif,
+  popupId,
 }: ImagePopupProps) {
   const denialChance = useSettingsStore((s) => s.denialChance);
   const showCaptions = useSettingsStore((s) => s.showCaptions);
@@ -40,11 +42,8 @@ export function ImagePopup({
   const lkToggle = useSettingsStore((s) => s.lkToggle);
   const mediaFile = imageUrl.split("?")[0].split("/").pop() || undefined;
   const clicksToClose = useRandomClicksToClose(multiClick, mediaFile);
-  const movingChance = useSettingsStore((s) => s.movingChance);
-  const movingSpeed = useSettingsStore((s) => s.movingSpeed);
 
   const [denied, setDenied] = useState(false);
-  const [movingEnabled, setMovingEnabled] = useState(false);
   const [imageLoaded, setImageLoaded] = useState(false);
   const [naturalSize, setNaturalSize] = useState<{ w: number; h: number } | null>(null);
   const [captionText, setCaptionText] = useState<string | undefined>();
@@ -64,21 +63,25 @@ export function ImagePopup({
   }, []);
 
   useEffect(() => {
-    setMovingEnabled(roll(movingChance));
-  }, []);
-
-  useEffect(() => {
     if (showCaptions && caption) {
       setCaptionText(caption);
     }
   }, [showCaptions, caption]);
 
-  const { currentPosition } = usePopupMovement({
-    enabled: movingEnabled,
-    speed: movingSpeed,
-    popupWidth: mediaWidth,
-    popupHeight: mediaHeight,
-  });
+  const handleLoad = useCallback(
+    (img: HTMLImageElement) => {
+      setImageLoaded(true);
+      if (img.naturalWidth > 0 && img.naturalHeight > 0) {
+        setNaturalSize({ w: img.naturalWidth, h: img.naturalHeight });
+        if (popupId) {
+          void window.api?.popup
+            .sizeToMedia(popupId, img.naturalWidth, img.naturalHeight, lkToggle === 1)
+            .catch(() => undefined);
+        }
+      }
+    },
+    [popupId, lkToggle]
+  );
 
   return (
     <PopupShell
@@ -92,9 +95,6 @@ export function ImagePopup({
     >
       <div
         style={{
-          position: "absolute",
-          top: currentPosition?.y ?? 0,
-          left: currentPosition?.x ?? 0,
           display: "flex",
           flexDirection: "column",
           alignItems: "center",
@@ -135,13 +135,7 @@ export function ImagePopup({
             data-testid="image-popup-img"
             src={imageUrl}
             alt=""
-            onLoad={(e) => {
-              setImageLoaded(true);
-              const img = e.currentTarget;
-              if (img.naturalWidth > 0 && img.naturalHeight > 0) {
-                setNaturalSize({ w: img.naturalWidth, h: img.naturalHeight });
-              }
-            }}
+            onLoad={(e) => handleLoad(e.currentTarget)}
             style={{
               maxWidth: "100%",
               maxHeight: "100%",
