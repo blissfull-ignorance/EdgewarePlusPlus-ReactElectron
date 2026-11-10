@@ -82,7 +82,9 @@ if (typeof window !== "undefined" && !(window as unknown as Record<string, unkno
       openPackLibrary: async () => undefined,
       onImportProgress: () => () => undefined,
       getPathForFile: () => null,
-      loadSettings: async () => null,
+      // The startup splash is verified in the Electron layer; the browser
+      // harness starts straight on the app UI.
+      loadSettings: async () => ({ showLoadingFlair: 0 }),
       saveSettings: async () => undefined,
       sendNotification: async () => undefined,
       openExternal: async () => false,

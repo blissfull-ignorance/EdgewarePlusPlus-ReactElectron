@@ -14,12 +14,12 @@ test.describe("First User Smoke Test", () => {
       settings: { delay: 200, popupMod: 100, vidMod: 0, audioMod: 0 },
     });
 
+    // Legacy "Original" theme surface (#f0f0f0) — styled app chrome, not the
+    // browser default white.
     const body = parseRGB(
       await page.locator("body").evaluate((el) => getComputedStyle(el).backgroundColor)
     );
-    expect(body.r).toBeLessThan(128);
-    expect(body.g).toBeLessThan(128);
-    expect(body.b).toBeLessThan(128);
+    expect(body).toEqual({ r: 240, g: 240, b: 240 });
 
     await expect(page.locator("[data-testid='pack-info']")).not.toHaveText("No pack loaded");
 

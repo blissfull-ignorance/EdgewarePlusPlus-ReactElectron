@@ -8,6 +8,13 @@ interface SettingsStoreHandle {
 test.describe("Dark Theme", () => {
   test("app renders with dark color scheme", async ({ page }) => {
     await launchApp(page);
+    await page.evaluate(() => {
+      (
+        window as unknown as {
+          __settingsStore: { getState: () => { setRaw: (v: Record<string, unknown>) => void } };
+        }
+      ).__settingsStore.getState().setRaw({ themeType: "Dark" });
+    });
 
     const body = parseRGB(
       await page.locator("body").evaluate((el) => getComputedStyle(el).backgroundColor)

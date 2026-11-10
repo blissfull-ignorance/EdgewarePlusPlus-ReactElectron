@@ -1,9 +1,9 @@
 import { test, expect } from "@playwright/test";
 import { launchApp, listRealPacks, parseRGB } from "./helpers";
 
-// ember[8] — the default theme (themeType "Original") filled-primary control color under Mantine's
-// dark color scheme, where `filled` controls resolve to ramp index 8. See src/theme/themeConfig.ts.
-const EMBER_8 = { r: 136, g: 19, b: 55 };
+// ember[6] — the default theme (themeType "Original") filled-primary control color under Mantine's
+// light color scheme, where `filled` controls resolve to ramp index 6. See src/theme/themeConfig.ts.
+const EMBER_6 = { r: 225, g: 29, b: 72 };
 
 test.describe("Visual Regression — styled app", () => {
   test.describe.configure({ timeout: 90_000 });
@@ -65,7 +65,7 @@ test.describe("Visual Regression — styled app", () => {
     const button = page.locator("[data-testid='start-stop-button']");
     await expect(button).toBeVisible();
     const bg = parseRGB(await button.evaluate((el) => getComputedStyle(el).backgroundColor));
-    expect(bg).toEqual(EMBER_8);
+    expect(bg).toEqual(EMBER_6);
 
     const radius = await button.evaluate((el) => {
       const value = getComputedStyle(el).borderTopLeftRadius;

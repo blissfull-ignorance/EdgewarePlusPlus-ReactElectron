@@ -206,7 +206,10 @@ export async function launchApp(page: Page, options: LaunchOptions = {}): Promis
               const raw = localStorage.getItem("__e2e_settings_file__");
               if (raw) return JSON.parse(raw) as Record<string, unknown>;
             }
-            return opts.settings ?? null;
+            // The startup splash is verified in the Electron layer; browser
+            // specs start straight on the app UI.
+            if (opts.settings) return { showLoadingFlair: 0, ...opts.settings };
+            return null;
           },
           saveSettings: async (settings: Record<string, unknown>) => {
             w.__e2eSaveCalls = (w.__e2eSaveCalls ?? 0) + 1;
