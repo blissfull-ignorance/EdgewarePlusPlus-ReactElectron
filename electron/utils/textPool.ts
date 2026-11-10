@@ -14,7 +14,7 @@ interface TextLists {
 
 interface TextIndex {
   default?: TextLists;
-  moods?: TextLists[];
+  moods?: (TextLists & { name?: string })[];
 }
 
 function usable(list: unknown): string[] {
@@ -25,12 +25,28 @@ function pick(pool: string[], rand: () => number): string | null {
   return pool.length ? pool[Math.floor(rand() * pool.length)] ?? pool[pool.length - 1] : null;
 }
 
+/**
+ * Mood lists limited to the active moods. When `activeMoods` is omitted every
+ * mood counts (legacy packs without mood gating, and unit tests); when given,
+ * only moods whose name is in the set contribute — mirroring the legacy
+ * default-plus-active-mood pools.
+ */
+function enabledMoods(
+  idx: TextIndex | undefined,
+  activeMoods?: ReadonlySet<string>
+): (TextLists & { name?: string })[] {
+  const moods = Array.isArray(idx?.moods) ? idx.moods : [];
+  if (!activeMoods) return moods;
+  return moods.filter((m) => m.name && activeMoods.has(m.name));
+}
+
 export function pickSubliminalText(
   idx: TextIndex | undefined,
-  rand: () => number = Math.random
+  rand: () => number = Math.random,
+  activeMoods?: ReadonlySet<string>
 ): string | null {
   if (!idx) return null;
-  const moods = Array.isArray(idx.moods) ? idx.moods : [];
+  const moods = enabledMoods(idx, activeMoods);
 
   const subliminals = [...usable(idx.default?.subliminals), ...moods.flatMap((m) => usable(m.subliminals))];
   const fromSubliminals = pick(subliminals, rand);
@@ -41,15 +57,16 @@ export function pickSubliminalText(
 }
 
 /**
- * A random notification text: the `notifications` lists (default + moods),
- * falling back to captions — mirrors legacy pack.random_notification().
+ * A random notification text: the `notifications` lists (default + active
+ * moods), falling back to captions — mirrors legacy pack.random_notification().
  */
 export function pickNotificationText(
   idx: TextIndex | undefined,
-  rand: () => number = Math.random
+  rand: () => number = Math.random,
+  activeMoods?: ReadonlySet<string>
 ): string | null {
   if (!idx) return null;
-  const moods = Array.isArray(idx.moods) ? idx.moods : [];
+  const moods = enabledMoods(idx, activeMoods);
 
   const notifications = [
     ...usable((idx.default as { notifications?: string[] } | undefined)?.notifications),

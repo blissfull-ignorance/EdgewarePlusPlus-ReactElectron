@@ -24,7 +24,6 @@ import { logger } from "../utils/logger";
 export function useCorruptionRuntime(active: boolean): void {
   useEffect(() => {
     if (!active) return;
-    if (useSettingsStore.getState().corruptionMode !== 1) return;
 
     let cancelled = false;
     const timers: Array<ReturnType<typeof setInterval>> = [];
@@ -36,13 +35,15 @@ export function useCorruptionRuntime(active: boolean): void {
       const overrides = store.transitionTo(level);
 
       const s = useSettingsStore.getState();
+      // Legacy negation: corruptionWallpaperCycle/corruptionThemeCycle are
+      // stored inverted — a stored 0 means the cycle is enabled.
       const allowed = gateOverrides(overrides, {
         fullPerm: s.corruptionFullPerm === 1,
-        themeCycle: s.corruptionThemeCycle === 1,
+        themeCycle: s.corruptionThemeCycle === 0,
       });
       if (Object.keys(allowed).length > 0) s.setRaw(allowed);
 
-      if (levelData?.wallpaper && s.corruptionWallpaperCycle === 1 && s.packPath) {
+      if (levelData?.wallpaper && s.corruptionWallpaperCycle === 0 && s.packPath) {
         const root = String(s.packPath).replace(/\/+$/, "");
         void window.api?.system
           .setWallpaper(`${root}/${levelData.wallpaper}`)
@@ -68,10 +69,13 @@ export function useCorruptionRuntime(active: boolean): void {
       }
       if (cancelled) return;
       if (!raw) {
-        logger.warn("[corruption] corruption mode is on but the pack ships no corruption.json — staying off");
+        if (useSettingsStore.getState().corruptionMode === 1) {
+          logger.warn("[corruption] corruption mode is on but the pack ships no corruption.json — staying off");
+        }
         return;
       }
 
+      useCorruptionStore.getState().reset();
       useCorruptionStore.getState().loadCorruptionData(raw);
       const { levels } = useCorruptionStore.getState();
       const maxLevel = maxKnownLevel(levels);
@@ -80,7 +84,30 @@ export function useCorruptionRuntime(active: boolean): void {
         return;
       }
 
+      // Scripted/manual path (legacy run_script): level injections apply
+      // while the runtime runs even with corruption mode off, because the
+      // pack script itself drives the session.
+      const unsubscribe = window.api?.corruption.onInject((level) => {
+        applyLevel(Math.min(Math.max(1, level), maxLevel));
+      });
+      if (unsubscribe) unsubscribes.push(unsubscribe);
+
       const s = useSettingsStore.getState();
+      // A script may have injected its first level before this listener
+      // attached; pull the mirrored level so the transition is not lost.
+      const pullMirrored = s.corruptionMode !== 1 || s.corruptionTrigger === "Script";
+      if (pullMirrored) {
+        try {
+          const mirrored = (await window.api?.corruption.getCurrentLevel()) ?? 0;
+          if (cancelled) return;
+          if (mirrored >= 1 && useCorruptionStore.getState().currentLevel === 0) {
+            applyLevel(Math.min(mirrored, maxLevel));
+          }
+        } catch {
+          /* level mirror unavailable — injections still stream in */
+        }
+      }
+      if (s.corruptionMode !== 1) return;
       const purity = s.corruptionPurityMode === 1;
 
       switch (s.corruptionTrigger) {
@@ -125,11 +152,9 @@ export function useCorruptionRuntime(active: boolean): void {
           break;
         }
         case "Script": {
-          applyLevel(startLevelFor(maxLevel, purity));
-          const unsubscribe = window.api?.corruption.onInject((level) => {
-            applyLevel(Math.min(Math.max(1, level), maxLevel));
-          });
-          if (unsubscribe) unsubscribes.push(unsubscribe);
+          if (useCorruptionStore.getState().currentLevel === 0) {
+            applyLevel(startLevelFor(maxLevel, purity));
+          }
           break;
         }
         default:

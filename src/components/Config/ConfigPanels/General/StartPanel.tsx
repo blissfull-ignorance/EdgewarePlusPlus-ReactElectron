@@ -1,5 +1,6 @@
-import { SimpleGrid, Stack, Text, Tooltip } from "@mantine/core";
-import { IconPlayerPlay, IconClock } from "@tabler/icons-react";
+import { SimpleGrid, Stack, Text, Tooltip, Button, Group } from "@mantine/core";
+import { IconPlayerPlay, IconClock, IconWand } from "@tabler/icons-react";
+import { useEffect, useState } from "react";
 import { useSettingsStore } from "../../../../stores";
 import { ConfigDropdown, ConfigField, ConfigToggle } from "../../../Config";
 import { SectionCard } from "../../../SectionCard";
@@ -9,6 +10,66 @@ const TIME_UNITS = [
   { label: "Hours", value: "Hours" },
   { label: "Days", value: "Days" },
 ];
+
+/**
+ * Applies the active pack's suggested configuration (its config.json), like
+ * the legacy "apply preset" control on the Start tab.
+ */
+function PackPresetCard() {
+  const setRaw = useSettingsStore((state) => state.setRaw);
+  const packPath = useSettingsStore((state) => state.packPath);
+  const [preset, setPreset] = useState<Record<string, unknown> | null>(null);
+  const [applied, setApplied] = useState(false);
+
+  useEffect(() => {
+    setApplied(false);
+    setPreset(null);
+    if (!packPath) return;
+    let alive = true;
+    void window.api?.pack
+      .loadPackConfig()
+      .then((cfg) => {
+        if (alive) setPreset(cfg && Object.keys(cfg).length > 0 ? cfg : null);
+      })
+      .catch(() => undefined);
+    return () => {
+      alive = false;
+    };
+  }, [packPath]);
+
+  if (!preset) return null;
+  const count = Object.keys(preset).length;
+
+  return (
+    <SectionCard
+      icon={<IconWand size={16} />}
+      title="Pack Preset"
+      description="The pack ships suggested configuration values."
+    >
+      <Group gap="md" wrap="wrap">
+        <Text size="sm" c="dimmed">
+          {count} suggested setting{count === 1 ? "" : "s"}
+        </Text>
+        <Button
+          size="xs"
+          variant="light"
+          data-testid="apply-pack-preset"
+          onClick={() => {
+            setRaw(preset);
+            setApplied(true);
+          }}
+        >
+          Apply pack preset
+        </Button>
+        {applied ? (
+          <Text size="sm" c="teal" data-testid="preset-applied">
+            Preset applied.
+          </Text>
+        ) : null}
+      </Group>
+    </SectionCard>
+  );
+}
 
 export function StartPanel() {
   const setRaw = useSettingsStore((state) => state.setRaw);
@@ -35,11 +96,11 @@ export function StartPanel() {
   ];
 
   const cornerData = [
-    { label: "Random", value: "0" },
-    { label: "Top Right", value: "1" },
-    { label: "Top Left", value: "2" },
-    { label: "Bottom Left", value: "3" },
-    { label: "Bottom Right", value: "4" },
+    { label: "Top Right", value: "0" },
+    { label: "Top Left", value: "1" },
+    { label: "Bottom Left", value: "2" },
+    { label: "Bottom Right", value: "3" },
+    { label: "Random", value: "4" },
   ];
 
   return (
@@ -104,6 +165,8 @@ export function StartPanel() {
         )}
       </SimpleGrid>
     </SectionCard>
+
+    <PackPresetCard />
 
       <SectionCard
         icon={<IconClock size={16} />}

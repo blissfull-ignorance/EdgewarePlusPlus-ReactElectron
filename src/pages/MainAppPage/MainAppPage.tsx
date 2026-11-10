@@ -17,6 +17,7 @@ import { SafewordModal } from "../../features/panic/SafewordModal";
 import { collectCorruptionDangers, type DangerReport } from "../../features/corruption/danger";
 import { CorruptionDangerModal } from "../../features/corruption/CorruptionDangerModal";
 import { useCorruptionRuntime } from "../../hooks/useCorruptionRuntime";
+import { useCorruptionStore } from "../../stores/corruptionStore";
 import { useWallpaperRotation } from "../../hooks/useWallpaperRotation";
 import { toKeyboardCode } from "../../../electron/utils/panicKeys";
 import { useSchedule } from "../../hooks/useSchedule";
@@ -225,6 +226,29 @@ export function MainAppPage() {
   // Legacy corruption_danger_check: full-permission corruption must disclose
   // the dangerous settings the pack can flip before the runtime starts. The
   // audit reads the pack's raw corruption.json so even blocked keys surface.
+  // Legacy run_script: a pack that ships script.lua drives its own scripted
+  // corruption session; start it with the runtime.
+  const startRuntime = useCallback(() => {
+    start();
+    void (async () => {
+      try {
+        if (await window.api?.pack.hasScript()) {
+          const ok = await window.api?.scripting.runLua("script.lua");
+          if (!ok) logger.warn("[MainAppPage] pack script.lua did not run");
+        }
+      } catch (err) {
+        logger.error("[MainAppPage] pack script failed:", err);
+      }
+    })();
+  }, [start]);
+
+  // Mirror the corruption moods into the main process so pack content
+  // resolvers gate mood-tagged media and text (legacy active-mood pools).
+  const activeMoods = useCorruptionStore((s) => s.activeMoods);
+  useEffect(() => {
+    void window.api?.pack.setActiveMoods(activeMoods).catch(() => undefined);
+  }, [activeMoods]);
+
   const handleStart = useCallback(() => {
     const s = useSettingsStore.getState();
     if (s.showDiscord === 1) {
@@ -247,16 +271,16 @@ export function MainAppPage() {
             setDangerReport(report);
             return;
           }
-          start();
+          startRuntime();
         })
         .catch((err) => {
           logger.error("[MainAppPage] corruption danger check failed:", err);
-          start();
+          startRuntime();
         });
       return;
     }
-    start();
-  }, [start]);
+    startRuntime();
+  }, [startRuntime]);
 
   return (
     <>
@@ -298,7 +322,7 @@ export function MainAppPage() {
         report={dangerReport}
         onProceed={() => {
           setDangerReport(null);
-          start();
+          startRuntime();
         }}
         onCancel={() => setDangerReport(null)}
       />

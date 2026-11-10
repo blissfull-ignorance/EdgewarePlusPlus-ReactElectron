@@ -25,7 +25,11 @@ function injectLevel(level: number): boolean {
     logger.warn(`[Corruption] Rejected inject level ${JSON.stringify(level)}`);
     return false;
   }
-  broadcast("corruption:inject", Math.floor(value));
+  const next = Math.floor(value);
+  // Keep the mirror current even when the renderer runtime has not attached
+  // its listener yet; the runtime pulls the level on activation.
+  mirror.level = next;
+  broadcast("corruption:inject", next);
   return true;
 }
 

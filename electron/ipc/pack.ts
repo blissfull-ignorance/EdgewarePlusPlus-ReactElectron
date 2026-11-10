@@ -4,6 +4,7 @@ import path from "node:path";
 import { ipcMain } from "electron";
 import { logger } from "../utils/logger";
 import { pickSubliminalText, pickNotificationText } from "../utils/textPool";
+import { getActiveMoods, isMoodEligible, setActiveMoods } from "../utils/moodState";
 import { loadAppIconDataUrl } from "../utils/appIcon";
 import { parseDiscordDat } from "../utils/discordDat";
 import { resolveBlacklistSource, computeBlacklistTarget } from "../utils/blacklist";
@@ -320,10 +321,29 @@ function loadPackIndex(packDir: string): Index {
 
 // ── Content resolvers (shared by IPC handlers and the Lua scripting host) ────
 
-function pickRandomFile(dirPath: string, pattern: RegExp): string | null {
+/**
+ * Random file from a pack media dir, mood-gated legacy-style: untagged files
+ * are always eligible; files tagged with a mood need that mood active.
+ */
+function pickMoodEligibleFile(packDir: string, subdir: string, pattern: RegExp): string | null {
+  const dirPath = path.join(packDir, subdir);
   if (!fs.existsSync(dirPath)) return null;
   const all = fs.readdirSync(dirPath).filter((f) => pattern.test(f));
-  return all.length ? all[Math.floor(Math.random() * all.length)] : null;
+  if (!all.length) return null;
+  let mediaMoods: Record<string, string> = {};
+  try {
+    mediaMoods = loadPackIndex(packDir).mediaMoods ?? {};
+  } catch {
+    /* index unreadable → treat everything as untagged */
+  }
+  const eligible = all.filter((f) => isMoodEligible(mediaMoods[f]));
+  return eligible.length ? eligible[Math.floor(Math.random() * eligible.length)] : null;
+}
+
+/** Moods of the active pack that are currently enabled (default excluded). */
+function activeIndexMoods(idx: Index): Index["moods"] {
+  const active = getActiveMoods();
+  return (idx.moods ?? []).filter((m) => m.name && active.has(m.name));
 }
 
 /** A random image filename from the active pack's img/ dir, or null. */
@@ -331,7 +351,7 @@ export function resolveRandomImage(): string | null {
   const packDir = currentPackDir();
   if (!packDir) return null;
   try {
-    return pickRandomFile(path.join(packDir, "img"), /\.(png|jpg|jpeg|gif|webp)$/i);
+    return pickMoodEligibleFile(packDir, "img", /\.(png|jpg|jpeg|gif|webp)$/i);
   } catch (err) {
     logger.error("[Pack] Failed to read random image:", err);
     return null;
@@ -343,7 +363,7 @@ export function resolveRandomAudio(): string | null {
   const packDir = currentPackDir();
   if (!packDir) return null;
   try {
-    return pickRandomFile(path.join(packDir, "aud"), /\.(mp3|wav|ogg|flac)$/i);
+    return pickMoodEligibleFile(packDir, "aud", /\.(mp3|wav|ogg|flac)$/i);
   } catch (err) {
     logger.error("[Pack] Failed to read random audio:", err);
     return null;
@@ -355,7 +375,7 @@ export function resolveRandomVideo(): string | null {
   const packDir = currentPackDir();
   if (!packDir) return null;
   try {
-    return pickRandomFile(path.join(packDir, "vid"), /\.(mp4|webm|mkv)$/i);
+    return pickMoodEligibleFile(packDir, "vid", /\.(mp4|webm|mkv)$/i);
   } catch (err) {
     logger.error("[Pack] Failed to read random video:", err);
     return null;
@@ -396,7 +416,7 @@ export function resolveRandomPrompt(): string | null {
     const idx = loadPackIndex(packDir);
     const pool: string[] = [
       ...(idx.default?.prompts ?? []).filter((p) => typeof p === "string" && p.trim()),
-      ...(idx.moods ?? []).flatMap((m) =>
+      ...activeIndexMoods(idx).flatMap((m) =>
         (m.prompts ?? []).filter((p) => typeof p === "string" && p.trim())
       ),
     ];
@@ -431,7 +451,7 @@ export function resolveRandomWeb(): string | null {
     const idx = loadPackIndex(packDir);
     const pool: Array<{ url: string; args: string[] }> = [
       ...(idx.default?.web ?? []).filter((w) => typeof w?.url === "string" && w.url.trim()),
-      ...(idx.moods ?? []).flatMap((m) =>
+      ...activeIndexMoods(idx).flatMap((m) =>
         (m.web ?? []).filter((w) => typeof w?.url === "string" && !!(w.url as string).trim())
       ),
     ];
@@ -451,7 +471,7 @@ export function resolveNotificationText(): string | null {
   const packDir = currentPackDir();
   if (!packDir) return null;
   try {
-    return pickNotificationText(loadPackIndex(packDir));
+    return pickNotificationText(loadPackIndex(packDir), Math.random, getActiveMoods());
   } catch (err) {
     logger.error("[Pack] Failed to read random notification text:", err);
     return null;
@@ -463,7 +483,7 @@ export function resolveSubliminalText(): string | null {
   const packDir = currentPackDir();
   if (!packDir) return null;
   try {
-    return pickSubliminalText(loadPackIndex(packDir));
+    return pickSubliminalText(loadPackIndex(packDir), Math.random, getActiveMoods());
   } catch (err) {
     logger.error("[Pack] Failed to read random subliminal text:", err);
     return null;
@@ -582,7 +602,7 @@ function registerHandlers(): void {
     const packDir = currentPackDir();
     if (!packDir) return null;
     try {
-      return pickSubliminalText(loadPackIndex(packDir));
+      return pickSubliminalText(loadPackIndex(packDir), Math.random, getActiveMoods());
     } catch (err) {
       logger.error("[Pack] Failed to read random subliminal text:", err);
       return null;
@@ -664,6 +684,62 @@ function registerHandlers(): void {
    * Returned unparsed: the danger audit inspects the raw per-level config
    * maps, including keys the runtime would refuse to apply.
    */
+  /**
+   * Mirror the renderer's active corruption moods into the main process so
+   * content resolvers gate mood-tagged media and text like the legacy app.
+   */
+  ipcMain.handle("pack:setActiveMoods", async (_event, moods: unknown): Promise<void> => {
+    setActiveMoods(Array.isArray(moods) ? moods.filter((m): m is string => typeof m === "string") : []);
+  });
+
+  /** The active pack's mood catalogue for the moods panel. */
+  ipcMain.handle(
+    "pack:listMoods",
+    async (): Promise<Array<{ name: string; mediaCount: number; captionCount: number }>> => {
+      const packDir = currentPackDir();
+      if (!packDir) return [];
+      try {
+        const idx = loadPackIndex(packDir);
+        const mediaCount = (name: string) =>
+          Object.values(loadPackIndex(packDir).mediaMoods ?? {}).filter((m) => m === name).length;
+        return (idx.moods ?? [])
+          .filter((m): m is Index["moods"][number] & { name: string } => typeof m.name === "string" && !!m.name)
+          .map((m) => ({
+            name: m.name,
+            mediaCount: mediaCount(m.name),
+            captionCount: (m.captions ?? []).length,
+          }));
+      } catch (err) {
+        logger.error("[Pack] Failed to list moods:", err);
+        return [];
+      }
+    }
+  );
+
+  /**
+   * The pack's suggested configuration (its config.json), with the legacy
+   * filter: version markers and the pack path are never presets.
+   */
+  ipcMain.handle("pack:loadPackConfig", async (): Promise<Record<string, unknown> | null> => {
+    const packDir = currentPackDir();
+    if (!packDir) return null;
+    const cfg = readJson<Record<string, unknown>>(path.join(packDir, "config.json"));
+    if (!cfg) return null;
+    const filtered: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(cfg)) {
+      if (key === "version" || key === "versionplusplus" || key === "packPath") continue;
+      filtered[key] = value;
+    }
+    return filtered;
+  });
+
+  /** Whether the active pack ships a script.lua (scripted corruption). */
+  ipcMain.handle("pack:hasScript", async (): Promise<boolean> => {
+    const packDir = currentPackDir();
+    if (!packDir) return false;
+    return fs.existsSync(path.join(packDir, "script.lua"));
+  });
+
   ipcMain.handle("pack:loadCorruption", async (): Promise<Record<string, unknown> | null> => {
     const packDir = currentPackDir();
     if (!packDir) return null;

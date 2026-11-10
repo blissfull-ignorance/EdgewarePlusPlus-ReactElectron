@@ -114,16 +114,16 @@ export function CorruptionPanel() {
 
         <ConfigToggle
           label="Cycle Wallpaper in Corruption"
-          value={corruptionWallpaperCycle}
-          onChange={(val) => setRaw({ corruptionWallpaperCycle: val })}
+          value={corruptionWallpaperCycle === 0 ? 1 : 0}
+          onChange={(val) => setRaw({ corruptionWallpaperCycle: val === 1 ? 0 : 1 })}
           disabled={!corruptionMode}
           description="Change wallpaper on each level"
         />
 
         <ConfigToggle
           label="Cycle Themes in Corruption"
-          value={corruptionThemeCycle}
-          onChange={(val) => setRaw({ corruptionThemeCycle: val })}
+          value={corruptionThemeCycle === 0 ? 1 : 0}
+          onChange={(val) => setRaw({ corruptionThemeCycle: val === 1 ? 0 : 1 })}
           disabled={!corruptionMode}
           description="Change theme on each level"
         />
