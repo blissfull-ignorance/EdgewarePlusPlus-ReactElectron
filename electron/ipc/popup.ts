@@ -99,9 +99,9 @@ function createPopupWindow(
   const id = `popup-${Date.now()}-${Math.random().toString(36).slice(2)}`;
   const bounds = getPrimaryMonitorBounds();
 
-  // Audio pops are a small chip, not a media window (owner: no window, just a
-  // symbol). Media pops start at a default frame and resize to the file once
-  // the renderer knows its natural size (popup:sizeToMedia).
+  // Audio pops are a small chip, not a media window. Media pops start at a
+  // default frame and resize to the file once the renderer knows its natural
+  // size (popup:sizeToMedia).
   const isAudio = type === "audio";
   const isSubliminal = type === "subliminal";
   const defaultWidth = isAudio ? 140 : 400;

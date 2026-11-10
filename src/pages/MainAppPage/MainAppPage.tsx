@@ -223,9 +223,6 @@ export function MainAppPage() {
   useWallpaperRotation(isRunning);
   useSchedule(isRunning);
 
-  // Legacy corruption_danger_check: full-permission corruption must disclose
-  // the dangerous settings the pack can flip before the runtime starts. The
-  // audit reads the pack's raw corruption.json so even blocked keys surface.
   // Legacy run_script: a pack that ships script.lua drives its own scripted
   // corruption session; start it with the runtime.
   const startRuntime = useCallback(() => {
@@ -249,6 +246,9 @@ export function MainAppPage() {
     void window.api?.pack.setActiveMoods(activeMoods).catch(() => undefined);
   }, [activeMoods]);
 
+  // Legacy corruption_danger_check: full-permission corruption must disclose
+  // the dangerous settings the pack can flip before the runtime starts. The
+  // audit reads the pack's raw corruption.json so even blocked keys surface.
   const handleStart = useCallback(() => {
     const s = useSettingsStore.getState();
     if (s.showDiscord === 1) {

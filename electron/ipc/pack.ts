@@ -680,11 +680,6 @@ function registerHandlers(): void {
   });
 
   /**
-   * The pack's raw corruption.json, or null when the pack ships none.
-   * Returned unparsed: the danger audit inspects the raw per-level config
-   * maps, including keys the runtime would refuse to apply.
-   */
-  /**
    * Mirror the renderer's active corruption moods into the main process so
    * content resolvers gate mood-tagged media and text like the legacy app.
    */
@@ -700,8 +695,9 @@ function registerHandlers(): void {
       if (!packDir) return [];
       try {
         const idx = loadPackIndex(packDir);
+        const mediaMoods = idx.mediaMoods ?? {};
         const mediaCount = (name: string) =>
-          Object.values(loadPackIndex(packDir).mediaMoods ?? {}).filter((m) => m === name).length;
+          Object.values(mediaMoods).filter((m) => m === name).length;
         return (idx.moods ?? [])
           .filter((m): m is Index["moods"][number] & { name: string } => typeof m.name === "string" && !!m.name)
           .map((m) => ({
@@ -740,6 +736,11 @@ function registerHandlers(): void {
     return fs.existsSync(path.join(packDir, "script.lua"));
   });
 
+  /**
+   * The pack's raw corruption.json, or null when the pack ships none.
+   * Returned unparsed: the danger audit inspects the raw per-level config
+   * maps, including keys the runtime would refuse to apply.
+   */
   ipcMain.handle("pack:loadCorruption", async (): Promise<Record<string, unknown> | null> => {
     const packDir = currentPackDir();
     if (!packDir) return null;

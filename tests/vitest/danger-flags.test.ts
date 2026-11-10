@@ -53,9 +53,9 @@ describe("collectSettingDangers", () => {
     expect(keys).toContain("timerMode");
   });
 
-  it("reports a sub-2s popup delay", () => {
+  it("reports a sub-2s popup delay, including zero", () => {
     expect(collectSettingDangers({ ...safe, delay: 1500 }).map((w) => w.key)).toContain("delay");
-    expect(collectSettingDangers({ ...safe, delay: 0 })).toEqual([]);
+    expect(collectSettingDangers({ ...safe, delay: 0 }).map((w) => w.key)).toContain("delay");
     expect(collectSettingDangers({ ...safe, delay: 5000 })).toEqual([]);
   });
 

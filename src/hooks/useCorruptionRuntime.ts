@@ -1,13 +1,14 @@
 /**
  * @file useCorruptionRuntime — drives corruption levels while the runtime runs.
  *
- * On activation with corruption mode on: loads the pack's corruption.json
- * into the corruption store, applies the starting level, and follows the
- * configured trigger — Timed (interval), Popup (spawn counter), Launch
- * (persisted launch count replay) or Script (injections relayed from the
- * main process). Each transition applies mood changes, full-permission
- * config overrides (theme changes additionally gated), the level wallpaper
- * when allowed, and publishes the level to the main process for the Lua API.
+ * On activation the pack's corruption.json is loaded and script-driven level
+ * injections are applied even with corruption mode off (the pack script owns
+ * the session). With corruption mode on the configured auto trigger also
+ * runs — Timed (interval), Popup (spawn counter), Launch (persisted launch
+ * count replay) or Script (start level only). Each transition applies mood
+ * changes, full-permission config overrides (theme changes additionally
+ * gated), the level wallpaper when allowed, and publishes the level to the
+ * main process for the Lua API.
  */
 import { useEffect } from "react";
 import { useSettingsStore } from "../stores/settingsStore";
