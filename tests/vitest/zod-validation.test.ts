@@ -15,6 +15,25 @@ describe("validateSettings", () => {
     expect(issues).toHaveLength(0);
   });
 
+  it("reports nothing for safe values of danger-flagged options", () => {
+    // These options carry legacy danger annotations; the schema must stay
+    // silent while the dangerous value is not actually set.
+    const issues = validateSettings({
+      fill: 0,
+      replace: 0,
+      mitosisMode: 0,
+      panicDisabled: 0,
+      corruptionWallpaperCycle: 0,
+      corruptionThemeCycle: 0,
+      showDiscord: 0,
+      startOnLogon: 0,
+      runOnSaveQuit: 0,
+      timerMode: 0,
+      delay: 5000,
+    });
+    expect(issues).toHaveLength(0);
+  });
+
   it("catches percentage out of range (too low)", () => {
     const issues = validateSettings({
       popupMod: -5,

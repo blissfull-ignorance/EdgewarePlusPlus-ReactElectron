@@ -143,27 +143,28 @@ export const CONFIG_KEYS_TO_FIELD: Record<string, string> = {
 
 export const RUN_ON_SAVE_QUIT_DANGER =
   "Edgeware will run on Save & Exit (AKA: when you hit Yes!)";
-const PANIC_LOCKOUT_DANGER =
+export const PANIC_LOCKOUT_DANGER =
   "Panic Lockout is enabled! Panic cannot be used until a specific time! Make sure you know your Safeword!";
-const MITOSIS_MODE_DANGER =
+export const MITOSIS_MODE_DANGER =
   "Mitosis Mode is enabled! With high popup rates, this could create a chain reaction, causing lag!";
-const HIBERNATE_DELAY_MIN_DANGER =
+export const HIBERNATE_DELAY_MIN_DANGER =
   "You are running Hibernate Mode with a short minimum cooldown! You might experience lag!";
-const HIBERNATE_DELAY_MAX_DANGER =
+export const HIBERNATE_DELAY_MAX_DANGER =
   "You are running Hibernate Mode with a short maximum cooldown! You might experience lag!";
-const SHOW_ON_DISCORD_DANGER =
+export const SHOW_ON_DISCORD_DANGER =
   "Show on Discord is enabled! This could lead to potential embarrassment!";
-const PANIC_DISABLED_DANGER =
+export const PANIC_DISABLED_DANGER =
   "Panic Hotkey is disabled! If you want to easily close Edgeware, check the documentation!";
-const FILL_DRIVE_DANGER =
+export const FILL_DRIVE_DANGER =
   "Fill Drive is enabled! Edgeware will place images all over your computer!";
-const REPLACE_IMAGES_DANGER =
+export const REPLACE_IMAGES_DANGER =
   "Replace Images is enabled! THIS WILL DELETE FILES ON YOUR COMPUTER!";
-const RUN_AT_STARTUP_DANGER =
+export const RUN_AT_STARTUP_DANGER =
   "Launch on PC Startup is enabled! This will run Edgeware when you start your computer!";
 
 /**
- * All 93 config items as Zod schemas with danger-level and block metadata.
+ * All config items as Zod schemas (type/range validation only). Danger flags
+ * live in features/corruption/dangerFlags and reflect the live settings.
  * Matches the legacy `items.py` CONFIG_ITEMS dict exactly.
  */
 export const CONFIG_ITEMS: Record<string, z.ZodType> = {
@@ -172,30 +173,14 @@ export const CONFIG_ITEMS: Record<string, z.ZodType> = {
   themeType: z
     .enum(["Original", "Dark", "The One", "Ransom", "Goth", "Bimbo"])
     .describe("UI theme"),
-  themeNoConfig: ZodBoolean.describe("Ignore config theme").refine(() => true, {
-    message: "block: true",
-  }),
-  showLoadingFlair: ZodBoolean.describe("Show splash at startup").refine(() => true, {
-    message: "block: true",
-  }),
-  runOnSaveQuit: ZodBoolean.describe("Run on Save & Exit").refine(() => true, {
-    message: RUN_ON_SAVE_QUIT_DANGER,
-  }),
-  desktopIcons: ZodBoolean.describe("Create desktop icons").refine(() => true, {
-    message: "block: true",
-  }),
-  safeMode: ZodBoolean.describe("Safe mode off").refine(() => true, {
-    message: "block: true",
-  }),
-  messageOff: ZodBoolean.describe("Hide messages").refine(() => true, {
-    message: "block: true",
-  }),
-  globalPanicButton: ZodString.describe("Global panic hotkey").refine(() => true, {
-    message: "block: true",
-  }),
-  presetsDanger: ZodBoolean.describe("Preset danger flag").refine(() => true, {
-    message: "block: true",
-  }),
+  themeNoConfig: ZodBoolean.describe("Ignore config theme"),
+  showLoadingFlair: ZodBoolean.describe("Show splash at startup"),
+  runOnSaveQuit: ZodBoolean.describe("Run on Save & Exit"),
+  desktopIcons: ZodBoolean.describe("Create desktop icons"),
+  safeMode: ZodBoolean.describe("Safe mode off"),
+  messageOff: ZodBoolean.describe("Hide messages"),
+  globalPanicButton: ZodString.describe("Global panic hotkey"),
+  presetsDanger: ZodBoolean.describe("Preset danger flag"),
 
   // ── Popup Types (16) ──
   delay: ZodNonNegative.describe("Delay between popups (ms)"),
@@ -239,9 +224,7 @@ export const CONFIG_ITEMS: Record<string, z.ZodType> = {
   clickthroughPopups: ZodBoolean.describe("Click-through enabled"),
 
   // ── Wallpaper (4) ──
-  rotateWallpaper: ZodBoolean.describe("Rotate wallpaper").refine(() => true, {
-    message: "block: BROKEN",
-  }),
+  rotateWallpaper: ZodBoolean.describe("Rotate wallpaper"),
   wallpaperDat: ZodString.describe("Wallpaper data"),
   wallpaperTimer: ZodNonNegative.describe("Wallpaper change interval (ms)"),
   wallpaperVariance: ZodNonNegative.describe("Wallpaper variance (ms)"),
@@ -252,40 +235,18 @@ export const CONFIG_ITEMS: Record<string, z.ZodType> = {
 
   // ── Dangerous (12) ──
   // Note: fill and replace are FEATURE-DROPPED but config keys remain
-  timerMode: ZodBoolean.describe("Panic lockout mode").refine(() => true, {
-    message: PANIC_LOCKOUT_DANGER,
-  }),
-  safeword: ZodString.describe("Panic lockout password").refine(() => true, {
-    message: "block: true",
-  }),
-  timerSetupTime: ZodNonNegative.describe("Panic lockout duration (min)").refine(() => true, {
-    message: "blocked by corruption",
-  }),
-  avoidList: ZodString.describe("Drive avoid list (delimited)").refine(() => true, {
-    message: "block: true",
-  }),
-  fill: ZodBoolean.describe("FillDrive enabled").refine(() => false, {
-    message: FILL_DRIVE_DANGER,
-  }),
+  timerMode: ZodBoolean.describe("Panic lockout mode"),
+  safeword: ZodString.describe("Panic lockout password"),
+  timerSetupTime: ZodNonNegative.describe("Panic lockout duration (min)"),
+  avoidList: ZodString.describe("Drive avoid list (delimited)"),
+  fill: ZodBoolean.describe("FillDrive enabled"),
   fillDelay: ZodNonNegative.describe("FillDrive delay"),
-  replace: ZodBoolean.describe("ReplaceImages enabled").refine(() => false, {
-    message: REPLACE_IMAGES_DANGER,
-  }),
-  replaceThresh: ZodNonNegative.describe("Replace threshold").refine(() => true, {
-    message: "block: BROKEN",
-  }),
-  drivePath: ZodString.describe("Drive path").refine(() => true, {
-    message: "block: true",
-  }),
-  panicDisabled: ZodBoolean.describe("Panic disabled").refine(() => true, {
-    message: PANIC_DISABLED_DANGER,
-  }),
-  startOnLogon: ZodBoolean.describe("Run at startup").refine(() => true, {
-    message: RUN_AT_STARTUP_DANGER,
-  }),
-  showDiscord: ZodBoolean.describe("Show on Discord").refine(() => true, {
-    message: SHOW_ON_DISCORD_DANGER,
-  }),
+  replace: ZodBoolean.describe("ReplaceImages enabled"),
+  replaceThresh: ZodNonNegative.describe("Replace threshold"),
+  drivePath: ZodString.describe("Drive path"),
+  panicDisabled: ZodBoolean.describe("Panic disabled"),
+  startOnLogon: ZodBoolean.describe("Run at startup"),
+  showDiscord: ZodBoolean.describe("Show on Discord"),
 
   // ── Modes (10) ──
   lkToggle: ZodBoolean.describe("Lowkey mode"),
@@ -294,14 +255,10 @@ export const CONFIG_ITEMS: Record<string, z.ZodType> = {
     .int()
     .min(0)
     .max(4)
-    .describe("Lowkey corner (0=Random, 1-4=corners)"),
-  mitosisMode: ZodBoolean.describe("Mitosis mode").refine(() => false, {
-    message: MITOSIS_MODE_DANGER,
-  }),
+    .describe("Lowkey corner (0=Top right, 1=Top left, 2=Bottom left, 3=Bottom right, 4=Random)"),
+  mitosisMode: ZodBoolean.describe("Mitosis mode"),
   mitosisStrength: ZodNonNegative.describe("Mitosis strength"),
-  hibernateMode: ZodBoolean.describe("Hibernate mode").refine(() => true, {
-    message: "block: BROKEN",
-  }),
+  hibernateMode: ZodBoolean.describe("Hibernate mode"),
   hibernateType: z
     .enum(["Original", "Spaced", "Glitch", "Ramp", "Pump-Scare", "Chaos"])
     .describe("Hibernate burst type"),
@@ -312,12 +269,8 @@ export const CONFIG_ITEMS: Record<string, z.ZodType> = {
   fixWallpaper: ZodBoolean.describe("Fix wallpaper after hibernate"),
 
   // ── Corruption (10) ──
-  corruptionMode: ZodBoolean.describe("Enable corruption mode").refine(() => true, {
-    message: "block: true",
-  }),
-  corruptionFullPerm: ZodBoolean.describe("Corruption full permissions").refine(() => true, {
-    message: "block: true",
-  }),
+  corruptionMode: ZodBoolean.describe("Enable corruption mode"),
+  corruptionFullPerm: ZodBoolean.describe("Corruption full permissions"),
   corruptionTrigger: z
     .enum(["Timed", "Popup", "Launch", "Script"])
     .describe("Corruption trigger type"),
@@ -327,32 +280,18 @@ export const CONFIG_ITEMS: Record<string, z.ZodType> = {
   corruptionTime: ZodNonNegative.describe("Corruption time per level (ms)"),
   corruptionPopups: ZodNonNegative.describe("Corruption popup count trigger"),
   corruptionLaunches: ZodNonNegative.describe("Corruption launch count trigger"),
-  corruptionWallpaperCycle: ZodBoolean.describe("Cycle wallpaper in corruption").refine(() => false, {
-    message: "inverted (negation)",
-  }),
-  corruptionThemeCycle: ZodBoolean.describe("Cycle themes in corruption").refine(() => false, {
-    message: "inverted (negation)",
-  }),
+  corruptionWallpaperCycle: ZodBoolean.describe("Cycle wallpaper in corruption"),
+  corruptionThemeCycle: ZodBoolean.describe("Cycle themes in corruption"),
   corruptionPurityMode: ZodBoolean.describe("Corruption purity mode"),
-  corruptionDevMode: ZodBoolean.describe("Corruption dev mode").refine(() => true, {
-    message: "block: true",
-  }),
+  corruptionDevMode: ZodBoolean.describe("Corruption dev mode"),
 
   // ── Troubleshooting (6) ──
-  toggleHibSkip: ZodBoolean.describe("Toggle hibernate skip").refine(() => true, {
-    message: "block: true",
-  }),
-  toggleMoodSet: ZodBoolean.describe("Toggle mood set").refine(() => true, {
-    message: "block: true",
-  }),
-  toggleInternet: ZodBoolean.describe("Toggle internet").refine(() => true, {
-    message: "block: true",
-  }),
-  mpvSubprocess: ZodBoolean.describe("Use MPV subprocess").refine(() => true, {
-    message: "block: true",
-  }),
+  toggleHibSkip: ZodBoolean.describe("Toggle hibernate skip"),
+  toggleMoodSet: ZodBoolean.describe("Toggle mood set"),
+  toggleInternet: ZodBoolean.describe("Toggle internet"),
+  mpvSubprocess: ZodBoolean.describe("Use MPV subprocess"),
   videoHardwareAcceleration: ZodBoolean.describe("Video hardware acceleration"),
-  panicButton: ZodString.describe("Panic hotkey").refine(() => true, { message: "block: true" }),
+  panicButton: ZodString.describe("Panic hotkey"),
 
   // ── Scheduler (8) ──
   schedule: ZodBoolean.describe("Schedule enabled"),
