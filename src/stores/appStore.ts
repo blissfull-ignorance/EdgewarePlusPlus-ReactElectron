@@ -41,7 +41,12 @@ export const useAppStore = create<AppState>()(
           set((s) => ({ popupsCount: Math.max(0, s.popupsCount - 1) })),
         setHibernateActive: (hibernateActive) => set({ hibernateActive }),
       }),
-      { name: "edgeware-app",  }
+      {
+        name: "edgeware-app",
+        // Runtime state is per-session: a boot must never resurrect a
+        // running session, its popup count, or hibernate.
+        partialize: (state) => ({ packPath: state.packPath, themeType: state.themeType }),
+      }
     ),
     { name: "AppStore" }
   )

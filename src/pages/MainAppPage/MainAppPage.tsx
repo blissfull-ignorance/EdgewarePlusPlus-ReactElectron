@@ -58,6 +58,7 @@ export function MainAppPage() {
       // Web pops do not open a window: like the original app they just launch a
       // pack url in the system's default browser.
       if (media.mediaType === "web") {
+        if (!useAppStore.getState().isRunning) return;
         void window.api?.system.openExternal(media.url).catch(() => undefined);
         return;
       }
@@ -91,6 +92,9 @@ export function MainAppPage() {
         logger.warn(`[MainAppPage] ${popType} pop refused: concurrency cap (${limits.maxAudio}/${limits.maxVideos}) reached`);
         return;
       }
+      // Every await above can outlive the runtime: a Stop during media
+      // selection must not be undone by the spawn that was already in flight.
+      if (!useAppStore.getState().isRunning) return;
 
       let id: string | null = null;
       if (limits.popupRenderMode === "electron") {
@@ -117,6 +121,7 @@ export function MainAppPage() {
       return;
     }
     const limits = useSettingsStore.getState();
+    if (!useAppStore.getState().isRunning) return;
     const id =
       limits.popupRenderMode === "electron"
         ? await spawnPopup("subliminal", text)

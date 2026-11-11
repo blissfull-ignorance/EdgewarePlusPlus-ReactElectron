@@ -22,6 +22,7 @@ import { IconPhoto, IconVideo, IconMusic, IconLock } from "@tabler/icons-react";
 import type { GalleryEntry, GalleryResult } from "../../types/pack";
 import { resolvePackMediaUrl, type MediaDir } from "../popup/resolveMediaUrl";
 import { useSettingsStore } from "../../stores/settingsStore";
+import { useCorruptionStore } from "../../stores/corruptionStore";
 
 const KIND_DIR: Record<GalleryEntry["kind"], MediaDir> = {
   image: "img",
@@ -76,7 +77,7 @@ export function GalleryPanel() {
     let alive = true;
     setLoading(true);
     void window.api?.pack
-      .listGallery()
+      .listGallery(packPath)
       .then((res) => {
         if (alive) setData(res);
       })
@@ -89,7 +90,11 @@ export function GalleryPanel() {
     };
   }, [packPath]);
 
-  const active = useMemo(() => new Set(data.activeMoods), [data.activeMoods]);
+  const sessionMoods = useCorruptionStore((s) => s.activeMoods);
+  const active = useMemo(
+    () => new Set([...data.activeMoods, ...sessionMoods]),
+    [data.activeMoods, sessionMoods]
+  );
 
   const visible = useMemo(
     () =>

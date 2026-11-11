@@ -3,6 +3,7 @@ import { act, renderHook, screen, waitFor, cleanup } from "@testing-library/reac
 import { MainAppPage } from "../../src/pages/MainAppPage/MainAppPage";
 import { usePopupLifecycle } from "../../src/hooks/usePopupLifecycle";
 import { useAppStore } from "../../src/stores/appStore";
+import { registerOpenPopup } from "../../src/features/popup/openPopups";
 import { useSettingsStore } from "../../src/stores/settingsStore";
 import { usePopupOverlayStore } from "../../src/stores/popupOverlayStore";
 import { renderWithMantine } from "./setup";
@@ -97,6 +98,8 @@ describe("usePopupLifecycle spawning (Electron mode)", () => {
     renderHook(() => usePopupLifecycle());
 
     act(() => {
+      registerOpenPopup("popup-1", "image");
+      registerOpenPopup("popup-2", "video");
       useAppStore.getState().incrementPopups();
       useAppStore.getState().incrementPopups();
     });
@@ -104,6 +107,13 @@ describe("usePopupLifecycle spawning (Electron mode)", () => {
 
     const onClosed = window as unknown as { __onPopupClosed?: (id: string) => void };
     expect(onClosed.__onPopupClosed).toBeTypeOf("function");
+
+    // A close for an id the renderer never spawned (script popup) must not
+    // erode the count.
+    act(() => {
+      onClosed.__onPopupClosed!("popup-lua");
+    });
+    expect(useAppStore.getState().popupsCount).toBe(2);
 
     act(() => {
       onClosed.__onPopupClosed!("popup-1");

@@ -86,6 +86,10 @@ async function testLoadIndex(files: Record<string, string | null>) {
       handle: (channel: string, handler: (...args: unknown[]) => unknown) => {
         handlers[channel] = handler;
       },
+  
+      on: (channel: string, handler: (...args: unknown[]) => unknown) => {
+        handlers[channel] = handler;
+      },
     },
     app: {
       getPath: (key: string) => {
@@ -315,6 +319,9 @@ describe("Desktop notification IPC via system:sendNotification", () => {
     vi.doMock("electron", () => ({
       ipcMain: {
         handle: (channel: string, handler: (...args: unknown[]) => unknown) => {
+          handlers[channel] = handler;
+        },
+        on: (channel: string, handler: (...args: unknown[]) => unknown) => {
           handlers[channel] = handler;
         },
       },

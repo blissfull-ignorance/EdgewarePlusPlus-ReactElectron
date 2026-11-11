@@ -92,7 +92,7 @@ export interface ElectronAPI {
     /** Whether the active pack ships a script.lua. */
     hasScript: () => Promise<boolean>;
     /** Every pack media file with its mood tags, for the gallery. */
-    listGallery: () => Promise<import("./pack").GalleryResult>;
+    listGallery: (packPath?: string | null) => Promise<import("./pack").GalleryResult>;
     /** The pack's startup splash image as a data URL, or null when the pack ships none. */
     splashImage: () => Promise<string | null>;
     /** The app icon (pack icon or bundled default) as a data URL, or null. */
@@ -190,6 +190,8 @@ export interface ElectronAPI {
     getPathForFile: (file: File) => string | null;
     /** Load settings from config.json on disk */
     loadSettings: () => Promise<Record<string, unknown> | null>;
+    /** Synchronous last-chance write of settings from the renderer's unload hook */
+    flushSettings: (values: Record<string, unknown>) => boolean;
     /** Save settings to config.json on disk */
     saveSettings: (settings: Record<string, unknown>) => Promise<void>;
     /** Send a native desktop notification */

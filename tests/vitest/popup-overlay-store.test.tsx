@@ -2,6 +2,7 @@ import { describe, expect, it, beforeEach } from "vitest";
 import { screen, waitFor, cleanup, fireEvent } from "@testing-library/react";
 import { usePopupOverlayStore } from "../../src/stores/popupOverlayStore";
 import { useAppStore } from "../../src/stores/appStore";
+import { registerOpenPopup } from "../../src/features/popup/openPopups";
 import { InAppPopupOverlay } from "../../src/components/InAppPopupOverlay";
 import { renderWithMantine } from "./setup";
 
@@ -146,6 +147,7 @@ describe("InAppPopupOverlay", () => {
     renderWithMantine(<InAppPopupOverlay />);
 
     const id = usePopupOverlayStore.getState().addPopup({ type: "image", mediaId: "img/x.png" });
+    registerOpenPopup(id, "image");
     useAppStore.getState().incrementPopups();
 
     await waitFor(() => {

@@ -6,7 +6,7 @@
  * safeword and hands it to `panic:unlock`, which completes the teardown on a
  * match and keeps the app running otherwise.
  */
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button, Group, Modal, Stack, Text, TextInput } from "@mantine/core";
 
 export interface SafewordModalProps {
@@ -17,6 +17,15 @@ export interface SafewordModalProps {
 export function SafewordModal({ opened, onClose }: SafewordModalProps) {
   const [value, setValue] = useState("");
   const [wrong, setWrong] = useState(false);
+
+  // Each lockout starts a fresh prompt: a previous attempt's text must not
+  // sit in the field when the modal reopens.
+  useEffect(() => {
+    if (opened) {
+      setValue("");
+      setWrong(false);
+    }
+  }, [opened]);
 
   const submit = () => {
     void window.api?.panic.unlock(value).then((result) => {

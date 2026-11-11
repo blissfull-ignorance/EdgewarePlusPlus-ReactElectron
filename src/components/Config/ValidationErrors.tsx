@@ -2,28 +2,23 @@ import { Alert, List, Text } from "@mantine/core";
 import { useMemo } from "react";
 import { useSettingsStore } from "../../stores/settingsStore";
 import { collectSettingDangers } from "../../features/corruption/dangerFlags";
-import type { ValidationIssue } from "../../utils/zodValidation";
-
-interface ValidationErrorsProps {
-  errors: ValidationIssue[];
-}
+import { validateSettings } from "../../utils/zodValidation";
 
 /**
- * Live configuration warnings: schema issues in the loaded file plus the
- * legacy danger flags that the current values actually trigger. Nothing is
- * listed unless it is active right now.
+ * Live configuration warnings: the legacy danger flags and schema issues
+ * computed from the values currently in the store. Nothing is listed unless
+ * it is active right now, and correcting a value clears its line.
  */
-export function ValidationErrors({ errors }: ValidationErrorsProps) {
+export function ValidationErrors() {
   const settings = useSettingsStore();
 
   const items = useMemo(() => {
-    const dangers = collectSettingDangers(
-      settings as unknown as Record<string, unknown>
-    ).map((d) => ({ key: d.key, message: d.message }));
+    const record = settings as unknown as Record<string, unknown>;
+    const dangers = collectSettingDangers(record);
     const dangerKeys = new Set(dangers.map((d) => d.key));
-    const schemaIssues = (errors ?? []).filter((e) => !dangerKeys.has(e.key));
+    const schemaIssues = validateSettings(record).filter((e) => !dangerKeys.has(e.key));
     return [...dangers, ...schemaIssues];
-  }, [settings, errors]);
+  }, [settings]);
 
   if (items.length === 0) return null;
 

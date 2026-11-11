@@ -14,8 +14,8 @@ export function registerOpenPopup(id: string, type: string): void {
   openTypes.set(id, type);
 }
 
-export function unregisterOpenPopup(id: string): void {
-  openTypes.delete(id);
+export function unregisterOpenPopup(id: string): boolean {
+  return openTypes.delete(id);
 }
 
 export function clearOpenPopups(): void {

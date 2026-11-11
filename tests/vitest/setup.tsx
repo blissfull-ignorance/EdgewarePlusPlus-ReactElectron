@@ -152,6 +152,7 @@ if (typeof window !== "undefined") {
       onImportProgress: vi.fn().mockReturnValue(() => undefined),
       getPathForFile: vi.fn().mockReturnValue(null),
       loadSettings: vi.fn().mockResolvedValue(null),
+      flushSettings: vi.fn().mockReturnValue(true),
       saveSettings: vi.fn().mockResolvedValue(undefined),
       sendNotification: vi.fn().mockResolvedValue(undefined),
       openExternal: vi.fn().mockResolvedValue(false),

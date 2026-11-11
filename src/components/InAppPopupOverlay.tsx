@@ -28,9 +28,10 @@ export function InAppPopupOverlay() {
 
   const handleClose = (id: string) => {
     removePopup(id);
-    unregisterOpenPopup(id);
-    useAppStore.getState().decrementPopups();
-    maybeOpenWebOnClose();
+    if (unregisterOpenPopup(id)) {
+      useAppStore.getState().decrementPopups();
+      maybeOpenWebOnClose();
+    }
   };
 
   const handleBlacklist = (id: string, mediaId: string) => {

@@ -20,6 +20,16 @@ import { initialMoveState, stepMove } from "../../src/features/popup/windowMovem
 // Registry of open popup windows, keyed by popup ID
 const popupWindows = new Map<string, BrowserWindow>();
 
+// Window type per popup ID, for the legacy concurrency caps
+const popupTypes = new Map<string, string>();
+
+/** How many popups of a type are currently open (legacy max_audio/max_videos). */
+export function countPopupsByType(type: "audio" | "video" | "image"): number {
+  let n = 0;
+  for (const t of popupTypes.values()) if (t === type) n += 1;
+  return n;
+}
+
 // Per-popup window movers (legacy try_move loop), stopped when the window closes
 const movers = new Map<string, ReturnType<typeof setInterval>>();
 
@@ -136,7 +146,10 @@ function createPopupWindow(
     alwaysOnTop: true,
     skipTaskbar: true,
     hasShadow: false,
-    focusable: true,
+    // Popups take mouse clicks but never window focus: focusable popups
+    // starve the main window's input routing once many are open, which can
+    // leave the user unable to click Stop during a storm.
+    focusable: false,
     webPreferences: {
       contextIsolation: true,
       nodeIntegration: false,
@@ -152,10 +165,12 @@ function createPopupWindow(
   popupWin.on("closed", () => {
     stopMoving(id);
     popupWindows.delete(id);
+    popupTypes.delete(id);
     notifyPopupClosed(id);
   });
 
   popupWindows.set(id, popupWin);
+  popupTypes.set(id, type);
 
   logger.info(`[Popup] Created popup ${id}: type=${type}, mediaId=${mediaId}`);
   return { id };
@@ -175,9 +190,17 @@ function closePopupById(id: string): void {
 function closeAllPopups(): void {
   const ids = Array.from(popupWindows.keys());
   for (const id of ids) {
-    closePopupById(id);
+    stopMoving(id);
+    const win = popupWindows.get(id);
+    popupWindows.delete(id);
+    popupTypes.delete(id);
+    // Destroy, not close: teardown must not wait on per-window unload
+    // handling while dozens of windows come down at once. The "closed"
+    // event still fires, so listeners see every window go.
+    if (win && !win.isDestroyed()) win.destroy();
+    logger.info(`[Popup] Closed popup ${id}`);
   }
-  logger.info(`[Popup] Closed all popups (${ids.length} total)`);
+  if (ids.length) logger.info(`[Popup] Closed all popups (${ids.length} total)`);
 }
 
 function registerHandlers(): void {

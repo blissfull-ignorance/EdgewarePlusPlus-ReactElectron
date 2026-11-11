@@ -9,7 +9,7 @@ import { useCallback, useEffect, useRef } from "react";
 import { useAppStore } from "../stores/appStore";
 import { useSettingsStore } from "../stores/settingsStore";
 import { maybeOpenWebOnClose } from "../features/popup/webOnClose";
-import { unregisterOpenPopup } from "../features/popup/openPopups";
+import { registerOpenPopup, unregisterOpenPopup } from "../features/popup/openPopups";
 
 export interface PopupInstance {
   id: string;
@@ -43,6 +43,7 @@ export function usePopupLifecycle(options: UsePopupLifecycleOptions = {}) {
           console.error("[usePopupLifecycle] popup:create returned no id");
           return null;
         }
+        registerOpenPopup(result.id, type);
         incrementPopups();
         return result.id;
       } catch (err) {
@@ -56,9 +57,14 @@ export function usePopupLifecycle(options: UsePopupLifecycleOptions = {}) {
   useEffect(() => {
     if (!window.api) return;
     const unsubscribe = window.api.popup.onClosed((id: string) => {
-      unregisterOpenPopup(id);
-      decrementPopups();
-      maybeOpenWebOnClose();
+      // Only renderer-spawned popups own a count slot; script-spawned
+      // windows closing must not erode the popup count.
+      if (unregisterOpenPopup(id)) {
+        decrementPopups();
+        // Web-on-close belongs to the session: a Stop-driven mass close
+        // must not launch browsers.
+        if (useAppStore.getState().isRunning) maybeOpenWebOnClose();
+      }
     });
     return unsubscribe;
   }, [decrementPopups]);
@@ -69,10 +75,10 @@ export function usePopupLifecycle(options: UsePopupLifecycleOptions = {}) {
 
       try {
         await window.api.popup.closePopup(id);
-        decrementPopups();
+        if (unregisterOpenPopup(id)) decrementPopups();
       } catch (err) {
         console.error("[usePopupLifecycle] Failed to close popup:", err);
-        decrementPopups();
+        if (unregisterOpenPopup(id)) decrementPopups();
       }
     },
     [decrementPopups]

@@ -94,6 +94,7 @@ if (typeof window !== "undefined" && !(window as unknown as Record<string, unkno
       // The startup splash is verified in the Electron layer; the browser
       // harness starts straight on the app UI.
       loadSettings: async () => ({ showLoadingFlair: 0 }),
+      flushSettings: () => true,
       saveSettings: async () => undefined,
       sendNotification: async () => undefined,
       openExternal: async () => false,

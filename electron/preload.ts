@@ -19,7 +19,7 @@ const electronAPI: ElectronAPI = {
     listMoods: () => ipcRenderer.invoke("pack:listMoods"),
     loadPackConfig: () => ipcRenderer.invoke("pack:loadPackConfig"),
     hasScript: () => ipcRenderer.invoke("pack:hasScript"),
-    listGallery: () => ipcRenderer.invoke("pack:listGallery"),
+    listGallery: (packPath) => ipcRenderer.invoke("pack:listGallery", packPath),
     splashImage: () => ipcRenderer.invoke("pack:splashImage"),
     iconImage: () => ipcRenderer.invoke("pack:iconImage"),
     blacklist: (fileName) => ipcRenderer.invoke("pack:blacklistMedia", fileName),
@@ -111,6 +111,7 @@ const electronAPI: ElectronAPI = {
       }
     },
     loadSettings: () => ipcRenderer.invoke("system:loadSettings"),
+    flushSettings: (values) => ipcRenderer.sendSync("system:saveSettingsSync", values),
     saveSettings: (settings) =>
       ipcRenderer.invoke("system:saveSettings", settings),
     sendNotification: (title, message, attachmentPath) =>

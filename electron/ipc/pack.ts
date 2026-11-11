@@ -739,10 +739,14 @@ function registerHandlers(): void {
    * gallery browser. Untagged files are default content; the mood list and
    * currently-active moods let the UI group and badge entries.
    */
-  ipcMain.handle("pack:listGallery", async (): Promise<GalleryResult> => {
-    const packDir = currentPackDir();
+  ipcMain.handle("pack:listGallery", async (_event, packPathArg?: unknown): Promise<GalleryResult> => {
+    // The renderer passes the store's packPath: switching packs is visible
+    // in the store before the autosave reaches disk, and reading a
+    // directory off disk would race that flush.
+    const requested = typeof packPathArg === "string" && packPathArg ? packPathArg : null;
+    const packDir = requested ?? currentPackDir();
     const activeMoods = [...getActiveMoods()];
-    if (!packDir) return { entries: [], moods: [], activeMoods };
+    if (!packDir || !fs.existsSync(packDir)) return { entries: [], moods: [], activeMoods };
     try {
       const indexRaw = readJson<{ moods?: Array<{ mood?: unknown; media?: unknown }> }>(
         path.join(packDir, "index.json")

@@ -345,6 +345,34 @@ export interface SettingsStore {
   setRaw: (values: Partial<Record<string, unknown>>) => void;
 }
 
+/**
+ * The persistable settings record: every state value except the store's own
+ * machinery. Unknown keys carried in the store (user-added config entries)
+ * round-trip untouched; keys that would shadow a store method are dropped so
+ * a hostile config can not disable persistence by being named `save`.
+ */
+export function collectSettingsValues(state: object): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const key of Object.keys(state)) {
+    const val = (state as Record<string, unknown>)[key];
+    if (typeof val === "function") continue;
+    if (NON_PERSISTED_KEYS.has(key) || STORE_METHOD_KEYS.has(key)) continue;
+    out[key] = val;
+  }
+  return out;
+}
+
+const NON_PERSISTED_KEYS = new Set([
+  "saveStatus",
+  "saveErrorMessage",
+  "dirty",
+  "loaded",
+  "validationErrors",
+]);
+
+/** Store methods a hostile config key must never be able to shadow. */
+const STORE_METHOD_KEYS = new Set(["load", "save", "setRaw"]);
+
 export const useSettingsStore = create<SettingsStore>()(
   devtools(
     persist(
@@ -372,16 +400,21 @@ export const useSettingsStore = create<SettingsStore>()(
               if (validationErrors.length > 0) {
                 logger.warn("[settingsStore] Validation issues on load:", validationErrors);
               }
-              set({ ...loaded, validationErrors, dirty: false, loaded: true } as Partial<SettingsStore>);
+              // Disk wins for every key it carries; keys absent fall back to
+              // defaults rather than to whatever a previous session left in
+              // local storage. Keys that would shadow store machinery are
+              // dropped so a config entry cannot disable save/load.
+              const clean = collectSettingsValues({ ...DEFAULT_SETTINGS, ...loaded });
+              set({ ...clean, validationErrors, dirty: false, loaded: true } as Partial<SettingsStore>);
               if (migrated) {
                 // Persist immediately: the main process registers the global
                 // panic shortcut from the stored file, not from this store.
                 void window.api?.system
-                  .saveSettings(loaded)
+                  .saveSettings(clean)
                   .then(() => window.api?.panic.refreshShortcut())
                   .catch(() => undefined);
               }
-              return { ...DEFAULT_SETTINGS, ...loaded } as SettingsValues;
+              return clean as SettingsValues;
             }
             // No file on disk: the disk is the source of truth, so a stale
             // rehydrated store must not masquerade as the user's settings.
@@ -396,20 +429,7 @@ export const useSettingsStore = create<SettingsStore>()(
 
         save: async (): Promise<void> => {
           const state = useSettingsStore.getState();
-          const stateAsRecord: Record<string, unknown> = {};
-          for (const key of Object.keys(state)) {
-            const val = state[key as keyof SettingsStore];
-            if (
-              typeof val !== "function" &&
-              key !== "saveStatus" &&
-              key !== "saveErrorMessage" &&
-              key !== "dirty" &&
-              key !== "loaded" &&
-              key !== "validationErrors"
-            ) {
-              stateAsRecord[key] = val;
-            }
-          }
+          const stateAsRecord = collectSettingsValues(state);
           set({ saveStatus: "saving", saveErrorMessage: null });
           try {
             await window.api?.system.saveSettings(stateAsRecord);
@@ -442,13 +462,7 @@ export const useSettingsStore = create<SettingsStore>()(
       {
         name: "edgeware-settings",
         version: 1,
-        partialize: (state) =>
-          Object.fromEntries(
-            Object.entries(state).filter(
-              ([key]) =>
-                !["saveStatus", "saveErrorMessage", "dirty", "loaded", "validationErrors"].includes(key)
-            )
-          ) as SettingsStore,
+        partialize: (state) => collectSettingsValues(state) as unknown as SettingsStore,
       }
     ),
     { name: "SettingsStore" }

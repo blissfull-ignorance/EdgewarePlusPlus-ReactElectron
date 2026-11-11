@@ -14,7 +14,6 @@ import { ModesPanel } from "./ConfigPanels/Modes/ModesPanel";
 import { CorruptionPanel } from "./ConfigPanels/Corruption/CorruptionPanel";
 import { TroubleshootingPanel } from "./ConfigPanels/Troubleshooting/TroubleshootingPanel";
 import { ValidationErrors } from "./ValidationErrors";
-import { useSettingsStore } from "../../stores";
 
 const CONFIG_TABS: { value: string; label: string; icon: Icon; description: string }[] = [
   {
@@ -62,7 +61,6 @@ export function ConfigPage({
   generalTab = "start",
   onGeneralTabChange,
 }: ConfigPageProps) {
-  const validationErrors = useSettingsStore((s) => s.validationErrors);
   const active = CONFIG_TABS.find((t) => t.value === tab) ?? CONFIG_TABS[0];
 
   return (
@@ -76,7 +74,7 @@ export function ConfigPage({
         </Text>
       </Stack>
 
-      {validationErrors.length > 0 ? <ValidationErrors errors={validationErrors} /> : null}
+      <ValidationErrors />
 
       <Tabs value={tab} onChange={(value) => onTabChange?.(value ?? tab)}>
         <Tabs.List mb="md">

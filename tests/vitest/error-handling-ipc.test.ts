@@ -13,6 +13,7 @@ const mockReaddir = vi.fn();
 const mockReadFileSync = vi.fn();
 const mockWriteFile = vi.fn();
 const mockRename = vi.fn();
+const mockRm = vi.fn();
 
 vi.mock("fs", () => ({
   default: {
@@ -23,6 +24,7 @@ vi.mock("fs", () => ({
       readdir: (...args: unknown[]) => mockReaddir(...args),
       writeFile: (...args: unknown[]) => mockWriteFile(...args),
       rename: (...args: unknown[]) => mockRename(...args),
+      rm: (...args: unknown[]) => mockRm(...args),
     },
   },
   existsSync: (...args: unknown[]) => mockExistsSync(...args),
@@ -37,6 +39,9 @@ vi.mock("fs", () => ({
 vi.mock("electron", () => ({
   ipcMain: {
     handle: (channel: string, handler: (...args: unknown[]) => unknown) => {
+      handlers[channel] = handler;
+    },
+    on: (channel: string, handler: (...args: unknown[]) => unknown) => {
       handlers[channel] = handler;
     },
   },
@@ -64,6 +69,7 @@ describe("system:saveSettings — error handling", () => {
     mockMkdir.mockReset();
     mockWriteFile.mockReset();
     mockRename.mockReset();
+    mockRm.mockReset().mockResolvedValue(undefined);
     handlers = {};
   });
 

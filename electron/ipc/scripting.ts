@@ -9,6 +9,7 @@ import { logger } from "../utils/logger";
 import {
   createPopupWindow,
   closeAllPopups,
+  countPopupsByType,
   onPopupClosed,
 } from "./popup";
 import {
@@ -88,7 +89,16 @@ function buildEdgewareHost(): EdgewareHost {
     },
     image: (file) => spawnMedia("image", file, resolveRandomImage),
     video: (file) => spawnMedia("video", file, resolveRandomVideo),
-    audio: (file) => spawnMedia("audio", file, resolveRandomAudio),
+    audio: (file) => {
+      // Legacy routes Lua audio through the same player pool as the roll
+      // driver: the max_audio cap applies to both sources together.
+      const cap = readNumberSetting("maxAudio") || 5;
+      if (countPopupsByType("audio") >= cap) {
+        logger.warn(`[Scripting] edgeware_v0 audio() refused: maxAudio (${cap}) reached`);
+        return null;
+      }
+      return spawnMedia("audio", file, resolveRandomAudio);
+    },
     prompt: (text) => {
       const phrase = text ?? resolveRandomPrompt();
       if (!phrase) {

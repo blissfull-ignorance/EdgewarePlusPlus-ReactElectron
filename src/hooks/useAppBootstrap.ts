@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { useSettingsStore } from "../stores/settingsStore";
+import { collectSettingsValues, useSettingsStore } from "../stores/settingsStore";
 import { usePackDiscoveryStore } from "./usePackDiscovery";
 import { useSettingsToasts } from "./useSettingsToasts";
 
@@ -20,6 +20,19 @@ export function useAppBootstrap(isPopupRoute: boolean) {
       await usePackDiscoveryStore.getState().refreshPacks();
     };
     init();
+  }, [isPopupRoute]);
+
+  // Quit must not drop settings changed inside the autosave window: flush
+  // synchronously while the window unloads.
+  useEffect(() => {
+    if (isPopupRoute) return;
+    const flush = () => {
+      const store = useSettingsStore.getState();
+      if (!store.dirty) return;
+      window.api?.system.flushSettings(collectSettingsValues(store));
+    };
+    window.addEventListener("pagehide", flush);
+    return () => window.removeEventListener("pagehide", flush);
   }, [isPopupRoute]);
 
   useEffect(() => {

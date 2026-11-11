@@ -290,15 +290,21 @@ function registerHandlers(): void {
   /**
    * Read the persisted corruption launch count, then record this launch.
    * Mirrors legacy `Data.CORRUPTION_LAUNCHES`; returns the count from before
-   * this launch so the runtime can resolve the starting level.
+   * this launch so the runtime can resolve the starting level. The count
+   * tracks app launches, not runtime starts: it increments at most once per
+   * process, however often the user starts and stops.
    */
+  let launchRecorded = false;
   ipcMain.handle("system:corruptionLaunches", async (): Promise<number> => {
     const file = path.join(dataDir(), "corruption_launches");
     let previous = 0;
     try {
       if (fs.existsSync(file)) previous = parseInt(fs.readFileSync(file, "utf-8"), 10) || 0;
-      fs.mkdirSync(dataDir(), { recursive: true });
-      fs.writeFileSync(file, String(previous + 1));
+      if (!launchRecorded) {
+        fs.mkdirSync(dataDir(), { recursive: true });
+        fs.writeFileSync(file, String(previous + 1));
+        launchRecorded = true;
+      }
     } catch (err) {
       logger.error("[System] Failed to update corruption launch count:", err);
     }
@@ -499,7 +505,29 @@ function registerHandlers(): void {
     }
   });
 
-  ipcMain.handle("system:loadSettings", async (): Promise<Record<string, unknown> | null> => {
+  let saveSeq = 0;
+
+  /**
+   * Last-chance settings write: the renderer calls this synchronously from
+   * its unload hook so dirty state inside the autosave window is not lost
+   * when the app quits.
+   */
+  ipcMain.on("system:saveSettingsSync", (event, settings: unknown): void => {
+    try {
+      const dir = dataDir();
+      if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+      const configPath = path.join(dir, "config.json");
+      const tmpPath = `${configPath}.${process.pid}.${saveSeq++}.sync.tmp`;
+      fs.writeFileSync(tmpPath, JSON.stringify(settings, null, 2), "utf-8");
+      fs.renameSync(tmpPath, configPath);
+      event.returnValue = true;
+    } catch (err) {
+      logger.error("[System] Failed to flush settings on unload:", err);
+      event.returnValue = false;
+    }
+  });
+
+ipcMain.handle("system:loadSettings", async (): Promise<Record<string, unknown> | null> => {
     const configPath = path.join(dataDir(), "config.json");
     return readJson<Record<string, unknown>>(configPath);
   });
@@ -511,11 +539,17 @@ function registerHandlers(): void {
         await fs.promises.mkdir(dir, { recursive: true });
       }
       const configPath = path.join(dir, "config.json");
-      // Atomic replace: a crash mid-write must never leave a half-written
-      // config that the next boot cannot read.
-      const tmpPath = `${configPath}.tmp`;
-      await fs.promises.writeFile(tmpPath, JSON.stringify(settings, null, 2), "utf-8");
-      await fs.promises.rename(tmpPath, configPath);
+      // Atomic replace with a per-writer temp name: concurrent saves must
+      // never share a staging file, or one writer's rename consumes or
+      // truncates another's payload and the config lands half-written.
+      const tmpPath = `${configPath}.${process.pid}.${saveSeq++}.tmp`;
+      try {
+        await fs.promises.writeFile(tmpPath, JSON.stringify(settings, null, 2), "utf-8");
+        await fs.promises.rename(tmpPath, configPath);
+      } catch (err) {
+        await fs.promises.rm(tmpPath, { force: true }).catch(() => undefined);
+        throw err;
+      }
     } catch (err) {
       logger.error("[System] Failed to save settings:", err);
       throw err;

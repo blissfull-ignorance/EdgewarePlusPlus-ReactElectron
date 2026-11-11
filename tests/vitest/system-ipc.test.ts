@@ -28,6 +28,9 @@ vi.mock("electron", () => ({
     handle: (channel: string, handler: (...args: unknown[]) => unknown) => {
       handlers[channel] = handler;
     },
+    on: (channel: string, handler: (...args: unknown[]) => unknown) => {
+      handlers[channel] = handler;
+    },
   },
   dialog: {
     showOpenDialog: async () => ({ canceled: true, filePaths: [] }),
