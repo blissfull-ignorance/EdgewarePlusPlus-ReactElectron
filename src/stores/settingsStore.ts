@@ -196,7 +196,7 @@ export const DEFAULT_SETTINGS: SettingsValues = {
   corruptionFadeType: "Normal",
   // Stored in seconds, matching the legacy config format; currently dormant —
   // consumers should interpret the value as seconds.
-  corruptionTime: 60,
+  corruptionTime: 60000,
   corruptionPopups: 5,
   corruptionLaunches: 2,
   corruptionWallpaperCycle: 0,
@@ -383,11 +383,13 @@ export const useSettingsStore = create<SettingsStore>()(
               }
               return { ...DEFAULT_SETTINGS, ...loaded } as SettingsValues;
             }
-            set({ dirty: false, loaded: true });
+            // No file on disk: the disk is the source of truth, so a stale
+            // rehydrated store must not masquerade as the user's settings.
+            set({ ...DEFAULT_SETTINGS, validationErrors: [], dirty: false, loaded: true } as Partial<SettingsStore>);
             return DEFAULT_SETTINGS;
           } catch (err) {
             logger.warn("[settingsStore] Failed to load settings, using defaults:", err);
-            set({ dirty: false, loaded: true });
+            set({ ...DEFAULT_SETTINGS, validationErrors: [], dirty: false, loaded: true } as Partial<SettingsStore>);
             return DEFAULT_SETTINGS;
           }
         },

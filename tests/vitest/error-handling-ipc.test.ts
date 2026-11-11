@@ -12,6 +12,7 @@ const mockMkdir = vi.fn();
 const mockReaddir = vi.fn();
 const mockReadFileSync = vi.fn();
 const mockWriteFile = vi.fn();
+const mockRename = vi.fn();
 
 vi.mock("fs", () => ({
   default: {
@@ -21,6 +22,7 @@ vi.mock("fs", () => ({
       mkdir: (...args: unknown[]) => mockMkdir(...args),
       readdir: (...args: unknown[]) => mockReaddir(...args),
       writeFile: (...args: unknown[]) => mockWriteFile(...args),
+      rename: (...args: unknown[]) => mockRename(...args),
     },
   },
   existsSync: (...args: unknown[]) => mockExistsSync(...args),
@@ -61,6 +63,7 @@ describe("system:saveSettings — error handling", () => {
     mockExistsSync.mockReset();
     mockMkdir.mockReset();
     mockWriteFile.mockReset();
+    mockRename.mockReset();
     handlers = {};
   });
 
@@ -68,6 +71,7 @@ describe("system:saveSettings — error handling", () => {
     mockExistsSync.mockReturnValue(false);
     mockMkdir.mockResolvedValue(undefined);
     mockWriteFile.mockResolvedValue(undefined);
+    mockRename.mockResolvedValue(undefined);
 
     const { registerHandlers } = await import("../../electron/ipc/system");
     registerHandlers();
@@ -81,6 +85,8 @@ describe("system:saveSettings — error handling", () => {
 
     expect(mockMkdir).toHaveBeenCalledWith(expect.any(String), { recursive: true });
     expect(mockWriteFile).toHaveBeenCalled();
+    // Config writes land atomically: temp file then rename over the target.
+    expect(mockRename).toHaveBeenCalled();
   });
 
   it("throws error when writeFile fails (e.g. disk full)", async () => {

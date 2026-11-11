@@ -76,6 +76,10 @@ function createWindow(): void {
 
   win.on("closed", () => {
     win = null;
+    // The main window is the app: close its popups and Lua session so no
+    // popup-spawning chain keeps the process alive behind invisible windows.
+    stopScripting();
+    closeAllPopups();
   });
 
   if (process.env.VITE_DEV_SERVER_URL) {

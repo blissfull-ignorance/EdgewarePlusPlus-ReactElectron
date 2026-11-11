@@ -9,6 +9,16 @@
  */
 
 import * as lua from "fengari/src/lua";
+// lua_sethook/LUA_MASKCOUNT exist at runtime but are missing from fengari's typings.
+const { lua_sethook, LUA_MASKCOUNT } = lua as unknown as {
+  lua_sethook: (
+    L: number,
+    func: (() => void) | null,
+    mask: number,
+    count: number
+  ) => number;
+  LUA_MASKCOUNT: number;
+};
 import * as lauxlib from "fengari/src/lauxlib";
 import * as lualib from "fengari/src/lualib";
 import { to_luastring } from "fengari";
@@ -176,6 +186,32 @@ export class FengariVM {
   }
 
   /**
+   * A pack script runs synchronously on the main-process event loop, so a
+   * runaway loop would freeze the whole app. A counted debug hook aborts any
+   * single protected call that outlives the budget; the state stays usable.
+   */
+  private runProtected(ms: number, call: () => number): number {
+    const deadline = Date.now() + ms;
+    lua_sethook(
+      this.L,
+      () => {
+        if (Date.now() > deadline) {
+          throw new Error("Lua execution budget exceeded");
+        }
+      },
+      LUA_MASKCOUNT,
+      20000
+    );
+    try {
+      return call();
+    } catch {
+      return -1;
+    } finally {
+      lua_sethook(this.L, () => undefined, 0, 0);
+    }
+  }
+
+  /**
    * Execute a Lua script string and return the result.
    */
   exec(script: string): LuaExecResult {
@@ -206,7 +242,7 @@ export class FengariVM {
     let pcallResult: number;
     const top = lua_gettop(this.L);
     try {
-      pcallResult = lua_pcall(this.L, 0, LUA_MULTRET, 0);
+      pcallResult = this.runProtected(5000, () => lua_pcall(this.L, 0, LUA_MULTRET, 0));
     } catch (err) {
       this._initialized = false;
       return { success: false, error: `PCall crash: ${err instanceof Error ? err.message : String(err)}` };
@@ -351,7 +387,7 @@ export class FengariVM {
     if (!this._initialized) return;
     lua_rawgeti(this.L, LUA_REGISTRYINDEX, ref);
     if (lua_isfunction(this.L, -1)) {
-      if (lua_pcall(this.L, 0, 0, 0) !== LUA_OK) {
+      if (this.runProtected(2000, () => lua_pcall(this.L, 0, 0, 0)) !== LUA_OK) {
         const err = lua_tojsstring(this.L, -1);
         logger.error(`[FengariVM] Lua callback error: ${err ?? "unknown"}`);
       }

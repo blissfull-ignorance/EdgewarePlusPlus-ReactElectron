@@ -6,6 +6,9 @@
  * then starts the runtime; with repeat enabled it re-arms after `repeatTime`
  * intervals. Unlike the legacy OS-task approach (Windows-only), the app must
  * be running — pair it with run-at-startup for unattended sessions.
+ *
+ * Firing goes through the same start path as the Start button, so scheduled
+ * sessions keep the corruption danger disclosure and the pack script run.
  */
 import { useEffect } from "react";
 import { useSettingsStore } from "../stores/settingsStore";
@@ -13,11 +16,12 @@ import { useAppStore } from "../stores/appStore";
 import { firstFireAt, repeatIntervalMs } from "../features/schedule/schedule";
 import { logger } from "../utils/logger";
 
-export function useSchedule(running: boolean): void {
+export function useSchedule(running: boolean, onFire: () => void): void {
+  const loaded = useSettingsStore((s) => s.loaded);
+  const schedule = useSettingsStore((s) => s.schedule);
+
   useEffect(() => {
-    if (running) return;
-    const s0 = useSettingsStore.getState();
-    if (s0.schedule !== 1) return;
+    if (running || !loaded || schedule !== 1) return;
 
     let cancelled = false;
     let timer: ReturnType<typeof setTimeout> | null = null;
@@ -34,7 +38,7 @@ export function useSchedule(running: boolean): void {
       if (cancelled) return;
       const s = useSettingsStore.getState();
       if (!useAppStore.getState().isRunning) {
-        useAppStore.getState().start();
+        onFire();
         logger.info("[schedule] scheduled session started");
       }
       const interval = repeatIntervalMs(s.repeatSchedule, s.repeatTime, s.repeatType);
@@ -48,5 +52,5 @@ export function useSchedule(running: boolean): void {
       cancelled = true;
       if (timer) clearTimeout(timer);
     };
-  }, [running]);
+  }, [running, loaded, schedule, onFire]);
 }

@@ -12,14 +12,12 @@ export function clicksForIndex(idx: Record<string, unknown> | null, fileName?: s
   let maxClicks = typeof d?.["maxClicks"] === "number" ? (d.maxClicks as number) : 1;
 
   if (fileName && idx) {
-    const mediaMoods = idx["mediaMoods"] as Record<string, string> | undefined;
+    const mediaMoods = idx["mediaMoods"] as Record<string, string[]> | undefined;
     const moods = (idx["moods"] ?? []) as Array<Record<string, unknown>>;
-    const moodName = mediaMoods?.[fileName];
-    if (moodName) {
-      const mood = moods.find((m) => m["name"] === moodName);
-      if (mood && typeof mood["maxClicks"] === "number") {
-        maxClicks = mood.maxClicks as number;
-      }
+    const moodNames = mediaMoods?.[fileName] ?? [];
+    const mood = moods.find((m) => moodNames.includes(m["name"] as string));
+    if (mood && typeof mood["maxClicks"] === "number") {
+      maxClicks = mood.maxClicks as number;
     }
   }
 

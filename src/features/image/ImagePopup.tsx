@@ -136,6 +136,7 @@ export function ImagePopup({
             src={imageUrl}
             alt=""
             onLoad={(e) => handleLoad(e.currentTarget)}
+            onError={() => onClose?.()}
             style={{
               maxWidth: "100%",
               maxHeight: "100%",

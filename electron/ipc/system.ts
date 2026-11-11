@@ -511,7 +511,11 @@ function registerHandlers(): void {
         await fs.promises.mkdir(dir, { recursive: true });
       }
       const configPath = path.join(dir, "config.json");
-      await fs.promises.writeFile(configPath, JSON.stringify(settings, null, 2), "utf-8");
+      // Atomic replace: a crash mid-write must never leave a half-written
+      // config that the next boot cannot read.
+      const tmpPath = `${configPath}.tmp`;
+      await fs.promises.writeFile(tmpPath, JSON.stringify(settings, null, 2), "utf-8");
+      await fs.promises.rename(tmpPath, configPath);
     } catch (err) {
       logger.error("[System] Failed to save settings:", err);
       throw err;

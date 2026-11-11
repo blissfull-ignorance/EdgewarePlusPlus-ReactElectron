@@ -262,11 +262,11 @@ describe("Legacy fallback pack format parsing via pack:loadIndex IPC", () => {
     expect(result).not.toBeNull();
     const index = result as Record<string, unknown>;
 
-    const mediaMoods = index.mediaMoods as Record<string, string>;
-    expect(mediaMoods["alpha1.png"]).toBe("mood_alpha");
-    expect(mediaMoods["alpha2.jpg"]).toBe("mood_alpha");
-    expect(mediaMoods["alpha3.gif"]).toBe("mood_alpha");
-    expect(mediaMoods["beta1.png"]).toBe("mood_beta");
+    const mediaMoods = index.mediaMoods as Record<string, string[]>;
+    expect(mediaMoods["alpha1.png"]).toEqual(["mood_alpha"]);
+    expect(mediaMoods["alpha2.jpg"]).toEqual(["mood_alpha"]);
+    expect(mediaMoods["alpha3.gif"]).toEqual(["mood_alpha"]);
+    expect(mediaMoods["beta1.png"]).toEqual(["mood_beta"]);
     expect(mediaMoods["default1.png"]).toBeUndefined();
     expect(mediaMoods["default2.jpg"]).toBeUndefined();
   });

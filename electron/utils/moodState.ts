@@ -15,7 +15,9 @@ export function getActiveMoods(): ReadonlySet<string> {
   return activeMoods;
 }
 
-/** Whether a pack file tagged with `mood` may be selected right now. */
-export function isMoodEligible(mood: string | undefined): boolean {
-  return !mood || activeMoods.has(mood);
+/** Whether a pack file tagged with `moods` may be selected right now:
+ *  untagged files are always eligible; tagged files need any one tag active. */
+export function isMoodEligible(moods: string[] | undefined): boolean {
+  if (!moods || moods.length === 0) return true;
+  return moods.some((mood) => activeMoods.has(mood));
 }

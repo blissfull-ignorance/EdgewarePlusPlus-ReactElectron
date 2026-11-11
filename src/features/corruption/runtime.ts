@@ -12,6 +12,8 @@
  *   time by the engine.
  */
 
+import { normalizePackConfigValues } from "./legacyConfig";
+
 export function nextLevelFor(level: number, maxLevel: number, purity: boolean): number {
   if (purity) return level > 1 ? level - 1 : 1;
   return level < maxLevel ? level + 1 : maxLevel;
@@ -41,5 +43,6 @@ export function gateOverrides(
     if (key === "themeType" && !opts.themeCycle) continue;
     allowed[key] = value;
   }
-  return allowed;
+  // Pack-authored values arrive in legacy units (corruptionTime in seconds).
+  return normalizePackConfigValues(allowed) as Record<string, string | number>;
 }

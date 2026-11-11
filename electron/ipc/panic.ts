@@ -21,6 +21,7 @@ import { toAccelerator } from "../utils/panicKeys";
 import { isLockoutActive, safewordMatches } from "../utils/panicLockout";
 import { destroyDiscord } from "./discord";
 import { closeAllPopups } from "./popup";
+import { getLuaVM } from "../scripting/fengariAdapter";
 import { setWallpaper } from "../utils/wallpaper";
 
 export interface PanicResult {
@@ -63,7 +64,10 @@ function readPanicConfig(): PanicConfig {
       timerMode: Number(parsed.timerMode ?? fallback.timerMode),
       timerSetupTime: Number(parsed.timerSetupTime ?? fallback.timerSetupTime),
       safeword: String(parsed.safeword ?? fallback.safeword),
-      globalPanicButton: String(parsed.globalPanicButton ?? fallback.globalPanicButton),
+      // The shipped early default "e" held the letter hostage system-wide;
+      // treat any stored "e" as Escape from the first registration onward.
+      globalPanicButton:
+        parsed.globalPanicButton === "e" ? "Key.esc" : String(parsed.globalPanicButton ?? fallback.globalPanicButton),
     };
   } catch {
     return fallback;
@@ -84,6 +88,10 @@ async function doPanic(): Promise<void> {
       logger.error("[Panic] Failed to set panic wallpaper:", err);
     }
   }
+  // Destroy the Lua session before closing popups: a live session reacts to
+  // the closes with on_stop callbacks, respawning popups and reentering the
+  // popup registry mid-teardown.
+  getLuaVM()?.destroy();
   closeAllPopups();
   globalShortcut.unregisterAll();
   // Hard exit: the runtime keeps spawning popups until the process dies, and

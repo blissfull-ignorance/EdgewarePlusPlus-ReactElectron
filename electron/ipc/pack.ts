@@ -86,17 +86,18 @@ function loadWeb(packDir: string): Record<string, unknown> {
  * Excludes 'default' mood files (matching legacy behavior).
  * Returns empty object if file doesn't exist or is malformed.
  */
-function loadMedia(packDir: string): Record<string, string> {
+function loadMedia(packDir: string): Record<string, string[]> {
   const data = readJson<Record<string, unknown>>(path.join(packDir, "media.json"));
   if (!data) return {};
 
-  const result: Record<string, string> = {};
+  const result: Record<string, string[]> = {};
   for (const [moodName, files] of Object.entries(data)) {
     if (moodName === "default") continue;
     if (!Array.isArray(files)) continue;
     for (const file of files) {
       if (typeof file === "string") {
-        result[file] = moodName;
+        const list = (result[file] ??= []);
+        if (!list.includes(moodName)) list.push(moodName);
       }
     }
   }
@@ -189,7 +190,7 @@ function loadIndexFallback(packDir: string): Index {
   }
 
   // ── Media moods: ensure moods exist ──
-  for (const moodName of new Set(Object.values(mediaMoods))) {
+  for (const moodName of new Set(Object.values(mediaMoods).flat())) {
     if (moodName === "default") continue;
     getOrCreateMood(index.moods, moodName);
   }
@@ -251,7 +252,7 @@ function loadModernIndex(packDir: string): Index | null {
   // Parse moods
   const rawMoods = rawData["moods"] as Record<string, unknown>[] | undefined;
   const moods: Mood[] = [];
-  const mediaMoods: Record<string, string> = {};
+  const mediaMoods: Record<string, string[]> = {};
 
   if (rawMoods && Array.isArray(rawMoods)) {
     for (const rawMood of rawMoods) {
@@ -270,11 +271,13 @@ function loadModernIndex(packDir: string): Index | null {
       };
       moods.push(mood);
 
-      // Build mediaMoods from mood.media arrays
+      // Build mediaMoods from mood.media arrays (a file may carry any
+      // number of mood tags; any active tag makes it eligible)
       const mediaList = rawMood["media"] as string[] | undefined;
       if (mediaList && Array.isArray(mediaList) && name) {
         for (const file of mediaList) {
-          mediaMoods[file] = name;
+          const list = (mediaMoods[file] ??= []);
+          if (!list.includes(name)) list.push(name);
         }
       }
     }
@@ -329,9 +332,9 @@ function loadPackIndex(packDir: string): Index {
 function pickMoodEligibleFile(packDir: string, subdir: string, pattern: RegExp): string | null {
   const dirPath = path.join(packDir, subdir);
   if (!fs.existsSync(dirPath)) return null;
-  const all = fs.readdirSync(dirPath).filter((f) => pattern.test(f));
+  const all = fs.readdirSync(dirPath).filter((f) => pattern.test(f) && !f.startsWith("."));
   if (!all.length) return null;
-  let mediaMoods: Record<string, string> = {};
+  let mediaMoods: Record<string, string[]> = {};
   try {
     mediaMoods = loadPackIndex(packDir).mediaMoods ?? {};
   } catch {
@@ -698,7 +701,7 @@ function registerHandlers(): void {
         const idx = loadPackIndex(packDir);
         const mediaMoods = idx.mediaMoods ?? {};
         const mediaCount = (name: string) =>
-          Object.values(mediaMoods).filter((m) => m === name).length;
+          Object.values(mediaMoods).filter((tags) => tags.includes(name)).length;
         return (idx.moods ?? [])
           .filter((m): m is Index["moods"][number] & { name: string } => typeof m.name === "string" && !!m.name)
           .map((m) => ({
@@ -756,7 +759,7 @@ function registerHandlers(): void {
       for (const [subdir, kind, pattern] of dirs) {
         const dirPath = path.join(packDir, subdir);
         if (!fs.existsSync(dirPath)) continue;
-        for (const file of fs.readdirSync(dirPath).filter((f) => pattern.test(f))) {
+        for (const file of fs.readdirSync(dirPath).filter((f) => pattern.test(f) && !f.startsWith("."))) {
           entries.push({ file, kind, moods: fileMoods[file] ?? [] });
         }
       }

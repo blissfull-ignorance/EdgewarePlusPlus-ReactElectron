@@ -225,15 +225,19 @@ export function MainAppPage() {
 
   useCorruptionRuntime(isRunning);
   useWallpaperRotation(isRunning);
-  useSchedule(isRunning);
 
   // Legacy run_script: a pack that ships script.lua drives its own scripted
   // corruption session; start it with the runtime.
   const startRuntime = useCallback(() => {
+    if (useAppStore.getState().isRunning) return;
     start();
     void (async () => {
       try {
         if (await window.api?.pack.hasScript()) {
+          // A Stop during the await above must not be undone by the script:
+          // IPC is FIFO per window, so skipping the call here (or ordering it
+          // before any later stop) keeps the session dead.
+          if (!useAppStore.getState().isRunning) return;
           const ok = await window.api?.scripting.runLua("script.lua");
           if (!ok) logger.warn("[MainAppPage] pack script.lua did not run");
         }
@@ -254,6 +258,7 @@ export function MainAppPage() {
   // the dangerous settings the pack can flip before the runtime starts. The
   // audit reads the pack's raw corruption.json so even blocked keys surface.
   const handleStart = useCallback(() => {
+    if (useAppStore.getState().isRunning) return;
     const s = useSettingsStore.getState();
     if (s.showDiscord === 1) {
       void window.api?.pack
@@ -285,6 +290,10 @@ export function MainAppPage() {
     }
     startRuntime();
   }, [startRuntime]);
+
+  // Scheduled sessions take the same path as the Start button (danger
+  // disclosure + pack script), not a bare store start.
+  useSchedule(isRunning, handleStart);
 
   return (
     <>

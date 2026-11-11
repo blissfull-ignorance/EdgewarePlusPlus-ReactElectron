@@ -120,7 +120,8 @@ export interface DiscordOverride {
 export interface Index {
   default: Default;
   moods: Mood[];
-  mediaMoods: Record<string, string>;
+  /** file → every mood whose `media` list names it (untagged files are absent) */
+  mediaMoods: Record<string, string[]>;
 }
 
 /**

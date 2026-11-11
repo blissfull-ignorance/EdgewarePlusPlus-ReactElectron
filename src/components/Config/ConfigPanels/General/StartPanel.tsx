@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useSettingsStore } from "../../../../stores";
 import { ConfigDropdown, ConfigField, ConfigToggle } from "../../../Config";
 import { SectionCard } from "../../../SectionCard";
+import { normalizePackConfigValues } from "../../../../features/corruption/legacyConfig";
 
 const TIME_UNITS = [
   { label: "Minutes", value: "Minutes" },
@@ -55,7 +56,7 @@ function PackPresetCard() {
           variant="light"
           data-testid="apply-pack-preset"
           onClick={() => {
-            setRaw(preset);
+            setRaw(normalizePackConfigValues(preset));
             setApplied(true);
           }}
         >

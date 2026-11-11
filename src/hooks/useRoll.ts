@@ -69,7 +69,13 @@ interface UseRollOptions {
 export function useRoll(options: UseRollOptions = {}) {
   const { onSpawn } = options;
   const isRunning = useAppStore((s) => s.isRunning);
-  const delay = useSettingsStore((s) => Math.max(s.delay, 100));
+  // A hand-edited or pack-preset delay can be non-numeric; NaN would make
+  // setInterval fire at its ~4ms clamp — a popup flood. Fall back to the
+  // default cadence instead.
+  const delay = useSettingsStore((s) => {
+    const raw = Number(s.delay);
+    return Math.max(100, Number.isFinite(raw) ? raw : 5000);
+  });
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const tick = useCallback(() => {

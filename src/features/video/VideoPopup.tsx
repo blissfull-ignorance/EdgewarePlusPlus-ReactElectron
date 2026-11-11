@@ -127,6 +127,7 @@ export function VideoPopup({
             muted={false}
             onEnded={handleEnded}
             onLoadedMetadata={handleVideoLoad}
+            onError={() => onClose?.()}
             style={{
               maxWidth: "100%",
               maxHeight: "100%",
