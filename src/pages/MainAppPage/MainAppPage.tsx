@@ -9,6 +9,7 @@ import { ConfigSaveStatus } from "../../components/Config/ConfigSaveStatus";
 import { ConfigPage } from "../../components/Config/ConfigPage";
 import { ErrorBoundary } from "../../components/ErrorBoundary";
 import { AppFrame, type MainView } from "../../components/shell/AppFrame";
+import { GalleryPanel } from "../../features/gallery/GalleryPanel";
 import { useRoll, type PopupType } from "../../hooks/useRoll";
 import { usePopupLifecycle } from "../../hooks/usePopupLifecycle";
 import { useMitosis, type MitosisSpawn } from "../../features/mitosis/useMitosis";
@@ -183,6 +184,9 @@ export function MainAppPage() {
     stop();
     usePopupOverlayStore.getState().clearAll();
     clearOpenPopups();
+    // Kill the Lua session before closing popups: a live session would react
+    // to the closes (on_stop chains) and keep spawning after "Stop".
+    void window.api?.scripting.stop().catch(() => undefined);
     void closeAll();
   }, [stop, closeAll]);
 
@@ -305,6 +309,10 @@ export function MainAppPage() {
     >
       {view === "status" ? (
         <MetadataPanel onOpenPackManager={openPackManager} />
+      ) : view === "gallery" ? (
+        <ErrorBoundary fallbackTitle="Gallery Error">
+          <GalleryPanel />
+        </ErrorBoundary>
       ) : (
         <ErrorBoundary fallbackTitle="Settings Error">
           <ConfigPage

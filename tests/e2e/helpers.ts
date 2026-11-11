@@ -146,6 +146,7 @@ export async function launchApp(page: Page, options: LaunchOptions = {}): Promis
           listMoods: async () => [],
           loadPackConfig: async () => null,
           hasScript: async () => false,
+          listGallery: async () => ({ entries: [], moods: [], activeMoods: [] }),
           blacklist: async () => ({ ok: true }),
           loadCorruption: async () => null,
           discord: async () => null,
@@ -183,6 +184,7 @@ export async function launchApp(page: Page, options: LaunchOptions = {}): Promis
         scripting: {
           runLua: async () => false,
           runSelfTest: async () => ({ ok: false, error: 'mock bridge' }),
+          stop: async () => true,
           injectCorruptionLevel: async () => false,
         },
         system: {

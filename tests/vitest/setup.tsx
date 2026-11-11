@@ -83,6 +83,7 @@ if (typeof window !== "undefined") {
       listMoods: vi.fn().mockResolvedValue([]),
       loadPackConfig: vi.fn().mockResolvedValue(null),
       hasScript: vi.fn().mockResolvedValue(false),
+      listGallery: vi.fn().mockResolvedValue({ entries: [], moods: [], activeMoods: [] }),
       blacklist: vi.fn().mockResolvedValue({ ok: true }),
       loadCorruption: vi.fn().mockResolvedValue(null),
       discord: vi.fn().mockResolvedValue(null),
@@ -127,6 +128,7 @@ if (typeof window !== "undefined") {
     scripting: {
       runLua: vi.fn().mockResolvedValue(false),
       runSelfTest: vi.fn().mockResolvedValue({ ok: false }),
+      stop: vi.fn().mockResolvedValue(true),
       injectCorruptionLevel: vi.fn().mockResolvedValue(false),
     },
     system: {

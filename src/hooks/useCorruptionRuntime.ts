@@ -167,6 +167,10 @@ export function useCorruptionRuntime(active: boolean): void {
       cancelled = true;
       for (const t of timers) clearInterval(t);
       for (const u of unsubscribes) u();
+      // A stopped session releases its moods and level: content re-locks and
+      // a later Start does not resurrect the previous run's transitions.
+      useCorruptionStore.getState().reset();
+      void window.api?.corruption.setLevel(0, null).catch(() => undefined);
     };
   }, [active]);
 }

@@ -28,6 +28,7 @@ if (typeof window !== "undefined" && !(window as unknown as Record<string, unkno
       listMoods: async () => [],
       loadPackConfig: async () => null,
       hasScript: async () => false,
+      listGallery: async () => ({ entries: [], moods: [], activeMoods: [] }),
       blacklist: async () => ({ ok: true }),
       loadCorruption: async () => null,
       discord: async () => null,
@@ -65,6 +66,7 @@ if (typeof window !== "undefined" && !(window as unknown as Record<string, unkno
     scripting: {
       runLua: async () => false,
       runSelfTest: async () => ({ ok: false, error: 'no lua host in this mode' }),
+      stop: async () => true,
       injectCorruptionLevel: async () => false,
     },
     system: {

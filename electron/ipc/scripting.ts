@@ -131,6 +131,18 @@ function buildEdgewareHost(): EdgewareHost {
   };
 }
 
+/**
+ * Tear down the Lua session: clears pending after() timers and popup
+ * callbacks and closes the interpreter, so a stopped runtime cannot keep
+ * driving popups or audio chains.
+ */
+function stopScripting(): void {
+  const vm = getLuaVM();
+  if (vm) {
+    vm.destroy();
+  }
+}
+
 function registerHandlers(): void {
   onPopupClosed((id) => {
     getLuaVM()?.handlePopupClosed(id);
@@ -211,6 +223,12 @@ function registerHandlers(): void {
     return { ok: true };
   });
 
+  ipcMain.handle("scripting:stop", async (): Promise<boolean> => {
+    stopScripting();
+    logger.info("[Scripting] Lua session stopped");
+    return true;
+  });
+
   ipcMain.handle("scripting:injectCorruptionLevel", async (_event, level: number): Promise<boolean> => {
     const vm = getLuaVM();
     if (!vm) {
@@ -226,4 +244,4 @@ function registerHandlers(): void {
   });
 }
 
-export { registerHandlers };
+export { registerHandlers, stopScripting };

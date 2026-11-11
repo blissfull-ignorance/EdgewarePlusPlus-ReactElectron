@@ -19,6 +19,7 @@ const electronAPI: ElectronAPI = {
     listMoods: () => ipcRenderer.invoke("pack:listMoods"),
     loadPackConfig: () => ipcRenderer.invoke("pack:loadPackConfig"),
     hasScript: () => ipcRenderer.invoke("pack:hasScript"),
+    listGallery: () => ipcRenderer.invoke("pack:listGallery"),
     splashImage: () => ipcRenderer.invoke("pack:splashImage"),
     iconImage: () => ipcRenderer.invoke("pack:iconImage"),
     blacklist: (fileName) => ipcRenderer.invoke("pack:blacklistMedia", fileName),
@@ -71,6 +72,7 @@ const electronAPI: ElectronAPI = {
   scripting: {
     runLua: (scriptName) => ipcRenderer.invoke("scripting:runLua", scriptName),
     runSelfTest: () => ipcRenderer.invoke("scripting:runSelfTest"),
+    stop: () => ipcRenderer.invoke("scripting:stop"),
     injectCorruptionLevel: (level) =>
       ipcRenderer.invoke("scripting:injectCorruptionLevel", level),
   },

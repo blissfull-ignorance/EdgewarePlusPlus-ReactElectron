@@ -16,9 +16,9 @@ configurePackMediaScheme();
 
 import { registerHandlers as registerPackHandlers } from "./ipc/pack";
 import { registerHandlers as registerCorruptionHandlers } from "./ipc/corruption";
-import { registerHandlers as registerPopupHandlers } from "./ipc/popup";
+import { registerHandlers as registerPopupHandlers, closeAllPopups } from "./ipc/popup";
 import { registerHandlers as registerHibernateHandlers } from "./ipc/hibernate";
-import { registerHandlers as registerScriptingHandlers } from "./ipc/scripting";
+import { registerHandlers as registerScriptingHandlers, stopScripting } from "./ipc/scripting";
 import { registerHandlers as registerSystemHandlers } from "./ipc/system";
 import { registerHandlers as registerPanicHandlers } from "./ipc/panic";
 import { registerHandlers as registerBooruHandlers } from "./ipc/booru";
@@ -108,11 +108,18 @@ app.whenReady().then(() => {
   });
 });
 
+app.on("before-quit", () => {
+  // Media windows stream audio and the Lua session schedules callbacks;
+  // both must die with the app, not outlive the window the user quit.
+  closeAllPopups();
+  stopScripting();
+});
+
 app.on("window-all-closed", () => {
   win = null;
-  if (process.platform !== "darwin") {
-    app.quit();
-  }
+  // No background mode on any platform: with every window gone there is
+  // nothing left to see or hear, so the process must exit.
+  app.quit();
 });
 
 process.on("uncaughtException", (err) => {

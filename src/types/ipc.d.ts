@@ -91,6 +91,8 @@ export interface ElectronAPI {
     loadPackConfig: () => Promise<Record<string, unknown> | null>;
     /** Whether the active pack ships a script.lua. */
     hasScript: () => Promise<boolean>;
+    /** Every pack media file with its mood tags, for the gallery. */
+    listGallery: () => Promise<import("./pack").GalleryResult>;
     /** The pack's startup splash image as a data URL, or null when the pack ships none. */
     splashImage: () => Promise<string | null>;
     /** The app icon (pack icon or bundled default) as a data URL, or null. */
@@ -150,6 +152,8 @@ export interface ElectronAPI {
     runLua: (scriptName: string) => Promise<boolean>;
     /** Run the bundled edgeware_v0 API self-test (visible popups + transitions) */
     runSelfTest: () => Promise<{ ok: boolean; error?: string }>;
+    /** Tear down the Lua session: pending timers, callbacks and audio chains stop */
+    stop: () => Promise<boolean>;
     /** Inject a corruption level into the running Lua VM (fires transition callbacks) */
     injectCorruptionLevel: (level: number) => Promise<boolean>;
   };
