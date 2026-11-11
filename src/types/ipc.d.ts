@@ -93,6 +93,14 @@ export interface ElectronAPI {
     hasScript: () => Promise<boolean>;
     /** Pin (or release with null) the pack a running session resolves from. */
     setRuntimePack: (dir: string | null) => Promise<void>;
+    /** Creator tools: the pack's raw index.json, or null. */
+    getEditableIndex: (packPath: string) => Promise<Record<string, unknown> | null>;
+    /** Creator tools: set a file's exact mood tags; resolves the new index. */
+    setFileTags: (packPath: string, file: string, tags: string[]) => Promise<Record<string, unknown> | null>;
+    /** Creator tools: add a mood to the pack index; resolves the new index. */
+    addMood: (packPath: string, name: string) => Promise<Record<string, unknown> | null>;
+    /** Creator tools: remove a mood from the pack index; resolves the new index. */
+    removeMood: (packPath: string, name: string) => Promise<Record<string, unknown> | null>;
     /** Every pack media file with its mood tags, for the gallery. */
     listGallery: (packPath?: string | null) => Promise<import("./pack").GalleryResult>;
     /** Star/unstar a gallery file ("<dir>/<file>"); resolves the new list. */
@@ -158,6 +166,10 @@ export interface ElectronAPI {
     runSelfTest: () => Promise<{ ok: boolean; error?: string }>;
     /** Tear down the Lua session: pending timers, callbacks and audio chains stop */
     stop: () => Promise<boolean>;
+    /** Creator tools: the pack's script.lua content (starter text if absent) */
+    readScript: (packPath: string) => Promise<{ content: string; exists: boolean } | null>;
+    /** Creator tools: save the pack's script.lua */
+    writeScript: (packPath: string, content: string) => Promise<boolean>;
     /** Inject a corruption level into the running Lua VM (fires transition callbacks) */
     injectCorruptionLevel: (level: number) => Promise<boolean>;
   };

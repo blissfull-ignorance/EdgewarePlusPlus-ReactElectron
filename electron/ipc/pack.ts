@@ -11,6 +11,7 @@ import { resolveBlacklistSource, computeBlacklistTarget } from "../utils/blackli
 
 import { Index, Mood, Web, DEFAULT_INDEX, GalleryEntry, GalleryResult } from "../../src/types/pack";
 import { buildFileMoods } from "../utils/galleryIndex";
+import { addMood, removeMood, setFileTags, type RawIndexLike } from "../utils/packEdit";
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -842,6 +843,81 @@ function registerHandlers(): void {
         fs.writeFileSync(path.join(dataDir(), "gallery_favourites.json"), JSON.stringify(next, null, 1), "utf-8");
       } catch (err) {
         logger.error("[Pack] Failed to persist gallery favourites:", err);
+      }
+      return next;
+    }
+  );
+
+/**
+   * Creator tools: edit the pack's own index.json. Every mutation takes the
+   * pack path explicitly (validated as a pack directory) and preserves
+   * unrecognized fields by editing the parsed object in place.
+   */
+  const editableIndex = (packPath: unknown): { dir: string; index: RawIndexLike } | null => {
+    if (typeof packPath !== "string" || !packPath) return null;
+    const dir = expandTilde(packPath);
+    if (!fs.existsSync(dir) || !looksLikePack(dir)) return null;
+    const index =
+      readJson<RawIndexLike>(path.join(dir, "index.json")) ?? { default: {}, moods: [] };
+    return { dir, index };
+  };
+
+  const writeIndex = (dir: string, index: RawIndexLike): void => {
+    fs.writeFileSync(path.join(dir, "index.json"), JSON.stringify(index, null, 2), "utf-8");
+  };
+
+  ipcMain.handle(
+    "pack:getEditableIndex",
+    async (_event, packPath: unknown): Promise<RawIndexLike | null> => {
+      const ctx = editableIndex(packPath);
+      return ctx ? ctx.index : null;
+    }
+  );
+
+  ipcMain.handle(
+    "pack:setFileTags",
+    async (_event, packPath: unknown, file: unknown, tags: unknown): Promise<RawIndexLike | null> => {
+      const ctx = editableIndex(packPath);
+      if (!ctx || typeof file !== "string" || !file || !Array.isArray(tags)) return null;
+      const clean = tags.filter((t): t is string => typeof t === "string");
+      const next = setFileTags(ctx.index, file, clean);
+      try {
+        writeIndex(ctx.dir, next);
+      } catch (err) {
+        logger.error("[Pack] Failed to save file tags:", err);
+        return null;
+      }
+      return next;
+    }
+  );
+
+  ipcMain.handle(
+    "pack:addMood",
+    async (_event, packPath: unknown, name: unknown): Promise<RawIndexLike | null> => {
+      const ctx = editableIndex(packPath);
+      if (!ctx || typeof name !== "string" || !name.trim()) return null;
+      const next = addMood(ctx.index, name);
+      try {
+        writeIndex(ctx.dir, next);
+      } catch (err) {
+        logger.error("[Pack] Failed to add mood:", err);
+        return null;
+      }
+      return next;
+    }
+  );
+
+  ipcMain.handle(
+    "pack:removeMood",
+    async (_event, packPath: unknown, name: unknown): Promise<RawIndexLike | null> => {
+      const ctx = editableIndex(packPath);
+      if (!ctx || typeof name !== "string" || !name) return null;
+      const next = removeMood(ctx.index, name);
+      try {
+        writeIndex(ctx.dir, next);
+      } catch (err) {
+        logger.error("[Pack] Failed to remove mood:", err);
+        return null;
       }
       return next;
     }

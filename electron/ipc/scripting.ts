@@ -27,6 +27,25 @@ import {
 import { showNotification, openExternalUrl } from "./system";
 import { panicFromTray } from "./panic";
 
+const STARTER_SCRIPT = `-- Edgeware++ pack script (edgeware_v0)
+-- Runs automatically when the runtime starts. Available calls:
+--   roll(pct)                true with pct% chance
+--   after(ms, fn)            call fn after ms
+--   corrupt()                advance the corruption level (unlocks moods)
+--   image([file]) video([f]) audio([file], [on_stop]) prompt([text], [on_close])
+--   subliminal([text]) web([url]) notification([text]) close_popups()
+--   set_popup_close_text(t)  panic()
+-- Media files are picked at random from the pack unless named explicitly,
+-- and mood-tagged files only appear while their mood is active.
+
+require("edgeware_v0")
+
+after(2000, function()
+    notification("Your pack script is running")
+    corrupt()
+end)
+`;
+
 function dataDir(): string {
   return path.join(app.getPath("userData"), "data");
 }
@@ -257,6 +276,47 @@ function registerHandlers(): void {
     logger.info("[Scripting] Lua session stopped");
     return true;
   });
+
+  /**
+   * Creator tools: read the pack's script.lua (or an empty starter) so the
+   * in-app designer can edit it. Paths stay inside the pack directory.
+   */
+  ipcMain.handle(
+    "scripting:readScript",
+    async (_event, packPath: unknown): Promise<{ content: string; exists: boolean } | null> => {
+      if (typeof packPath !== "string" || !packPath) return null;
+      const dir = path.resolve(packPath.replace(/^~/, process.env.HOME ?? packPath));
+      const file = path.join(dir, "script.lua");
+      if (path.dirname(file) !== dir) return null;
+      const exists = fs.existsSync(file);
+      if (!exists) return { content: STARTER_SCRIPT, exists: false };
+      try {
+        return { content: fs.readFileSync(file, "utf-8"), exists: true };
+      } catch (err) {
+        logger.error("[Scripting] Failed to read pack script:", err);
+        return null;
+      }
+    }
+  );
+
+  ipcMain.handle(
+    "scripting:writeScript",
+    async (_event, packPath: unknown, content: unknown): Promise<boolean> => {
+      if (typeof packPath !== "string" || !packPath || typeof content !== "string") return false;
+      if (content.length > 200_000) return false;
+      const dir = path.resolve(packPath.replace(/^~/, process.env.HOME ?? packPath));
+      if (!fs.existsSync(dir)) return false;
+      const file = path.join(dir, "script.lua");
+      try {
+        fs.writeFileSync(file, content, "utf-8");
+        logger.info(`[Scripting] Pack script saved (${content.length} chars)`);
+        return true;
+      } catch (err) {
+        logger.error("[Scripting] Failed to write pack script:", err);
+        return false;
+      }
+    }
+  );
 
   ipcMain.handle("scripting:injectCorruptionLevel", async (_event, level: number): Promise<boolean> => {
     const vm = getLuaVM();
