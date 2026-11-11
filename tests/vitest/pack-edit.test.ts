@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { addMood, listMoodNames, removeMood, setFileTags, type RawIndexLike } from "../../electron/utils/packEdit";
+import { addMood, listMoodNames, removeMood, renameMood, setFileTags, type RawIndexLike } from "../../electron/utils/packEdit";
 
 const base = (): RawIndexLike => ({
   default: { maxClicks: 1, captions: ["base"] },
@@ -72,6 +72,18 @@ describe("packEdit", () => {
     expect(ok.media).toEqual(["f.png"]);
     const fine = moods.find((m) => m && (m as RawIndexLike).mood === "fine") as RawIndexLike;
     expect(fine.media).toEqual([]);
+  });
+
+  it("renames a mood in place", () => {
+    const next = renameMood(base(), "vanilla", "classic");
+    expect(listMoodNames(next)).toEqual(["classic", "goon"]);
+  });
+
+  it("rename is a no-op for blank, identical or colliding names", () => {
+    expect(listMoodNames(renameMood(base(), "vanilla", "  "))).toEqual(["vanilla", "goon"]);
+    expect(listMoodNames(renameMood(base(), "vanilla", "vanilla"))).toEqual(["vanilla", "goon"]);
+    expect(listMoodNames(renameMood(base(), "vanilla", "goon"))).toEqual(["vanilla", "goon"]);
+    expect(listMoodNames(renameMood(base(), "ghost", "x"))).toEqual(["vanilla", "goon"]);
   });
 
   it("handles an index without moods", () => {

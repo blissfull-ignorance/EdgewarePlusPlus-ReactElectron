@@ -11,7 +11,7 @@ import { resolveBlacklistSource, computeBlacklistTarget } from "../utils/blackli
 
 import { Index, Mood, Web, DEFAULT_INDEX, GalleryEntry, GalleryResult } from "../../src/types/pack";
 import { buildFileMoods } from "../utils/galleryIndex";
-import { addMood, removeMood, setFileTags, type RawIndexLike } from "../utils/packEdit";
+import { addMood, removeMood, renameMood, setFileTags, type RawIndexLike } from "../utils/packEdit";
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -901,6 +901,22 @@ function registerHandlers(): void {
         writeIndex(ctx.dir, next);
       } catch (err) {
         logger.error("[Pack] Failed to add mood:", err);
+        return null;
+      }
+      return next;
+    }
+  );
+
+  ipcMain.handle(
+    "pack:renameMood",
+    async (_event, packPath: unknown, from: unknown, to: unknown): Promise<RawIndexLike | null> => {
+      const ctx = editableIndex(packPath);
+      if (!ctx || typeof from !== "string" || typeof to !== "string" || !to.trim()) return null;
+      const next = renameMood(ctx.index, from, to);
+      try {
+        writeIndex(ctx.dir, next);
+      } catch (err) {
+        logger.error("[Pack] Failed to rename mood:", err);
         return null;
       }
       return next;

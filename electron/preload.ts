@@ -26,6 +26,7 @@ const electronAPI: ElectronAPI = {
     setFileTags: (packPath, file, tags) => ipcRenderer.invoke("pack:setFileTags", packPath, file, tags),
     addMood: (packPath, name) => ipcRenderer.invoke("pack:addMood", packPath, name),
     removeMood: (packPath, name) => ipcRenderer.invoke("pack:removeMood", packPath, name),
+    renameMood: (packPath, from, to) => ipcRenderer.invoke("pack:renameMood", packPath, from, to),
     splashImage: () => ipcRenderer.invoke("pack:splashImage"),
     iconImage: () => ipcRenderer.invoke("pack:iconImage"),
     blacklist: (fileName) => ipcRenderer.invoke("pack:blacklistMedia", fileName),
@@ -81,6 +82,8 @@ const electronAPI: ElectronAPI = {
     stop: () => ipcRenderer.invoke("scripting:stop"),
     readScript: (packPath) => ipcRenderer.invoke("scripting:readScript", packPath),
     writeScript: (packPath, content) => ipcRenderer.invoke("scripting:writeScript", packPath, content),
+    writePackDesign: (packPath, lua, corruptionJson) =>
+      ipcRenderer.invoke("scripting:writePackDesign", packPath, lua, corruptionJson),
     injectCorruptionLevel: (level) =>
       ipcRenderer.invoke("scripting:injectCorruptionLevel", level),
   },

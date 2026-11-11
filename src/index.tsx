@@ -35,6 +35,7 @@ if (typeof window !== "undefined" && !(window as unknown as Record<string, unkno
       setFileTags: async () => null,
       addMood: async () => null,
       removeMood: async () => null,
+      renameMood: async () => null,
       blacklist: async () => ({ ok: true }),
       loadCorruption: async () => null,
       discord: async () => null,
@@ -75,6 +76,7 @@ if (typeof window !== "undefined" && !(window as unknown as Record<string, unkno
       stop: async () => true,
       readScript: async () => null,
       writeScript: async () => false,
+      writePackDesign: async () => false,
       injectCorruptionLevel: async () => false,
     },
     system: {

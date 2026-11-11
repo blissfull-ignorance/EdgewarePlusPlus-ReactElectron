@@ -62,6 +62,24 @@ export function setFileTags(index: RawIndexLike, file: string, tags: string[]): 
   return { ...index, moods };
 }
 
+/** Rename a mood in place; unknown or colliding names are no-ops. */
+export function renameMood(index: RawIndexLike, from: string, to: string): RawIndexLike {
+  const clean = to.trim();
+  const moods = Array.isArray(index.moods) ? index.moods : [];
+  if (!clean || clean === from) return index;
+  if (moods.some((m) => moodNameOf(m) === clean)) return index;
+  let renamed = false;
+  const next = moods.map((m) => {
+    if (moodNameOf(m) === from) {
+      renamed = true;
+      const rec = asRecord(m);
+      return { ...(rec as Record<string, unknown>), mood: clean };
+    }
+    return m;
+  });
+  return renamed ? { ...index, moods: next } : index;
+}
+
 /** Every mood name the index defines, in file order. */
 export function listMoodNames(index: RawIndexLike): string[] {
   return (Array.isArray(index.moods) ? index.moods : [])

@@ -155,7 +155,9 @@ test.describe("Creator Tools authoring flow", () => {
   test("the script designer writes script.lua and Start runs it", async () => {
     const { window } = running!;
     await window.locator("[data-testid='creator-tab-script']").click();
-    const editor = window.locator("[data-testid='creator-script-editor']");
+    // Hand-written editing lives on the designer's code tab.
+    await window.locator("[data-testid='designer-mode-toggle']").getByText("Code").click();
+    const editor = window.locator("[data-testid='designer-code']");
     await expect(editor).toBeVisible();
     // Starter text appears for a pack without a script.
     await expect(editor).toContainText("edgeware_v0");
@@ -163,8 +165,8 @@ test.describe("Creator Tools authoring flow", () => {
     await editor.fill(
       'require("edgeware_v0")\nprint("CREATOR-SCRIPT ran")\ncorrupt()\n'
     );
-    await window.locator("[data-testid='creator-script-save']").click();
-    await expect(window.locator("[data-testid='creator-script-status']")).toContainText("Saved");
+    await window.locator("[data-testid='designer-save']").click();
+    await expect(window.locator("[data-testid='designer-status']")).toContainText("Saved");
     expect(readFileSync(path.join(packDir, "script.lua"), "utf-8")).toContain("CREATOR-SCRIPT");
 
     // Start the runtime: the freshly authored script auto-runs and corrupts.
@@ -192,7 +194,8 @@ test.describe("Creator Tools authoring flow", () => {
     await running!.window.locator("[data-testid='main-tab-creator']").click();
     await expect(running!.window.locator("[data-testid='creator-card-two.png']")).toBeVisible();
     await running!.window.locator("[data-testid='creator-tab-script']").click();
-    await expect(running!.window.locator("[data-testid='creator-script-editor']")).toContainText(
+    await running!.window.locator("[data-testid='designer-mode-toggle']").getByText("Code").click();
+    await expect(running!.window.locator("[data-testid='designer-code']")).toContainText(
       "CREATOR-SCRIPT"
     );
   });

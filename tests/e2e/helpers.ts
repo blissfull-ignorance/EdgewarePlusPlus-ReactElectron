@@ -153,6 +153,7 @@ export async function launchApp(page: Page, options: LaunchOptions = {}): Promis
           setFileTags: async () => null,
           addMood: async () => null,
           removeMood: async () => null,
+          renameMood: async () => null,
           blacklist: async () => ({ ok: true }),
           loadCorruption: async () => null,
           discord: async () => null,
@@ -193,6 +194,7 @@ export async function launchApp(page: Page, options: LaunchOptions = {}): Promis
           stop: async () => true,
           readScript: async () => null,
           writeScript: async () => false,
+          writePackDesign: async () => false,
           injectCorruptionLevel: async () => false,
         },
         system: {

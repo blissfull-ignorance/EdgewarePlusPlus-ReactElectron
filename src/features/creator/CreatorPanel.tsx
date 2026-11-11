@@ -15,7 +15,8 @@ import {
   Text,
   TextInput,
 } from "@mantine/core";
-import { IconPalette, IconCode, IconPlus, IconTrash } from "@tabler/icons-react";
+import { IconPalette, IconCode, IconPlus, IconTrash, IconPencil } from "@tabler/icons-react";
+import { DesignerSection } from "./DesignerSection";
 import type { GalleryEntry, GalleryResult } from "../../types/pack";
 import { resolvePackMediaUrl, type MediaDir } from "../popup/resolveMediaUrl";
 import { useSettingsStore } from "../../stores/settingsStore";
@@ -136,6 +137,9 @@ function TaggingSection() {
   const [moods, setMoods] = useState<RawMood[]>([]);
   const [newMood, setNewMood] = useState("");
   const [editing, setEditing] = useState<GalleryEntry | null>(null);
+  const [onlyUncategorized, setOnlyUncategorized] = useState(false);
+  const [renaming, setRenaming] = useState<string | null>(null);
+  const [renameValue, setRenameValue] = useState("");
   const [savedAt, setSavedAt] = useState<number>(0);
 
   const reload = useCallback(async () => {
@@ -194,6 +198,32 @@ function TaggingSection() {
 
   const moodOf = useMemo(() => new Map(moods.map((m) => [m.mood, m])), [moods]);
 
+  const uncategorizedCount = useMemo(
+    () => gallery.entries.filter((e) => tagsFor(moods, e.file).length === 0).length,
+    [gallery.entries, moods]
+  );
+  const visibleEntries = useMemo(
+    () =>
+      onlyUncategorized
+        ? gallery.entries.filter((e) => tagsFor(moods, e.file).length === 0)
+        : gallery.entries,
+    [gallery.entries, moods, onlyUncategorized]
+  );
+
+  const commitRename = (): void => {
+    if (!packPath || !renaming || !renameValue.trim() || renameValue.trim() === renaming) {
+      setRenaming(null);
+      return;
+    }
+    void window.api?.pack
+      .renameMood(packPath, renaming, renameValue.trim())
+      .then((idx) => {
+        setRenaming(null);
+        applyIndex(idx);
+      })
+      .catch(() => undefined);
+  };
+
   if (!packPath) {
     return <Text c="dimmed">Select a pack first (Status tab or Pack Management).</Text>;
   }
@@ -221,11 +251,50 @@ function TaggingSection() {
       </Group>
 
       <Group gap="xs" wrap="wrap">
+        <Chip
+          checked={onlyUncategorized}
+          onChange={() => setOnlyUncategorized((v) => !v)}
+          size="xs"
+          data-testid="creator-uncategorized-chip"
+        >
+          <span data-testid="creator-uncategorized-label">
+            Uncategorised ({uncategorizedCount} of {gallery.entries.length})
+          </span>
+        </Chip>
+      </Group>
+
+      <Group gap="xs" wrap="wrap">
         {moods.map((m) => (
           <Group key={m.mood} gap={4} wrap="nowrap" data-testid={`creator-mood-${m.mood}`}>
-            <Chip checked disabled size="xs">
-              {m.mood}
-            </Chip>
+            {renaming === m.mood ? (
+              <TextInput
+                size="xs"
+                w={120}
+                value={renameValue}
+                autoFocus
+                onChange={(e) => setRenameValue(e.currentTarget.value)}
+                onKeyDown={(e) => e.key === "Enter" && commitRename()}
+                onBlur={commitRename}
+                data-testid={`creator-mood-rename-input-${m.mood}`}
+                aria-label={`New name for mood ${m.mood}`}
+              />
+            ) : (
+              <Chip checked disabled size="xs">
+                {m.mood}
+              </Chip>
+            )}
+            <Button
+              size="xs"
+              variant="subtle"
+              aria-label={`Rename mood ${m.mood}`}
+              data-testid={`creator-mood-rename-${m.mood}`}
+              onClick={() => {
+                setRenaming(m.mood);
+                setRenameValue(m.mood);
+              }}
+            >
+              <IconPencil size={12} />
+            </Button>
             <Badge size="xs" variant="light" c="gray">
               {Array.isArray(m.media) ? m.media.length : 0}
             </Badge>
@@ -248,7 +317,7 @@ function TaggingSection() {
       ) : (
         <ScrollArea h="calc(100vh - 420px)" type="auto">
           <SimpleGrid cols={{ base: 3, sm: 4, md: 5, lg: 6 }} spacing="md" verticalSpacing="md">
-            {gallery.entries.map((entry) => {
+            {visibleEntries.map((entry) => {
               const fileTags = tagsFor(moods, entry.file);
               return (
                 <Stack
@@ -283,87 +352,6 @@ function TaggingSection() {
       )}
 
       {editing ? <TagEditor entry={editing} moods={moods} onToggle={toggleTag} /> : null}
-    </Stack>
-  );
-}
-
-function ScriptSection() {
-  const packPath = useSettingsStore((s) => s.packPath);
-  const [content, setContent] = useState("");
-  const [exists, setExists] = useState(false);
-  const [status, setStatus] = useState<"idle" | "saved" | "failed">("idle");
-
-  useEffect(() => {
-    if (!packPath) return;
-    let alive = true;
-    void window.api?.scripting
-      .readScript(packPath)
-      .then((res) => {
-        if (!alive || !res) return;
-        setContent(res.content);
-        setExists(res.exists);
-      })
-      .catch(() => undefined);
-    return () => {
-      alive = false;
-    };
-  }, [packPath]);
-
-  const save = (): void => {
-    if (!packPath) return;
-    void window.api?.scripting
-      .writeScript(packPath, content)
-      .then((ok) => setStatus(ok ? "saved" : "failed"))
-      .catch(() => setStatus("failed"));
-  };
-
-  if (!packPath) {
-    return <Text c="dimmed">Select a pack first (Status tab or Pack Management).</Text>;
-  }
-
-  return (
-    <Stack gap="sm" data-testid="creator-script">
-      <Text size="xs" c="dimmed">
-        script.lua runs when the runtime starts and drives corruption via corrupt().{" "}
-        {exists ? "This pack already ships a script." : "This pack has no script yet — the editor shows a starter."}
-      </Text>
-      <textarea
-        value={content}
-        onChange={(e) => {
-          setContent(e.currentTarget.value);
-          setStatus("idle");
-        }}
-        spellCheck={false}
-        aria-label="Pack script source"
-        data-testid="creator-script-editor"
-        style={{
-          width: "100%",
-          minHeight: 320,
-          fontFamily: "var(--mantine-font-family-monospace, monospace)",
-          fontSize: 13,
-          lineHeight: 1.5,
-          backgroundColor: "var(--mantine-color-dark-8)",
-          color: "var(--mantine-color-dark-0)",
-          border: "1px solid var(--mantine-color-dark-4)",
-          borderRadius: 8,
-          padding: 12,
-          resize: "vertical",
-        }}
-      />
-      <Group gap="sm">
-        <Button size="xs" onClick={save} data-testid="creator-script-save">
-          Save script
-        </Button>
-        {status === "saved" ? (
-          <Text size="sm" c="teal" data-testid="creator-script-status">
-            Saved to the pack.
-          </Text>
-        ) : status === "failed" ? (
-          <Text size="sm" c="red" data-testid="creator-script-status">
-            Could not write the pack script.
-          </Text>
-        ) : null}
-      </Group>
     </Stack>
   );
 }
@@ -403,7 +391,7 @@ export function CreatorPanel() {
           </Button>
         </Group>
       </Group>
-      {section === "tagging" ? <TaggingSection /> : <ScriptSection />}
+      {section === "tagging" ? <TaggingSection /> : <DesignerSection />}
     </Stack>
   );
 }

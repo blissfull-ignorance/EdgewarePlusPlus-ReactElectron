@@ -90,6 +90,7 @@ if (typeof window !== "undefined") {
       setFileTags: vi.fn().mockResolvedValue(null),
       addMood: vi.fn().mockResolvedValue(null),
       removeMood: vi.fn().mockResolvedValue(null),
+      renameMood: vi.fn().mockResolvedValue(null),
       blacklist: vi.fn().mockResolvedValue({ ok: true }),
       loadCorruption: vi.fn().mockResolvedValue(null),
       discord: vi.fn().mockResolvedValue(null),
@@ -137,6 +138,7 @@ if (typeof window !== "undefined") {
       stop: vi.fn().mockResolvedValue(true),
       readScript: vi.fn().mockResolvedValue(null),
       writeScript: vi.fn().mockResolvedValue(false),
+      writePackDesign: vi.fn().mockResolvedValue(false),
       injectCorruptionLevel: vi.fn().mockResolvedValue(false),
     },
     system: {

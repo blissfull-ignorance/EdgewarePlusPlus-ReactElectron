@@ -299,6 +299,44 @@ function registerHandlers(): void {
     }
   );
 
+  /**
+   * Creator tools: save a designed script and its corruption tables as one
+   * unit, so the sequence and the level effects can never drift apart.
+   */
+  ipcMain.handle(
+    "scripting:writePackDesign",
+    async (_event, packPath: unknown, lua: unknown, corruptionJson: unknown): Promise<boolean> => {
+      if (
+        typeof packPath !== "string" ||
+        !packPath ||
+        typeof lua !== "string" ||
+        typeof corruptionJson !== "string" ||
+        lua.length > 200_000 ||
+        corruptionJson.length > 200_000
+      ) {
+        return false;
+      }
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(corruptionJson);
+      } catch {
+        return false;
+      }
+      if (!parsed || typeof parsed !== "object") return false;
+      const dir = path.resolve(packPath.replace(/^~/, process.env.HOME ?? packPath));
+      if (!fs.existsSync(dir)) return false;
+      try {
+        fs.writeFileSync(path.join(dir, "script.lua"), lua, "utf-8");
+        fs.writeFileSync(path.join(dir, "corruption.json"), JSON.stringify(parsed, null, 2), "utf-8");
+        logger.info("[Scripting] Pack design saved (script.lua + corruption.json)");
+        return true;
+      } catch (err) {
+        logger.error("[Scripting] Failed to save pack design:", err);
+        return false;
+      }
+    }
+  );
+
   ipcMain.handle(
     "scripting:writeScript",
     async (_event, packPath: unknown, content: unknown): Promise<boolean> => {
