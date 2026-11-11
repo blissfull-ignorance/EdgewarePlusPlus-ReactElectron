@@ -8,8 +8,11 @@ import { normalizePackConfigValues } from "../../src/features/corruption/legacyC
  * pack values must be converted on apply.
  */
 describe("normalizePackConfigValues", () => {
-  it("converts legacy seconds to ms for corruptionTime", () => {
-    expect(normalizePackConfigValues({ corruptionTime: 30 })).toEqual({ corruptionTime: 30000 });
+  it("converts legacy seconds to ms for corruptionTime and popupTimeout", () => {
+    expect(normalizePackConfigValues({ corruptionTime: 30, popupTimeout: 3 })).toEqual({
+      corruptionTime: 30000,
+      popupTimeout: 3000,
+    });
   });
 
   it("leaves other keys untouched", () => {

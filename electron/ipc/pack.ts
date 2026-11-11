@@ -19,8 +19,20 @@ function dataDir(): string {
   return path.join(app.getPath("userData"), "data");
 }
 
+/**
+ * The pack a running session was started with. While set, content resolvers
+ * ignore config.json changes: switching packs applies on the next start,
+ * like the legacy app which loads its pack once per run.
+ */
+let runtimePackDir: string | null = null;
+
+export function setRuntimePackDir(dir: string | null): void {
+  runtimePackDir = dir ? expandTilde(dir) : null;
+}
+
 /** Resolve the current pack's root directory. */
 function currentPackDir(): string | null {
+  if (runtimePackDir) return runtimePackDir;
   try {
     const cfg = fs.readFileSync(path.join(dataDir(), "config.json"), "utf-8");
     const parsed = JSON.parse(cfg) as Record<string, unknown>;
@@ -321,6 +333,16 @@ function loadPackIndex(packDir: string): Index {
   if (modern) return modern;
 
   return loadIndexFallback(packDir);
+}
+
+/** A directory is browsable as a pack only if it ships pack manifests. */
+function looksLikePack(dir: string): boolean {
+  return (
+    fs.existsSync(path.join(dir, "info.json")) ||
+    fs.existsSync(path.join(dir, "index.json")) ||
+    fs.existsSync(path.join(dir, "captions.json")) ||
+    fs.existsSync(path.join(dir, "media.json"))
+  );
 }
 
 // ── Content resolvers (shared by IPC handlers and the Lua scripting host) ────
@@ -746,7 +768,9 @@ function registerHandlers(): void {
     const requested = typeof packPathArg === "string" && packPathArg ? packPathArg : null;
     const packDir = requested ?? currentPackDir();
     const activeMoods = [...getActiveMoods()];
-    if (!packDir || !fs.existsSync(packDir)) return { entries: [], moods: [], activeMoods };
+    if (!packDir || !fs.existsSync(packDir) || !looksLikePack(packDir)) {
+      return { entries: [], moods: [], activeMoods };
+    }
     try {
       const indexRaw = readJson<{ moods?: Array<{ mood?: unknown; media?: unknown }> }>(
         path.join(packDir, "index.json")
@@ -773,6 +797,11 @@ function registerHandlers(): void {
       logger.error("[Pack] Failed to list gallery:", err);
       return { entries: [], moods: [], activeMoods };
     }
+  });
+
+  /** Pin (or release) the pack a running session resolves content from. */
+  ipcMain.handle("pack:setRuntimePack", async (_event, dir: unknown): Promise<void> => {
+    setRuntimePackDir(typeof dir === "string" && dir ? dir : null);
   });
 
   ipcMain.handle("pack:hasScript", async (): Promise<boolean> => {

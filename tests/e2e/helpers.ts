@@ -146,6 +146,7 @@ export async function launchApp(page: Page, options: LaunchOptions = {}): Promis
           listMoods: async () => [],
           loadPackConfig: async () => null,
           hasScript: async () => false,
+          setRuntimePack: async () => undefined,
           listGallery: async () => ({ entries: [], moods: [], activeMoods: [] }),
           blacklist: async () => ({ ok: true }),
           loadCorruption: async () => null,

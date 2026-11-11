@@ -1,4 +1,5 @@
 import { Select, Stack } from "@mantine/core";
+import { useId } from "react";
 import { ConfigFieldLabel } from "./ConfigFieldLabel";
 
 interface ConfigDropdownProps {
@@ -20,10 +21,13 @@ export function ConfigDropdown({
   disabled,
   testId,
 }: ConfigDropdownProps) {
+  const inputId = useId();
   return (
     <Stack gap="xs">
-      <ConfigFieldLabel label={label} description={description} />
+      <ConfigFieldLabel label={label} description={description} htmlFor={inputId} />
       <Select
+        id={inputId}
+        aria-label={label}
         value={value.toString()}
         onChange={(val) => onChange(val !== null ? val : "")}
         data={data}

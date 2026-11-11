@@ -28,6 +28,7 @@ if (typeof window !== "undefined" && !(window as unknown as Record<string, unkno
       listMoods: async () => [],
       loadPackConfig: async () => null,
       hasScript: async () => false,
+      setRuntimePack: async () => undefined,
       listGallery: async () => ({ entries: [], moods: [], activeMoods: [] }),
       blacklist: async () => ({ ok: true }),
       loadCorruption: async () => null,

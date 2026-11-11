@@ -107,7 +107,7 @@ export function VideoPopup({
       buttonless={buttonless > 0}
       clicksToClose={clicksToClose}
       clickthroughEnabled={clickthrough > 0}
-      timeoutMs={timeoutPopups > 0 ? popupTimeout * 1000 : 0}
+      timeoutMs={timeoutPopups > 0 ? popupTimeout : 0}
       opacity={lkToggle === 1 && lkScaling > 0 ? lkScaling / 100 : 1}
     >
       <div style={{ width: "100%", height: "100%" }}>

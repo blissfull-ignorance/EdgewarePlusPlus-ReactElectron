@@ -19,6 +19,7 @@ const electronAPI: ElectronAPI = {
     listMoods: () => ipcRenderer.invoke("pack:listMoods"),
     loadPackConfig: () => ipcRenderer.invoke("pack:loadPackConfig"),
     hasScript: () => ipcRenderer.invoke("pack:hasScript"),
+    setRuntimePack: (dir) => ipcRenderer.invoke("pack:setRuntimePack", dir),
     listGallery: (packPath) => ipcRenderer.invoke("pack:listGallery", packPath),
     splashImage: () => ipcRenderer.invoke("pack:splashImage"),
     iconImage: () => ipcRenderer.invoke("pack:iconImage"),

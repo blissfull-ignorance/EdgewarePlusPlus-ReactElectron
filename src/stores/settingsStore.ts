@@ -155,7 +155,7 @@ export const DEFAULT_SETTINGS: SettingsValues = {
   multiClick: 0,
   lkScaling: 100,
   timeoutPopups: 0,
-  popupTimeout: 1,
+  popupTimeout: 10000,
   disabledMonitors: "[]",
   movingChance: 0,
   movingSpeed: 5,

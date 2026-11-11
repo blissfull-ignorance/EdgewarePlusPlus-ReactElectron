@@ -23,8 +23,14 @@ function scheduleBurst(type: string, durationInSec: number): void {
   clearAllTimers();
   hibernateActive = true;
 
-  const numPopups = Math.max(1, Math.round(durationInSec / 2));
-  const burstDuration = durationInSec * 1000;
+  // Bursts are minutes-long by design; clamp hostile durations so the
+  // scheduler can never allocate an unbounded timer array.
+  const safeDuration = Math.min(
+    3600,
+    Math.max(1, Number.isFinite(durationInSec) ? Math.round(durationInSec) : 1)
+  );
+  const numPopups = Math.max(1, Math.round(safeDuration / 2));
+  const burstDuration = safeDuration * 1000;
 
   let intervals: number[] = [];
   switch (type) {

@@ -15,7 +15,7 @@ import { pathToFileURL } from "node:url";
 import { logger } from "../utils/logger";
 import { lowkeyPosition } from "../../src/features/popup/lowkeyPosition";
 import { legacyPopupSize } from "../../src/features/popup/legacySize";
-import { initialMoveState, stepMove } from "../../src/features/popup/windowMovement";
+import { initialMoveState, stepMove, type MoveState } from "../../src/features/popup/windowMovement";
 
 // Registry of open popup windows, keyed by popup ID
 const popupWindows = new Map<string, BrowserWindow>();
@@ -30,15 +30,36 @@ export function countPopupsByType(type: "audio" | "video" | "image"): number {
   return n;
 }
 
-// Per-popup window movers (legacy try_move loop), stopped when the window closes
-const movers = new Map<string, ReturnType<typeof setInterval>>();
+// Windows whose popups drift, moved by one shared ticker (legacy try_move
+// ran one thread per popup, but per-window JS timers saturate the main
+// process once dozens move at once); each entry carries its own velocity.
+const movers = new Map<string, MoveState>();
+let moverTimer: ReturnType<typeof setInterval> | null = null;
+
+function ensureMoverLoop(): void {
+  if (moverTimer) return;
+  moverTimer = setInterval(() => {
+    for (const [id, state] of movers) {
+      const win = popupWindows.get(id);
+      if (!win || win.isDestroyed()) {
+        movers.delete(id);
+        continue;
+      }
+      const display = screen.getDisplayMatching(win.getBounds());
+      const size = win.getBounds();
+      movers.set(id, stepMove(state, display.bounds, size.width, size.height));
+      const next = movers.get(id)!;
+      win.setPosition(next.x, next.y);
+    }
+    if (movers.size === 0 && moverTimer) {
+      clearInterval(moverTimer);
+      moverTimer = null;
+    }
+  }, 16);
+}
 
 function stopMoving(id: string): void {
-  const timer = movers.get(id);
-  if (timer) {
-    clearInterval(timer);
-    movers.delete(id);
-  }
+  movers.delete(id);
 }
 
 // Main window that requested popups — used to deliver close notifications
@@ -212,6 +233,11 @@ function registerHandlers(): void {
       mediaId: string,
       hypnoGif?: string
     ): Promise<{ id: string }> => {
+      const POPUP_TYPES = ["image", "video", "audio", "subliminal", "prompt"] as const;
+      if (!POPUP_TYPES.includes(type) || typeof mediaId !== "string" || !mediaId || mediaId.length > 2048) {
+        logger.warn(`[Popup] Rejected create with type=${JSON.stringify(type)}`);
+        throw new Error("Invalid popup request");
+      }
       try {
         mainWin = BrowserWindow.fromWebContents(event.sender);
         return createPopupWindow(type, mediaId, hypnoGif);
@@ -279,18 +305,8 @@ function registerHandlers(): void {
     if (!win || win.isDestroyed() || movers.has(id)) return false;
     const speed = readSetting("movingSpeed") || 5;
     const start = win.getBounds();
-    let state = initialMoveState(start.x, start.y, speed);
-    const timer = setInterval(() => {
-      if (win.isDestroyed()) {
-        stopMoving(id);
-        return;
-      }
-      const display = screen.getDisplayMatching(win.getBounds());
-      const size = win.getBounds();
-      state = stepMove(state, display.bounds, size.width, size.height);
-      win.setPosition(state.x, state.y);
-    }, 16);
-    movers.set(id, timer);
+    movers.set(id, initialMoveState(start.x, start.y, speed));
+    ensureMoverLoop();
     return true;
   });
 }

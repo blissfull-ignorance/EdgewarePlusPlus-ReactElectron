@@ -55,7 +55,7 @@ export function registerPackMediaProtocol(): void {
   protocol.handle(PACK_MEDIA_SCHEME, (request) => {
     try {
       const url = new URL(request.url);
-      const packRoot = currentPackDir();
+      const packRoot = currentPackDir() ?? "";
 
       let rel: string;
       try {
@@ -67,22 +67,38 @@ export function registerPackMediaProtocol(): void {
       // The booru downloader caches fetched images outside the pack; serve
       // that host from the cache root instead of the pack directory.
       let filePath: string | null;
+      let confineRoot: string | null = null;
       if (url.host === "booru-cache") {
         const cacheRoot = path.join(app.getPath("userData"), "data", "booru-cache");
         const candidate = path.join(cacheRoot, rel);
         filePath = candidate.startsWith(cacheRoot + path.sep) ? candidate : null;
+        confineRoot = cacheRoot;
       } else {
         filePath = resolvePackMediaPath(packRoot, url.host, rel);
+        confineRoot = path.join(path.resolve(packRoot), url.host);
       }
-      if (!filePath) return notFound();
+      if (!filePath || !confineRoot) return notFound();
+
+      // Symlink-aware confinement: a pack (or cache) file that resolves
+      // outside its own subtree is refused, never served.
+      let real: string;
+      try {
+        real = fs.realpathSync(filePath);
+        const subRoot = fs.realpathSync(confineRoot);
+        if (real !== subRoot && !real.startsWith(subRoot + path.sep)) return notFound();
+      } catch {
+        return notFound();
+      }
 
       let stat: fs.Stats;
       try {
-        stat = fs.statSync(filePath);
+        stat = fs.statSync(real);
       } catch {
         return notFound();
       }
       if (!stat.isFile()) return notFound();
+
+      filePath = real;
 
       const stream = Readable.toWeb(fs.createReadStream(filePath)) as unknown as ReadableStream;
       return new Response(stream, {

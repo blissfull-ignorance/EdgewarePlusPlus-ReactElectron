@@ -52,6 +52,18 @@ function readNumberSetting(key: string): number {
   }
 }
 
+/** A stored cap of 0 means "none allowed"; only a missing key takes the fallback. */
+function readCap(key: string, fallback: number): number {
+  try {
+    const cfg = fs.readFileSync(path.join(dataDir(), "config.json"), "utf-8");
+    const parsed = JSON.parse(cfg) as Record<string, unknown>;
+    const value = Number(parsed[key]);
+    return Number.isFinite(value) && value >= 0 ? value : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
 /**
  * Runtime operations behind the edgeware_v0 Lua globals: popups, corruption,
  * panic, browser and notifications, all resolved against the active pack.
@@ -88,11 +100,18 @@ function buildEdgewareHost(): EdgewareHost {
       setCloseLabelOverride(text);
     },
     image: (file) => spawnMedia("image", file, resolveRandomImage),
-    video: (file) => spawnMedia("video", file, resolveRandomVideo),
+    video: (file) => {
+      const cap = readCap("maxVideos", 50);
+      if (countPopupsByType("video") >= cap) {
+        logger.warn(`[Scripting] edgeware_v0 video() refused: maxVideos (${cap}) reached`);
+        return null;
+      }
+      return spawnMedia("video", file, resolveRandomVideo);
+    },
     audio: (file) => {
       // Legacy routes Lua audio through the same player pool as the roll
       // driver: the max_audio cap applies to both sources together.
-      const cap = readNumberSetting("maxAudio") || 5;
+      const cap = readCap("maxAudio", 5);
       if (countPopupsByType("audio") >= cap) {
         logger.warn(`[Scripting] edgeware_v0 audio() refused: maxAudio (${cap}) reached`);
         return null;

@@ -78,3 +78,29 @@ export function resolvePackMediaPath(
 
   return target;
 }
+
+/**
+ * Symlink-aware confinement: the lexically resolved target and its real
+ * path must both stay under `<packRoot>/<subdir>`. A pack that ships a
+ * symlink pointing outside itself (e.g. `img/x.png → /etc/passwd`) is
+ * rejected, not served. `realpath` returns null when the file does not
+ * exist, which callers treat as "not found" rather than a traversal.
+ */
+export function isPathConstrained(
+  realpath: (p: string) => string,
+  packRoot: string,
+  subdir: string,
+  target: string
+): boolean {
+  const subRoot = path.resolve(packRoot, subdir);
+  const inside = (p: string): boolean =>
+    p === subRoot || p.startsWith(subRoot + path.sep);
+  if (!inside(path.resolve(target))) return false;
+  try {
+    const realSub = realpath(subRoot);
+    const real = realpath(target);
+    return real === realSub || real.startsWith(realSub + path.sep);
+  } catch {
+    return false;
+  }
+}

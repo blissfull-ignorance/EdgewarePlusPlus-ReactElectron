@@ -43,8 +43,10 @@ function registerHandlers(): void {
   ipcMain.handle(
     "corruption:setLevel",
     (_event, level: number, nextLevelTime: number | null): void => {
-      mirror.level = Number(level) || 0;
-      mirror.nextLevelTime = nextLevelTime != null ? Number(nextLevelTime) : null;
+      const next = Number(level);
+      const nextTime = Number(nextLevelTime);
+      mirror.level = Number.isFinite(next) && next >= 0 ? next : 0;
+      mirror.nextLevelTime = Number.isFinite(nextTime) && nextLevelTime != null ? nextTime : null;
     }
   );
 

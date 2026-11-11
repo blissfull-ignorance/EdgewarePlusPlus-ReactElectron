@@ -83,6 +83,7 @@ if (typeof window !== "undefined") {
       listMoods: vi.fn().mockResolvedValue([]),
       loadPackConfig: vi.fn().mockResolvedValue(null),
       hasScript: vi.fn().mockResolvedValue(false),
+      setRuntimePack: vi.fn().mockResolvedValue(undefined),
       listGallery: vi.fn().mockResolvedValue({ entries: [], moods: [], activeMoods: [] }),
       blacklist: vi.fn().mockResolvedValue({ ok: true }),
       loadCorruption: vi.fn().mockResolvedValue(null),

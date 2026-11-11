@@ -23,6 +23,7 @@ import type { GalleryEntry, GalleryResult } from "../../types/pack";
 import { resolvePackMediaUrl, type MediaDir } from "../popup/resolveMediaUrl";
 import { useSettingsStore } from "../../stores/settingsStore";
 import { useCorruptionStore } from "../../stores/corruptionStore";
+import { useAppStore } from "../../stores/appStore";
 
 const KIND_DIR: Record<GalleryEntry["kind"], MediaDir> = {
   image: "img",
@@ -69,6 +70,7 @@ export function GalleryPanel() {
   const packPath = useSettingsStore((s) => s.packPath);
   const [data, setData] = useState<GalleryResult>({ entries: [], moods: [], activeMoods: [] });
   const [loading, setLoading] = useState(true);
+  const isRunning = useAppStore((s) => s.isRunning);
   const [moodFilter, setMoodFilter] = useState<string | null>(null);
   const [typeFilter, setTypeFilter] = useState<"all" | GalleryEntry["kind"]>("all");
   const [selected, setSelected] = useState<GalleryEntry | null>(null);
@@ -88,7 +90,7 @@ export function GalleryPanel() {
     return () => {
       alive = false;
     };
-  }, [packPath]);
+  }, [packPath, isRunning]);
 
   const sessionMoods = useCorruptionStore((s) => s.activeMoods);
   const active = useMemo(

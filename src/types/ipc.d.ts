@@ -91,6 +91,8 @@ export interface ElectronAPI {
     loadPackConfig: () => Promise<Record<string, unknown> | null>;
     /** Whether the active pack ships a script.lua. */
     hasScript: () => Promise<boolean>;
+    /** Pin (or release with null) the pack a running session resolves from. */
+    setRuntimePack: (dir: string | null) => Promise<void>;
     /** Every pack media file with its mood tags, for the gallery. */
     listGallery: (packPath?: string | null) => Promise<import("./pack").GalleryResult>;
     /** The pack's startup splash image as a data URL, or null when the pack ships none. */

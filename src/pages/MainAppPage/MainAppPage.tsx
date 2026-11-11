@@ -192,6 +192,7 @@ export function MainAppPage() {
     // Kill the Lua session before closing popups: a live session would react
     // to the closes (on_stop chains) and keep spawning after "Stop".
     void window.api?.scripting.stop().catch(() => undefined);
+    void window.api?.pack.setRuntimePack(null).catch(() => undefined);
     void closeAll();
   }, [stop, closeAll]);
 
@@ -238,6 +239,11 @@ export function MainAppPage() {
     start();
     void (async () => {
       try {
+        // The session resolves all pack content from the pack chosen now;
+        // switching packs mid-run applies on the next start.
+        await window.api?.pack
+          .setRuntimePack(useSettingsStore.getState().packPath ?? null)
+          .catch(() => undefined);
         if (await window.api?.pack.hasScript()) {
           // A Stop during the await above must not be undone by the script:
           // IPC is FIFO per window, so skipping the call here (or ordering it

@@ -1,3 +1,4 @@
+import { useId } from "react";
 import { Stack, TextInput } from "@mantine/core";
 import { ConfigFieldLabel } from "./ConfigFieldLabel";
 
@@ -18,10 +19,13 @@ export function ConfigField({
   disabled,
   type = "text",
 }: ConfigFieldProps) {
+  const inputId = useId();
   return (
     <Stack gap="xs">
-      <ConfigFieldLabel label={label} description={description} />
+      <ConfigFieldLabel label={label} description={description} htmlFor={inputId} />
       <TextInput
+        id={inputId}
+        aria-label={label}
         value={value.toString()}
         onChange={(event) => onChange(event.currentTarget.value)}
         type={type}
