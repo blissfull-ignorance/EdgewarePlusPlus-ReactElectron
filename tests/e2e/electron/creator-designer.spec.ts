@@ -120,6 +120,11 @@ test.describe("No-code corruption designer", () => {
     await window.locator("[data-testid='designer-advance-audio-0']").click();
     await window.locator("[role='option']", { hasText: "voice.wav" }).click();
 
+    // Level 1 also sets a wallpaper.
+    await window.locator("[data-testid='designer-wallpaper-0']").click();
+    // Both level cards mount a wallpaper dropdown; only the open one is visible.
+    await window.locator("[role='option']:visible", { hasText: "one.png" }).click();
+
     // Level 2: activate the "vault" mood, final level.
     await window.locator(`[data-testid='designer-add-1-vault']`).click();
 
@@ -130,9 +135,11 @@ test.describe("No-code corruption designer", () => {
     expect(lua).toContain("EDGWARE-DESIGNER");
     expect(lua).toContain('audio("voice.wav", function() level2() end)');
     const corruption = JSON.parse(readFileSync(path.join(packDir, "corruption.json"), "utf-8")) as {
-      moods: Record<string, { add: string[] }>;
+      moods: Record<string, { add: string[]; wallpaper?: string }>;
     };
     expect(corruption.moods["2"].add).toEqual(["vault"]);
+    // The runtime reads the level wallpaper from the mood entry, pack-relative.
+    expect(corruption.moods["1"].wallpaper).toBe("img/one.png");
 
     // Start: level 1 runs, audio plays once, ends → level 2 → mood unlocks.
     await window.locator("[data-testid='main-tab-status']").click();

@@ -47,7 +47,16 @@ export function emptyDesign(): DesignerScript {
 }
 
 function luaString(value: string): string {
-  return `"${value.replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/\r?\n/g, "\\n")}"`;
+  return (
+    `"${value
+      .replace(/\\/g, "\\\\")
+      .replace(/"/g, '\\"')
+      .replace(/\r\n|\r|\n/g, "\\n")
+      .replace(/\t/g, "\\t")
+      // Control characters cannot appear in a Lua string literal.
+      // eslint-disable-next-line no-control-regex
+      .replace(/[\u0000-\u0008\u000b-\u001f\u007f]/g, "")}"`
+  );
 }
 
 function actionLine(action: DesignerLevel["actions"][number]): string | null {
@@ -104,15 +113,33 @@ export function generateLua(design: DesignerScript): string {
   return lines.join("\n") + "\n";
 }
 
+/**
+ * The last level of a design never chains onward; normalize a stale advance
+ * (e.g. one left in a hostile marker block) so the saved artifacts and the
+ * editor agree with what the UI shows.
+ */
+export function normalizeDesign(design: DesignerScript): DesignerScript {
+  if (design.levels.length === 0) return design;
+  const levels = design.levels.map((l, i) =>
+    i === design.levels.length - 1 ? { ...l, advance: { mode: "end" as const } } : l
+  );
+  return { ...design, levels };
+}
+
 export function generateCorruptionJson(design: DesignerScript): string {
-  const moods: Record<string, { add: string[]; remove: string[] }> = {};
-  const wallpapers: Record<string, string> = {};
+  const moods: Record<string, { add: string[]; remove: string[]; wallpaper?: string }> = {};
   for (let i = 0; i < design.levels.length; i++) {
     const level = design.levels[i];
-    moods[String(i + 1)] = { add: level.addMoods, remove: level.removeMoods };
-    if (level.wallpaper) wallpapers[String(i + 1)] = level.wallpaper;
+    const entry: { add: string[]; remove: string[]; wallpaper?: string } = {
+      add: level.addMoods,
+      remove: level.removeMoods,
+    };
+    // The runtime resolves the level wallpaper relative to the pack root,
+    // so the bare img/ filename is stored with its directory.
+    if (level.wallpaper) entry.wallpaper = `img/${level.wallpaper}`;
+    moods[String(i + 1)] = entry;
   }
-  return JSON.stringify({ moods, wallpapers, config: {} }, null, 2);
+  return JSON.stringify({ moods, config: {} }, null, 2);
 }
 
 export function parseDesignerScript(lua: string): DesignerScript | null {

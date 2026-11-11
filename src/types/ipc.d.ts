@@ -172,8 +172,8 @@ export interface ElectronAPI {
     readScript: (packPath: string) => Promise<{ content: string; exists: boolean } | null>;
     /** Creator tools: save the pack's script.lua */
     writeScript: (packPath: string, content: string) => Promise<boolean>;
-    /** Creator tools: save script.lua and corruption.json as one design */
-    writePackDesign: (packPath: string, lua: string, corruptionJson: string) => Promise<boolean>;
+    /** Creator tools: save script.lua and (unless null) corruption.json as one design */
+    writePackDesign: (packPath: string, lua: string, corruptionJson: string | null) => Promise<boolean>;
     /** Inject a corruption level into the running Lua VM (fires transition callbacks) */
     injectCorruptionLevel: (level: number) => Promise<boolean>;
   };

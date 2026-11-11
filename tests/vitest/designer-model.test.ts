@@ -3,9 +3,11 @@ import {
   emptyDesign,
   generateCorruptionJson,
   generateLua,
+  normalizeDesign,
   parseDesignerScript,
   type DesignerScript,
 } from "../../src/features/creator/designerModel";
+import { parseCorruptionData } from "../../src/features/corruption/corruptionEngine";
 
 const design: DesignerScript = {
   version: 1,
@@ -53,14 +55,50 @@ describe("designerModel", () => {
     expect(lua).toContain('notification("hello \\"world\\"\\nline2")');
   });
 
-  it("generates corruption.json tables keyed by level", () => {
-    const parsed = JSON.parse(generateCorruptionJson(design)) as {
-      moods: Record<string, { add: string[]; remove: string[] }>;
-      wallpapers: Record<string, string>;
+  it("generates corruption.json the runtime parser actually consumes", () => {
+    // Assert against the real consumer, not the generator's own shape.
+    const parsed = parseCorruptionData(JSON.parse(generateCorruptionJson(design)));
+    expect([...parsed.levels[1].addMoods]).toEqual(["vanilla"]);
+    expect([...parsed.levels[1].removeMoods]).toEqual([]);
+    expect(parsed.levels[1].wallpaper).toBe("img/wall1.png");
+    expect([...parsed.levels[2].addMoods]).toEqual(["goon"]);
+    expect([...parsed.levels[2].removeMoods]).toEqual(["vanilla"]);
+    expect(parsed.levels[2].wallpaper).toBeNull();
+    expect(parsed.levels[3].wallpaper).toBeNull();
+  });
+
+  it("normalizes the last level to a terminal advance", () => {
+    const stale: DesignerScript = {
+      version: 1,
+      startDelaySeconds: 1,
+      levels: [
+        { addMoods: [], removeMoods: [], wallpaper: null, actions: [], advance: { mode: "audio", file: "a.wav" } },
+        { addMoods: [], removeMoods: [], wallpaper: null, actions: [], advance: { mode: "audio", file: "b.wav" } },
+      ],
     };
-    expect(parsed.moods["1"]).toEqual({ add: ["vanilla"], remove: [] });
-    expect(parsed.moods["2"]).toEqual({ add: ["goon"], remove: ["vanilla"] });
-    expect(parsed.wallpapers).toEqual({ "1": "wall1.png" });
+    const next = normalizeDesign(stale);
+    expect(next.levels[0].advance).toEqual({ mode: "audio", file: "a.wav" });
+    expect(next.levels[1].advance).toEqual({ mode: "end" });
+    expect(normalizeDesign(emptyDesign())).toEqual(emptyDesign());
+  });
+
+  it("escapes control characters in generated Lua strings", () => {
+    const tricky: DesignerScript = {
+      version: 1,
+      startDelaySeconds: 1,
+      levels: [
+        {
+          addMoods: [],
+          removeMoods: [],
+          wallpaper: null,
+          actions: [{ kind: "notification", text: "a\u0000b\u0007c\rd\te" }],
+          advance: { mode: "end" },
+        },
+      ],
+    };
+    const lua = generateLua(tricky);
+    expect(lua).not.toContain("\u0000");
+    expect(lua).toContain('notification("abc\\nd\\te")');
   });
 
   it("round-trips the design through the marker block", () => {

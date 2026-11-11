@@ -27,6 +27,13 @@ import {
 import { showNotification, openExternalUrl } from "./system";
 import { panicFromTray } from "./panic";
 
+/** Write via temp file + rename so a crash never leaves a half-written file. */
+function writeAtomic(file: string, content: string): void {
+  const tmp = `${file}.${process.pid}.tmp`;
+  fs.writeFileSync(tmp, content, "utf-8");
+  fs.renameSync(tmp, file);
+}
+
 const STARTER_SCRIPT = `-- Edgeware++ pack script (edgeware_v0)
 -- Runs automatically when the runtime starts. Available calls:
 --   roll(pct)                true with pct% chance
@@ -291,7 +298,12 @@ function registerHandlers(): void {
       const exists = fs.existsSync(file);
       if (!exists) return { content: STARTER_SCRIPT, exists: false };
       try {
-        return { content: fs.readFileSync(file, "utf-8"), exists: true };
+        const content = fs.readFileSync(file, "utf-8");
+        if (content.length > 200_000) {
+          logger.warn("[Scripting] Pack script too large to edit in-app");
+          return null;
+        }
+        return { content, exists: true };
       } catch (err) {
         logger.error("[Scripting] Failed to read pack script:", err);
         return null;
@@ -310,25 +322,31 @@ function registerHandlers(): void {
         typeof packPath !== "string" ||
         !packPath ||
         typeof lua !== "string" ||
-        typeof corruptionJson !== "string" ||
         lua.length > 200_000 ||
-        corruptionJson.length > 200_000
+        !(corruptionJson === null || typeof corruptionJson === "string") ||
+        (typeof corruptionJson === "string" && corruptionJson.length > 200_000)
       ) {
         return false;
       }
-      let parsed: unknown;
-      try {
-        parsed = JSON.parse(corruptionJson);
-      } catch {
-        return false;
+      // null means "no level tables to write"; the pack's corruption.json
+      // (possibly hand-authored) stays untouched.
+      let parsed: unknown = null;
+      if (typeof corruptionJson === "string") {
+        try {
+          parsed = JSON.parse(corruptionJson);
+        } catch {
+          return false;
+        }
+        if (!parsed || typeof parsed !== "object") return false;
       }
-      if (!parsed || typeof parsed !== "object") return false;
       const dir = path.resolve(packPath.replace(/^~/, process.env.HOME ?? packPath));
       if (!fs.existsSync(dir)) return false;
       try {
-        fs.writeFileSync(path.join(dir, "script.lua"), lua, "utf-8");
-        fs.writeFileSync(path.join(dir, "corruption.json"), JSON.stringify(parsed, null, 2), "utf-8");
-        logger.info("[Scripting] Pack design saved (script.lua + corruption.json)");
+        writeAtomic(path.join(dir, "script.lua"), lua);
+        if (parsed) {
+          writeAtomic(path.join(dir, "corruption.json"), JSON.stringify(parsed, null, 2));
+        }
+        logger.info("[Scripting] Pack design saved");
         return true;
       } catch (err) {
         logger.error("[Scripting] Failed to save pack design:", err);

@@ -168,6 +168,8 @@ test.describe("Creator Tools authoring flow", () => {
     await window.locator("[data-testid='designer-save']").click();
     await expect(window.locator("[data-testid='designer-status']")).toContainText("Saved");
     expect(readFileSync(path.join(packDir, "script.lua"), "utf-8")).toContain("CREATOR-SCRIPT");
+    // An empty design must not wipe the pack's hand-authored level tables.
+    expect(readFileSync(path.join(packDir, "corruption.json"), "utf-8")).toContain("secret");
 
     // Start the runtime: the freshly authored script auto-runs and corrupts.
     await window.locator("[data-testid='main-tab-status']").click();

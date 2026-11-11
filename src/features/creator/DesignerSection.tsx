@@ -29,6 +29,7 @@ import {
   emptyDesign,
   generateCorruptionJson,
   generateLua,
+  normalizeDesign,
   parseDesignerScript,
   type DesignerAction,
   type DesignerLevel,
@@ -342,13 +343,24 @@ export function DesignerSection() {
 
   const save = (): void => {
     if (!packPath) return;
-    const lua = sourceMode === "code" ? code : generateLua(design);
+    // The code tab is authoritative for the script there; its embedded
+    // marker (when present) is authoritative for the level tables, so the
+    // two artifacts can never describe different designs.
+    const effective = normalizeDesign(
+      sourceMode === "code" ? (parseDesignerScript(code) ?? design) : design
+    );
+    const lua = sourceMode === "code" ? code : generateLua(effective);
+    // A design with no levels describes nothing; leave the pack's existing
+    // corruption.json alone instead of wiping a hand-authored progression.
+    const corruptionJson =
+      effective.levels.length > 0 ? generateCorruptionJson(effective) : null;
     void window.api?.scripting
-      .writePackDesign(packPath, lua, generateCorruptionJson(design))
+      .writePackDesign(packPath, lua, corruptionJson)
       .then((ok) => {
         setStatus(ok ? "saved" : "failed");
         if (ok) {
           setCode(lua);
+          setDesign(effective);
           setDesignDirty(false);
           void reload().catch(() => undefined);
         }
