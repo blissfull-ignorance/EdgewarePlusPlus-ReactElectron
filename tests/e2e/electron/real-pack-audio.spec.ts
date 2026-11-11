@@ -46,7 +46,7 @@ test.describe("A21.4 — real pack audio playback state verified progressing", (
     cleanupTempState(state);
   });
 
-  test("settings-driven audio pop reports element-level playback advancing; Stop closes it", async () => {
+  test("settings-driven audio pop reports element-level playback advancing; it closes when the file ends", async () => {
     const app = running!.app;
     const window = running!.window;
 
@@ -88,9 +88,8 @@ test.describe("A21.4 — real pack audio playback state verified progressing", (
       .poll(async () => (await audioState()).cur, { timeout: 15000 })
       .toBeGreaterThan(0);
 
-    // Regression guard ("blank canvas without a close button"): the audio popup
-    // must have a visible shell and a working close button — not be an invisible
-    // always-on-top window stuck open until Stop.
+    // One-shot playback (legacy on_eos): the audio popup closes itself when
+    // the file ends — it must not linger looping until Stop.
     let audioWin: Page | null = null;
     for (const w of app.windows()) {
       try {
@@ -102,9 +101,8 @@ test.describe("A21.4 — real pack audio playback state verified progressing", (
       } catch { /* mid-close */ }
     }
     expect(audioWin).not.toBeNull();
-    // Audio pops are a buttonless chip: clicking the chip itself closes it.
+    // The chip stays the visible, clickable surface while the file plays.
     await expect(audioWin!.locator('[data-testid="audio-popup-chip"]')).toBeVisible();
-    await audioWin!.locator('[data-testid="audio-popup-chip"]').click();
     await expect
       .poll(async () => {
         try {
