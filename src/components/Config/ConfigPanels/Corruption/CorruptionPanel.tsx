@@ -49,7 +49,6 @@ export function CorruptionPanel() {
           label="Enable Corruption Mode"
           value={corruptionMode}
           onChange={(val) => setRaw({ corruptionMode: val })}
-          disabled
           description="Enable guided mode with level transitions"
         />
 
@@ -57,7 +56,6 @@ export function CorruptionPanel() {
           label="Full Permissions"
           value={corruptionFullPerm}
           onChange={(val) => setRaw({ corruptionFullPerm: val })}
-          disabled
           description="Allow pack to modify Edgeware settings"
         />
 

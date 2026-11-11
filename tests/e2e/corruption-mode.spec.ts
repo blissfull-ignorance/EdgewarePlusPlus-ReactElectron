@@ -32,8 +32,40 @@ test.describe("Corruption Mode", () => {
     await expect(page.locator("[data-testid='next-level-time']")).not.toBeVisible();
   });
 
-  test("corruption config tab exposes the mode controls", async ({ page }) => {
+  test("the Corruption panel toggle turns the mode on and off", async ({ page }) => {
     await launchApp(page, { packs });
+
+    await page.locator("[data-testid='main-tabs']").getByRole("button", { name: "Config" }).click();
+    await page.getByRole("tab", { name: "Corruption" }).click();
+
+    const modeToggle = page.getByLabel("Enable Corruption Mode");
+    await expect(modeToggle).toBeEnabled();
+    await modeToggle.click();
+    const after = await page.evaluate(
+      () =>
+        (
+          window as unknown as {
+            __settingsStore: { getState: () => { corruptionMode: number; corruptionFullPerm: number } };
+          }
+        ).__settingsStore.getState()
+    );
+    expect(after.corruptionMode).toBe(1);
+
+    await modeToggle.click();
+    const off = await page.evaluate(
+      () =>
+        (
+          window as unknown as {
+            __settingsStore: { getState: () => { corruptionMode: number } };
+          }
+        ).__settingsStore.getState().corruptionMode
+    );
+    expect(off).toBe(0);
+
+    await expect(page.getByLabel("Full Permissions")).toBeEnabled();
+  });
+
+  test("corruption config tab exposes the mode controls", async ({ page }) => {    await launchApp(page, { packs });
 
     await page.locator("[data-testid='main-tabs']").getByRole("button", { name: "Config" }).click();
     await page.getByRole("tab", { name: "Corruption" }).click();
