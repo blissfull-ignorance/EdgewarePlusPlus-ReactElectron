@@ -85,6 +85,7 @@ if (typeof window !== "undefined") {
       hasScript: vi.fn().mockResolvedValue(false),
       setRuntimePack: vi.fn().mockResolvedValue(undefined),
       listGallery: vi.fn().mockResolvedValue({ entries: [], moods: [], activeMoods: [] }),
+      setFavourite: vi.fn().mockResolvedValue([]),
       blacklist: vi.fn().mockResolvedValue({ ok: true }),
       loadCorruption: vi.fn().mockResolvedValue(null),
       discord: vi.fn().mockResolvedValue(null),

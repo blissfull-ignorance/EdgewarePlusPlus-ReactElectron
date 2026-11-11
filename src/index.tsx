@@ -30,6 +30,7 @@ if (typeof window !== "undefined" && !(window as unknown as Record<string, unkno
       hasScript: async () => false,
       setRuntimePack: async () => undefined,
       listGallery: async () => ({ entries: [], moods: [], activeMoods: [] }),
+      setFavourite: async () => [],
       blacklist: async () => ({ ok: true }),
       loadCorruption: async () => null,
       discord: async () => null,

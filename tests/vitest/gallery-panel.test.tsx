@@ -16,6 +16,7 @@ const result = {
   ],
   moods: ["locked", "voice"],
   activeMoods: ["voice"],
+  favourites: [],
 };
 
 beforeEach(() => {
@@ -67,7 +68,7 @@ describe("GalleryPanel", () => {
   });
 
   it("shows the empty state for a pack without media", async () => {
-    api().listGallery.mockResolvedValue({ entries: [], moods: [], activeMoods: [] });
+    api().listGallery.mockResolvedValue({ entries: [], moods: [], activeMoods: [], favourites: [] });
     renderWithMantine(<GalleryPanel />);
     await waitFor(() =>
       expect(screen.getByText("The active pack ships no media files.")).toBeInTheDocument()
@@ -79,5 +80,19 @@ describe("GalleryPanel", () => {
     await waitFor(() => expect(api().listGallery).toHaveBeenCalledTimes(1));
     useSettingsStore.setState({ packPath: "/packs/other" });
     await waitFor(() => expect(api().listGallery).toHaveBeenCalledTimes(2));
+  });
+  it("stars a file through the bridge and filters to favourites", async () => {
+    api().setFavourite.mockReset().mockResolvedValue(["img/free.png"]);
+    renderWithMantine(<GalleryPanel />);
+    await waitFor(() => expect(screen.getByTestId("gallery-card-free.png")).toBeInTheDocument());
+
+    screen.getByTestId("gallery-star-free.png").click();
+    await waitFor(() => expect(api().setFavourite).toHaveBeenCalledWith("img/free.png", true));
+
+    screen.getByTestId("gallery-chip-favourites").click();
+    await waitFor(() =>
+      expect(screen.queryByTestId("gallery-card-locked.png")).not.toBeInTheDocument()
+    );
+    expect(screen.getByTestId("gallery-card-free.png")).toBeInTheDocument();
   });
 });

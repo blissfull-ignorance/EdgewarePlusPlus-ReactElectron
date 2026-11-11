@@ -150,6 +150,8 @@ export interface GalleryResult {
   moods: string[];
   /** Moods currently unlocked by the corruption progression. */
   activeMoods: string[];
+  /** Files the user starred, as "<dir>/<file>" keys. */
+  favourites: string[];
 }
 
 /**

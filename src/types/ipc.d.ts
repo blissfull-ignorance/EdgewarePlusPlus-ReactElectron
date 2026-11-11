@@ -95,6 +95,8 @@ export interface ElectronAPI {
     setRuntimePack: (dir: string | null) => Promise<void>;
     /** Every pack media file with its mood tags, for the gallery. */
     listGallery: (packPath?: string | null) => Promise<import("./pack").GalleryResult>;
+    /** Star/unstar a gallery file ("<dir>/<file>"); resolves the new list. */
+    setFavourite: (key: string, favourite: boolean) => Promise<string[]>;
     /** The pack's startup splash image as a data URL, or null when the pack ships none. */
     splashImage: () => Promise<string | null>;
     /** The app icon (pack icon or bundled default) as a data URL, or null. */

@@ -151,6 +151,39 @@ test.describe("Pack moods, preset and script auto-run (AAP-shaped pack)", () => 
     await window.locator("[data-testid='main-tab-status']").click();
   });
 
+  test("favourites persist across restarts and filter the grid", async () => {
+    const { window } = running!;
+    await window.locator("[data-testid='main-tab-gallery']").click();
+    await expect(window.locator("[data-testid='gallery-card-free.png']")).toBeVisible();
+
+    await window.locator("[data-testid='gallery-star-free.png']").click();
+    // The star click must reach the bridge before the chip count is read.
+    await expect
+      .poll(() =>
+        window.evaluate(() =>
+          (
+            window as unknown as { api: { pack: { listGallery: () => Promise<{ favourites: string[] }> } } }
+          ).api.pack.listGallery().then((g) => g.favourites.join(","))
+        )
+      )
+      .toBe("img/free.png");
+
+    await window.locator("[data-testid='gallery-chip-favourites']").click();
+    await expect(window.locator("[data-testid='gallery-card-free.png']")).toBeVisible();
+    await expect(window.locator("[data-testid='gallery-card-locked.png']")).toHaveCount(0);
+    await window.locator("[data-testid='gallery-chip-favourites']").click();
+
+    // Restart the app: the star survives.
+    await quitApp(running!);
+    running = await launchApp(state!, { EDGWARE_STUB_BROWSER: "1" });
+    await running.window.locator("[data-testid='main-tab-gallery']").click();
+    await expect(running.window.locator("[data-testid='gallery-card-free.png']")).toBeVisible();
+    await running.window.locator("[data-testid='gallery-chip-favourites']").click();
+    await expect(running.window.locator("[data-testid='gallery-card-free.png']")).toBeVisible();
+    await expect(running.window.locator("[data-testid='gallery-card-locked.png']")).toHaveCount(0);
+    await running.window.locator("[data-testid='main-tab-status']").click();
+  });
+
   test("mood-tagged media stays locked while its mood is inactive", async () => {
     await running!.window.evaluate(() =>
       (window as unknown as { api: { pack: { setActiveMoods: (m: string[]) => Promise<void> } } }).api.pack.setActiveMoods([])

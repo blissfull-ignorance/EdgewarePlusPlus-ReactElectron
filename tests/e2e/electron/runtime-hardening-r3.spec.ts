@@ -1,6 +1,5 @@
 import { expect, test } from "@playwright/test";
 import { copyFileSync, mkdirSync, symlinkSync, writeFileSync } from "node:fs";
-import os from "node:os";
 import path from "node:path";
 import {
   cleanupTempState,

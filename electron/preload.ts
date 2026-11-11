@@ -21,6 +21,7 @@ const electronAPI: ElectronAPI = {
     hasScript: () => ipcRenderer.invoke("pack:hasScript"),
     setRuntimePack: (dir) => ipcRenderer.invoke("pack:setRuntimePack", dir),
     listGallery: (packPath) => ipcRenderer.invoke("pack:listGallery", packPath),
+    setFavourite: (key, favourite) => ipcRenderer.invoke("pack:setFavourite", key, favourite),
     splashImage: () => ipcRenderer.invoke("pack:splashImage"),
     iconImage: () => ipcRenderer.invoke("pack:iconImage"),
     blacklist: (fileName) => ipcRenderer.invoke("pack:blacklistMedia", fileName),

@@ -335,6 +335,24 @@ function loadPackIndex(packDir: string): Index {
   return loadIndexFallback(packDir);
 }
 
+/** User-starred gallery files, shared by the gallery view and the toggle. */
+function readFavouritesList(): string[] {
+  try {
+    const list = readJson<unknown>(path.join(dataDir(), "gallery_favourites.json"));
+    return Array.isArray(list) ? list.filter((k): k is string => typeof k === "string") : [];
+  } catch {
+    return [];
+  }
+}
+
+/** Gallery favourite keys are "<dir>/<file>" under a known media dir. */
+const GALLERY_DIR_BY_KIND = new Set(["img/", "vid/", "aud/"]);
+
+function favouriteKey(entry: GalleryEntry): string {
+  const dir = entry.kind === "image" ? "img/" : entry.kind === "video" ? "vid/" : "aud/";
+  return `${dir}${entry.file}`;
+}
+
 /** A directory is browsable as a pack only if it ships pack manifests. */
 function looksLikePack(dir: string): boolean {
   return (
@@ -768,8 +786,9 @@ function registerHandlers(): void {
     const requested = typeof packPathArg === "string" && packPathArg ? packPathArg : null;
     const packDir = requested ?? currentPackDir();
     const activeMoods = [...getActiveMoods()];
+    const favourites = readFavouritesList();
     if (!packDir || !fs.existsSync(packDir) || !looksLikePack(packDir)) {
-      return { entries: [], moods: [], activeMoods };
+      return { entries: [], moods: [], activeMoods, favourites };
     }
     try {
       const indexRaw = readJson<{ moods?: Array<{ mood?: unknown; media?: unknown }> }>(
@@ -792,12 +811,41 @@ function registerHandlers(): void {
         }
       }
       const moods = [...new Set(entries.flatMap((e) => e.moods))].sort();
-      return { entries, moods, activeMoods };
+      const keys = new Set(entries.map(favouriteKey));
+      return { entries, moods, activeMoods, favourites: favourites.filter((k) => keys.has(k)) };
     } catch (err) {
       logger.error("[Pack] Failed to list gallery:", err);
-      return { entries: [], moods: [], activeMoods };
+      return { entries: [], moods: [], activeMoods, favourites: [] };
     }
   });
+
+  // ── Gallery favourites (user stars, persisted across packs and boots) ──
+
+  ipcMain.handle("pack:listFavourites", async (): Promise<string[]> => readFavouritesList());
+
+  ipcMain.handle(
+    "pack:setFavourite",
+    async (_event, key: unknown, favourite: unknown): Promise<string[]> => {
+      if (
+        typeof key !== "string" ||
+        ![...GALLERY_DIR_BY_KIND].some((prefix) => key.startsWith(prefix)) ||
+        typeof favourite !== "boolean"
+      ) {
+        return readFavouritesList();
+      }
+      const set = new Set(readFavouritesList());
+      if (favourite) set.add(key);
+      else set.delete(key);
+      const next = [...set].sort();
+      try {
+        fs.mkdirSync(dataDir(), { recursive: true });
+        fs.writeFileSync(path.join(dataDir(), "gallery_favourites.json"), JSON.stringify(next, null, 1), "utf-8");
+      } catch (err) {
+        logger.error("[Pack] Failed to persist gallery favourites:", err);
+      }
+      return next;
+    }
+  );
 
   /** Pin (or release) the pack a running session resolves content from. */
   ipcMain.handle("pack:setRuntimePack", async (_event, dir: unknown): Promise<void> => {

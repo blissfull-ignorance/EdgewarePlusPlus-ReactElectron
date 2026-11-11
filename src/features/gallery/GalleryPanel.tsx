@@ -17,8 +17,9 @@ import {
   SimpleGrid,
   Stack,
   Text,
+  UnstyledButton,
 } from "@mantine/core";
-import { IconPhoto, IconVideo, IconMusic, IconLock } from "@tabler/icons-react";
+import { IconPhoto, IconVideo, IconMusic, IconLock, IconStar, IconStarFilled } from "@tabler/icons-react";
 import type { GalleryEntry, GalleryResult } from "../../types/pack";
 import { resolvePackMediaUrl, type MediaDir } from "../popup/resolveMediaUrl";
 import { useSettingsStore } from "../../stores/settingsStore";
@@ -36,6 +37,11 @@ const KIND_ICON: Record<GalleryEntry["kind"], React.ReactNode> = {
   video: <IconVideo size={40} stroke={1.2} />,
   audio: <IconMusic size={40} stroke={1.2} />,
 };
+
+/** Stable cross-pack identity for a media file: "<dir>/<file>". */
+export function favouriteKey(entry: GalleryEntry): string {
+  return `${KIND_DIR[entry.kind]}/${entry.file}`;
+}
 
 function Thumb({ entry }: { entry: GalleryEntry }) {
   const url = resolvePackMediaUrl(entry.file, KIND_DIR[entry.kind]);
@@ -68,10 +74,11 @@ function Thumb({ entry }: { entry: GalleryEntry }) {
 
 export function GalleryPanel() {
   const packPath = useSettingsStore((s) => s.packPath);
-  const [data, setData] = useState<GalleryResult>({ entries: [], moods: [], activeMoods: [] });
+  const [data, setData] = useState<GalleryResult>({ entries: [], moods: [], activeMoods: [], favourites: [] });
   const [loading, setLoading] = useState(true);
   const isRunning = useAppStore((s) => s.isRunning);
   const [moodFilter, setMoodFilter] = useState<string | null>(null);
+  const [favouritesOnly, setFavouritesOnly] = useState(false);
   const [typeFilter, setTypeFilter] = useState<"all" | GalleryEntry["kind"]>("all");
   const [selected, setSelected] = useState<GalleryEntry | null>(null);
 
@@ -98,16 +105,32 @@ export function GalleryPanel() {
     [data.activeMoods, sessionMoods]
   );
 
+  const favouriteKeys = useMemo(() => new Set(data.favourites), [data.favourites]);
+
   const visible = useMemo(
     () =>
       data.entries.filter((e) => {
+        if (favouritesOnly && !favouriteKeys.has(favouriteKey(e))) return false;
         if (typeFilter !== "all" && e.kind !== typeFilter) return false;
         if (moodFilter === null) return true;
         if (moodFilter === "default") return e.moods.length === 0;
         return e.moods.includes(moodFilter);
       }),
-    [data.entries, moodFilter, typeFilter]
+    [data.entries, moodFilter, typeFilter, favouritesOnly, favouriteKeys]
   );
+
+  const toggleFavourite = (entry: GalleryEntry): void => {
+    const key = favouriteKey(entry);
+    const next = !favouriteKeys.has(key);
+    setData((d) => ({
+      ...d,
+      favourites: next ? [...d.favourites, key] : d.favourites.filter((k) => k !== key),
+    }));
+    void window.api?.pack
+      .setFavourite(key, next)
+      .then((list) => setData((d) => ({ ...d, favourites: list })))
+      .catch(() => undefined);
+  };
 
   const selectedUrl = selected ? resolvePackMediaUrl(selected.file, KIND_DIR[selected.kind]) : "";
 
@@ -123,17 +146,32 @@ export function GalleryPanel() {
             their content for popups
           </Text>
         </div>
-        <SegmentedControl
+        <Group gap="sm" wrap="nowrap">
+          <Chip
+            checked={favouritesOnly}
+            onClick={() => setFavouritesOnly((v) => !v)}
+            size="xs"
+            data-testid="gallery-favourites-chip"
+          >
+            <span data-testid="gallery-chip-favourites">
+              <Group gap={4} wrap="nowrap">
+                <IconStarFilled size={12} />
+                Favourites ({data.favourites.length})
+              </Group>
+            </span>
+          </Chip>
+          <SegmentedControl
           data={[
             { label: "All", value: "all" },
             { label: "Images", value: "image" },
             { label: "Videos", value: "video" },
             { label: "Audio", value: "audio" },
           ]}
-          value={typeFilter}
-          onChange={(v) => setTypeFilter(v as typeof typeFilter)}
-          data-testid="gallery-type-filter"
-        />
+            value={typeFilter}
+            onChange={(v) => setTypeFilter(v as typeof typeFilter)}
+            data-testid="gallery-type-filter"
+          />
+        </Group>
       </Group>
 
       <Group gap="xs" wrap="wrap" data-testid="gallery-mood-chips">
@@ -184,7 +222,9 @@ export function GalleryPanel() {
           <Text c="dimmed">
             {data.entries.length === 0
               ? "The active pack ships no media files."
-              : "No files match this filter."}
+              : favouritesOnly && data.favourites.length === 0
+                ? "No favourites yet — star files to collect them here."
+                : "No files match this filter."}
           </Text>
         </Center>
       ) : (
@@ -198,7 +238,24 @@ export function GalleryPanel() {
                 style={{ cursor: "pointer" }}
                 onClick={() => setSelected(entry)}
               >
-                <Thumb entry={entry} />
+                <div style={{ position: "relative" }}>
+                  <Thumb entry={entry} />
+                  <UnstyledButton
+                    aria-label={favouriteKeys.has(favouriteKey(entry)) ? `Unstar ${entry.file}` : `Star ${entry.file}`}
+                    data-testid={`gallery-star-${entry.file}`}
+                    style={{ position: "absolute", top: 4, right: 4, padding: 4, borderRadius: 6, backgroundColor: "rgba(0,0,0,0.45)" }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      toggleFavourite(entry);
+                    }}
+                  >
+                    {favouriteKeys.has(favouriteKey(entry)) ? (
+                      <IconStarFilled size={16} color="#ffd43b" />
+                    ) : (
+                      <IconStar size={16} color="rgba(255,255,255,0.8)" />
+                    )}
+                  </UnstyledButton>
+                </div>
                 <Text size="xs" truncate title={entry.file}>
                   {entry.file}
                 </Text>
