@@ -23,8 +23,13 @@ const MEDIA_PACK_IMG = path.join(REPO_ROOT, "tests", "e2e", "fixtures", "Real Te
 function writeMoodPack(packsDir: string): string {
   const packDir = path.join(packsDir, "Mood Gate Pack");
   mkdirSync(path.join(packDir, "img"), { recursive: true });
+  mkdirSync(path.join(packDir, "aud"), { recursive: true });
   copyFileSync(path.join(MEDIA_PACK_IMG, "applelw.png"), path.join(packDir, "img", "free.png"));
   copyFileSync(path.join(MEDIA_PACK_IMG, "globelw.png"), path.join(packDir, "img", "locked.png"));
+  copyFileSync(
+    path.join(REPO_ROOT, "tests", "e2e", "fixtures", "Real Test Pack", "aud", "think.wav"),
+    path.join(packDir, "aud", "voice.wav")
+  );
 
   writeFileSync(
     path.join(packDir, "info.json"),
@@ -118,6 +123,32 @@ test.describe("Pack moods, preset and script auto-run (AAP-shaped pack)", () => 
   test.afterAll(async () => {
     if (running) await quitApp(running);
     cleanupTempState(state);
+  });
+
+  test("the Gallery tab lists all pack content with mood tags and filters", async () => {
+    const { window } = running!;
+    await window.locator("[data-testid='main-tab-gallery']").click();
+    await expect(window.locator("[data-testid='gallery-panel']")).toBeVisible();
+
+    await expect(window.locator("[data-testid='gallery-card-free.png']")).toBeVisible();
+    await expect(window.locator("[data-testid='gallery-card-locked.png']")).toBeVisible();
+    await expect(window.locator("[data-testid='gallery-card-voice.wav']")).toBeVisible();
+
+    // The locked mood chip carries a locked badge while the mood is inactive.
+    await expect(window.locator("[data-testid='gallery-chip-locked']")).toContainText("locked");
+
+    await window.locator("[data-testid='gallery-chip-locked']").click();
+    await expect(window.locator("[data-testid='gallery-card-locked.png']")).toBeVisible();
+    await expect(window.locator("[data-testid='gallery-card-free.png']")).toHaveCount(0);
+
+    await window.locator("[data-testid='gallery-chip-all']").click();
+    await window.locator("[data-testid='gallery-card-locked.png']").click();
+    await expect(window.locator("[data-testid='gallery-modal']")).toBeVisible();
+    // Escape is the panic hotkey — dismiss the modal with its close button.
+    await window.getByLabel("Close gallery view").click();
+    await expect(window.locator("[data-testid='gallery-modal']")).toBeHidden();
+
+    await window.locator("[data-testid='main-tab-status']").click();
   });
 
   test("mood-tagged media stays locked while its mood is inactive", async () => {

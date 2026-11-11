@@ -1,9 +1,9 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { Group, Title, Badge, Text, UnstyledButton } from "@mantine/core";
-import { IconLayoutDashboard, IconSettings } from "@tabler/icons-react";
+import { IconLayoutDashboard, IconSettings, IconPhoto } from "@tabler/icons-react";
 import defaultAppIcon from "../../assets/app_icon.png";
 
-export type MainView = "status" | "config";
+export type MainView = "status" | "config" | "gallery";
 
 interface NavItemProps {
   active: boolean;
@@ -120,6 +120,13 @@ export function AppFrame({ view, onViewChange, actions, children }: AppFrameProp
             icon={<IconSettings size={18} />}
             testId="main-tab-config"
             onClick={() => onViewChange("config")}
+          />
+          <NavItem
+            active={view === "gallery"}
+            label="Gallery"
+            icon={<IconPhoto size={18} />}
+            testId="main-tab-gallery"
+            onClick={() => onViewChange("gallery")}
           />
           <div style={{ marginTop: "auto", padding: "0 4px" }}>
             <Text size="xs" c="dimmed">

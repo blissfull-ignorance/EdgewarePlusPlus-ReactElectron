@@ -9,7 +9,8 @@ import { loadAppIconDataUrl } from "../utils/appIcon";
 import { parseDiscordDat } from "../utils/discordDat";
 import { resolveBlacklistSource, computeBlacklistTarget } from "../utils/blacklist";
 
-import { Index, Mood, Web, DEFAULT_INDEX } from "../../src/types/pack";
+import { Index, Mood, Web, DEFAULT_INDEX, GalleryEntry, GalleryResult } from "../../src/types/pack";
+import { buildFileMoods } from "../utils/galleryIndex";
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -730,6 +731,43 @@ function registerHandlers(): void {
   });
 
   /** Whether the active pack ships a script.lua (scripted corruption). */
+  /**
+   * Every media file the active pack ships, tagged with its moods, for the
+   * gallery browser. Untagged files are default content; the mood list and
+   * currently-active moods let the UI group and badge entries.
+   */
+  ipcMain.handle("pack:listGallery", async (): Promise<GalleryResult> => {
+    const packDir = currentPackDir();
+    const activeMoods = [...getActiveMoods()];
+    if (!packDir) return { entries: [], moods: [], activeMoods };
+    try {
+      const indexRaw = readJson<{ moods?: Array<{ mood?: unknown; media?: unknown }> }>(
+        path.join(packDir, "index.json")
+      );
+      const legacyMedia = readJson<Record<string, unknown>>(path.join(packDir, "media.json"));
+      const fileMoods = buildFileMoods(indexRaw?.moods, legacyMedia ?? undefined);
+
+      const dirs: Array<[string, GalleryEntry["kind"], RegExp]> = [
+        ["img", "image", /\.(png|jpg|jpeg|gif|webp)$/i],
+        ["vid", "video", /\.(mp4|webm|mkv)$/i],
+        ["aud", "audio", /\.(mp3|wav|ogg|flac)$/i],
+      ];
+      const entries: GalleryEntry[] = [];
+      for (const [subdir, kind, pattern] of dirs) {
+        const dirPath = path.join(packDir, subdir);
+        if (!fs.existsSync(dirPath)) continue;
+        for (const file of fs.readdirSync(dirPath).filter((f) => pattern.test(f))) {
+          entries.push({ file, kind, moods: fileMoods[file] ?? [] });
+        }
+      }
+      const moods = [...new Set(entries.flatMap((e) => e.moods))].sort();
+      return { entries, moods, activeMoods };
+    } catch (err) {
+      logger.error("[Pack] Failed to list gallery:", err);
+      return { entries: [], moods: [], activeMoods };
+    }
+  });
+
   ipcMain.handle("pack:hasScript", async (): Promise<boolean> => {
     const packDir = currentPackDir();
     if (!packDir) return false;

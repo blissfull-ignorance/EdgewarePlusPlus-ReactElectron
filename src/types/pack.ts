@@ -135,6 +135,23 @@ export interface Info {
 }
 
 /**
+ * Gallery: one pack media file with its mood tags (empty = default content).
+ */
+export interface GalleryEntry {
+  file: string;
+  kind: "image" | "video" | "audio";
+  moods: string[];
+}
+
+export interface GalleryResult {
+  entries: GalleryEntry[];
+  /** Every mood tag the pack defines, sorted. */
+  moods: string[];
+  /** Moods currently unlocked by the corruption progression. */
+  activeMoods: string[];
+}
+
+/**
  * Pack listing entry — returned by system:listPacks IPC.
  */
 export interface PackListing {
