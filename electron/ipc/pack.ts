@@ -968,9 +968,10 @@ function registerHandlers(): void {
       const ctx = editableIndex(packPath);
       if (!ctx || typeof from !== "string" || typeof to !== "string" || !to.trim()) return null;
       const next = renameMood(ctx.index, from, to);
-      // A colliding or blank target returns the index unchanged; propagating
-      // such a no-op would rewire the design to a mood the index never got.
-      if (next === ctx.index) return next;
+      // A colliding or blank target returns the index unchanged; report null
+      // so the UI does not claim a save that never happened, and never
+      // propagate a rename the index refused.
+      if (next === ctx.index) return null;
       try {
         writeIndex(ctx.dir, next);
       } catch (err) {
@@ -988,7 +989,7 @@ function registerHandlers(): void {
       const ctx = editableIndex(packPath);
       if (!ctx || typeof name !== "string" || !name) return null;
       const next = removeMood(ctx.index, name);
-      if (JSON.stringify(next) === JSON.stringify(ctx.index)) return next;
+      if (JSON.stringify(next) === JSON.stringify(ctx.index)) return null;
       try {
         writeIndex(ctx.dir, next);
       } catch (err) {

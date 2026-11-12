@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { devtools, persist } from "zustand/middleware";
+import { devtools } from "zustand/middleware";
 import { logger } from "../utils/logger";
 import {
   parseCorruptionData,
@@ -32,79 +32,91 @@ export interface CorruptionState {
   reset: () => void;
 }
 
+// Session state only: level, active moods and transitions are rebuilt by
+// each run and must never survive a restart (boot never resurrects).
 export const useCorruptionStore = create<CorruptionState>()(
   devtools(
-    persist(
-      (set, get) => ({
-        currentLevel: 0,
-        activeMoods: [],
-        nextLevelTime: null,
-        driverType: "timer",
-        transitions: [],
-        levels: {},
-        corruptionError: null,
+    (set, get) => ({
+      currentLevel: 0,
+      activeMoods: [],
+      nextLevelTime: null,
+      driverType: "timer",
+      transitions: [],
+      levels: {},
+      corruptionError: null,
 
-        loadCorruptionData: (rawData) => {
-          try {
-            if (typeof rawData !== "object" || rawData === null) {
-              set({ corruptionError: "Corruption data is missing or invalid. Corruption mode will remain at level 0." });
-              logger.warn("[corruptionStore] Invalid corruption data received:", rawData);
-              return;
-            }
-            const parsed = parseCorruptionData(rawData);
-            if (Object.keys(parsed.levels).length === 0) {
-              set({ corruptionError: "No corruption levels found in pack data. Corruption mode will remain at level 0.", levels: {} });
-            } else {
-              set({ levels: parsed.levels, corruptionError: null });
-            }
-          } catch (err) {
-            const message = err instanceof Error ? err.message : "Unknown error loading corruption data";
-            set({ corruptionError: `Failed to load corruption data: ${message}. Corruption mode will remain at level 0.` });
-            logger.error("[corruptionStore] Error loading corruption data:", err);
+      loadCorruptionData: (rawData) => {
+        try {
+          if (typeof rawData !== "object" || rawData === null) {
+            set({
+              corruptionError:
+                "Corruption data is missing or invalid. Corruption mode will remain at level 0.",
+            });
+            logger.warn(
+              "[corruptionStore] Invalid corruption data received:",
+              rawData,
+            );
+            return;
           }
-        },
-
-        transitionTo: (level) => {
-          const state = get();
-          const levelData = state.levels[level];
-          if (!levelData) {
-            set({ currentLevel: level });
-            return {};
+          const parsed = parseCorruptionData(rawData);
+          if (Object.keys(parsed.levels).length === 0) {
+            set({
+              corruptionError:
+                "No corruption levels found in pack data. Corruption mode will remain at level 0.",
+              levels: {},
+            });
+          } else {
+            set({ levels: parsed.levels, corruptionError: null });
           }
-
-          const newMoods = computeActiveMoods(state.activeMoods, levelData);
-          const configOverrides = computeConfigOverrides(levelData);
-
+        } catch (err) {
+          const message =
+            err instanceof Error
+              ? err.message
+              : "Unknown error loading corruption data";
           set({
-            currentLevel: level,
-            activeMoods: newMoods,
-            transitions: [...state.transitions, `${state.currentLevel}→${level}`],
+            corruptionError: `Failed to load corruption data: ${message}. Corruption mode will remain at level 0.`,
           });
+          logger.error("[corruptionStore] Error loading corruption data:", err);
+        }
+      },
 
-          return configOverrides;
-        },
+      transitionTo: (level) => {
+        const state = get();
+        const levelData = state.levels[level];
+        if (!levelData) {
+          set({ currentLevel: level });
+          return {};
+        }
 
-        setDriverType: (driverType) => set({ driverType }),
+        const newMoods = computeActiveMoods(state.activeMoods, levelData);
+        const configOverrides = computeConfigOverrides(levelData);
 
-        setNextLevelTime: (nextLevelTime) => set({ nextLevelTime }),
+        set({
+          currentLevel: level,
+          activeMoods: newMoods,
+          transitions: [...state.transitions, `${state.currentLevel}→${level}`],
+        });
 
-        reset: () =>
-          set({
-            currentLevel: 0,
-            activeMoods: [],
-            nextLevelTime: null,
-            driverType: "timer",
-            transitions: [],
-            levels: {},
-            corruptionError: null,
-          }),
-      }),
-      {
-        name: "edgeware-corruption",
-      }
-    ),
-    { name: "CorruptionStore" }
-  )
+        return configOverrides;
+      },
+
+      setDriverType: (driverType) => set({ driverType }),
+
+      setNextLevelTime: (nextLevelTime) => set({ nextLevelTime }),
+
+      reset: () =>
+        set({
+          currentLevel: 0,
+          activeMoods: [],
+          nextLevelTime: null,
+          driverType: "timer",
+          transitions: [],
+          levels: {},
+          corruptionError: null,
+        }),
+    }),
+    { name: "CorruptionStore" },
+  ),
 );
 
 /**

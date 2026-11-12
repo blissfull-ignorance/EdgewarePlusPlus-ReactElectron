@@ -225,3 +225,115 @@ test("an unsaved design survives leaving Creator and coming back", async () => {
     cleanupTempState(state);
   }
 });
+
+test("quitting mid-session does not carry moods into the next launch", async () => {
+  const state: TempState = createTempState();
+  const dir = path.join(state.packsDir, "CT-Resurrect");
+  mkdirSync(path.join(dir, "img"), { recursive: true });
+  writeFileSync(path.join(dir, "img", "one.png"), "png");
+  writeFileSync(path.join(dir, "img", "gated.png"), "png");
+  writeFileSync(
+    path.join(dir, "info.json"),
+    JSON.stringify({ name: "CT-Resurrect", id: "ctres", creator: "e2e", version: "1", description: "x" })
+  );
+  writeFileSync(
+    path.join(dir, "index.json"),
+    JSON.stringify({
+      default: { maxClicks: 1, captions: ["c"] },
+      moods: [{ mood: "gated", captions: [], media: ["gated.png"] }],
+    })
+  );
+  writeFileSync(
+    path.join(dir, "corruption.json"),
+    JSON.stringify({ moods: { "1": { add: ["gated"], remove: [] } }, config: {} })
+  );
+  writeFileSync(path.join(dir, "script.lua"), 'require("edgeware_v0")\nafter(300, corrupt)\n');
+  const seed = {
+    packPath: dir,
+    popupRenderMode: "electron",
+    popupMod: 0,
+    showLoadingFlair: 0,
+    corruptionMode: 0,
+    corruptionTrigger: "Script",
+    delay: 60000,
+  };
+  seedConfig(state, seed);
+  let running = await launchApp(state, {
+    EDGWARE_STUB_BROWSER: "1",
+    EDGWARE_PANIC_SKIP_WALLPAPER: "1",
+  });
+  try {
+    // Grant the mood, then quit WITHOUT pressing Stop.
+    await running.window.locator("[data-testid='start-stop-button']").click();
+    await running.window.locator("[data-testid='main-tab-gallery']").click();
+    await expect(running.window.locator("[data-testid='gallery-chip-gated']")).toContainText(
+      /active/i,
+      { timeout: 30_000 }
+    );
+    await quitApp(running);
+
+    running = await launchApp(state, {
+      EDGWARE_STUB_BROWSER: "1",
+      EDGWARE_PANIC_SKIP_WALLPAPER: "1",
+    });
+    await running.window.locator("[data-testid='main-tab-gallery']").click();
+    // Nothing is running: the badge is locked and the pool stays gated.
+    await expect(running.window.locator("[data-testid='gallery-chip-gated']")).not.toContainText(
+      /active/i
+    );
+    const picks = await running.window.evaluate(() =>
+      Promise.all(
+        Array.from({ length: 30 }, () =>
+          (window as unknown as { api: { pack: { randomImage: () => Promise<string | null> } } }).api.pack.randomImage()
+        )
+      )
+    );
+    expect(picks.filter((f) => f === "gated.png")).toEqual([]);
+  } finally {
+    await quitApp(running);
+    cleanupTempState(state);
+  }
+});
+
+test("a colliding mood rename changes nothing and claims nothing", async () => {
+  const state: TempState = createTempState();
+  const dir = path.join(state.packsDir, "CT-Collide");
+  mkdirSync(path.join(dir, "img"), { recursive: true });
+  writeFileSync(path.join(dir, "img", "one.png"), "png");
+  writeFileSync(
+    path.join(dir, "info.json"),
+    JSON.stringify({ name: "CT-Collide", id: "ctcollide", creator: "e2e", version: "1", description: "x" })
+  );
+  const index = JSON.stringify({
+    default: { maxClicks: 1, captions: ["c"] },
+    moods: [
+      { mood: "alpha", captions: [], media: ["one.png"] },
+      { mood: "beta", captions: [], media: [] },
+    ],
+  });
+  writeFileSync(path.join(dir, "index.json"), index);
+  seedConfig(state, {
+    packPath: dir,
+    popupRenderMode: "electron",
+    popupMod: 0,
+    showLoadingFlair: 0,
+    delay: 60000,
+  });
+  const running = await launchApp(state, {
+    EDGWARE_STUB_BROWSER: "1",
+    EDGWARE_PANIC_SKIP_WALLPAPER: "1",
+  });
+  try {
+    await running.window.locator("[data-testid='main-tab-creator']").click();
+    await running.window.locator("[data-testid='creator-mood-rename-alpha']").click();
+    await running.window.locator("[data-testid='creator-mood-rename-input-alpha']").fill("beta");
+    await running.window.keyboard.press("Enter");
+    // No false success banner, and the mood list is untouched.
+    await expect(running.window.locator("[data-testid='creator-saved']")).toHaveCount(0);
+    await expect(running.window.locator("[data-testid='creator-mood-alpha']")).toBeVisible();
+    expect(readFileSync(path.join(dir, "index.json"), "utf-8")).toBe(index);
+  } finally {
+    await quitApp(running);
+    cleanupTempState(state);
+  }
+});

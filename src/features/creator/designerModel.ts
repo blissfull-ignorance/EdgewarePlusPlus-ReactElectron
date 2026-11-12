@@ -72,6 +72,8 @@ export function emptyDesign(): DesignerScript {
 }
 
 function clampMs(ms: number): number {
+  // A delay that overflows to +Infinity means "absurdly long", not "now".
+  if (ms === Number.POSITIVE_INFINITY) return MAX_LUA_DELAY_MS;
   if (!Number.isFinite(ms)) return 0;
   return Math.min(MAX_LUA_DELAY_MS, Math.max(0, Math.round(ms)));
 }

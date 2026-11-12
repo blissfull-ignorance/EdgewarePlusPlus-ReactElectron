@@ -241,6 +241,19 @@ describe("designerModel", () => {
     expect(({} as Record<string, unknown>).polluted).toBeUndefined();
   });
 
+  it("maps overflow-to-Infinity delays to the maximum, not zero", () => {
+    const wild: DesignerScript = {
+      version: 1,
+      startDelaySeconds: 1e308,
+      levels: [
+        { addMoods: [], removeMoods: [], wallpaper: null, actions: [], advance: { mode: "end" }, config: {} },
+      ],
+    };
+    const lua = generateLua(wild);
+    expect(lua).toContain(`after(${2_147_483_647}, level1)`);
+    expect(lua).not.toContain("after(0, level1)");
+  });
+
   it("clamps absurd delays into the 32-bit timer range", () => {
     const wild: DesignerScript = {
       version: 1,
