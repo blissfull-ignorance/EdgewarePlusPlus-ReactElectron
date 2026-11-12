@@ -3,6 +3,7 @@ import { mkdirSync } from "node:fs";
 import path from "node:path";
 import {
   cleanupTempState,
+  clickStart,
   createTempState,
   ensureElectronBuild,
   launchApp,
@@ -151,7 +152,7 @@ test.describe("popup visuals (no thick borders; overlays keep media clean)", () 
         /* noop */
       }
     });
-    await running.window.locator("[data-testid='start-stop-button']").click();
+    await clickStart(running.window);
   });
 
   test.afterAll(async () => {

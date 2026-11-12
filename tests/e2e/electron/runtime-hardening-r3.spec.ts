@@ -3,6 +3,7 @@ import { copyFileSync, mkdirSync, symlinkSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import {
   cleanupTempState,
+  clickStart,
   createTempState,
   ensureElectronBuild,
   launchApp,
@@ -140,7 +141,7 @@ test("the running session keeps its pack; switching applies on next start", asyn
   baseSeed(state, packA);
   const running = await launchApp(state);
   try {
-    await running.window.locator("[data-testid='start-stop-button']").click();
+    await clickStart(running.window);
 
     // Mid-run pack switch: the session still draws from the pinned pack.
     await running.window.evaluate((b) => {
@@ -162,7 +163,7 @@ test("the running session keeps its pack; switching applies on next start", asyn
     await running.window.locator("[data-testid='start-stop-button']").click();
 
     // Next start uses the new pack.
-    await running.window.locator("[data-testid='start-stop-button']").click();
+    await clickStart(running.window);
     const afterRestart = await running.window.evaluate(() =>
       Promise.all(
         Array.from({ length: 10 }, () =>

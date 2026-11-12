@@ -64,6 +64,7 @@ test.describe("No-code corruption designer", () => {
       packPath: packDir,
       popupRenderMode: "electron",
       popupMod: 0,
+      vidMod: 0,
       showLoadingFlair: 0,
       corruptionMode: 0,
       corruptionTrigger: "Script",
