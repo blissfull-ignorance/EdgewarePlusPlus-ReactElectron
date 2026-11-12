@@ -1,3 +1,4 @@
+import { restoreWallpaperIfDirty } from "./utils/wallpaperMemory";
 import { app, BrowserWindow } from "electron";
 import path from "path";
 
@@ -104,6 +105,11 @@ app.whenReady().then(() => {
     if (dockIcon) app.dock.setIcon(dockIcon);
   }
   createWindow();
+  // A crash or panic mid-session can leave the pack's wallpaper applied;
+  // the cached original comes back on the next boot.
+  void restoreWallpaperIfDirty().catch((err) =>
+    logger.error("[Main] Startup wallpaper restore failed:", err)
+  );
 
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) {

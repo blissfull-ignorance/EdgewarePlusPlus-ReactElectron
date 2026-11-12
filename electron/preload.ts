@@ -136,6 +136,9 @@ const electronAPI: ElectronAPI = {
   booru: {
     fetchImage: (tags) => ipcRenderer.invoke("booru:fetchImage", tags),
   },
+  wallpaper: {
+    restoreOriginal: () => ipcRenderer.invoke("wallpaper:restoreOriginal"),
+  },
   panic: {
     trigger: (opts) => ipcRenderer.invoke("panic:trigger", opts),
     status: () => ipcRenderer.invoke("panic:status"),

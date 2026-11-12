@@ -21,8 +21,10 @@ import { toAccelerator } from "../utils/panicKeys";
 import { isLockoutActive, safewordMatches } from "../utils/panicLockout";
 import { destroyDiscord } from "./discord";
 import { closeAllPopups } from "./popup";
+import { activePackPath } from "./pack";
 import { getLuaVM } from "../scripting/fengariAdapter";
 import { setWallpaper } from "../utils/wallpaper";
+import { beforeWallpaperChange } from "../utils/wallpaperMemory";
 
 export interface PanicResult {
   ok: boolean;
@@ -83,7 +85,10 @@ async function doPanic(): Promise<void> {
   if (process.env.EDGWARE_PANIC_SKIP_WALLPAPER !== "1") {
     try {
       const realPath = materializePanicWallpaper();
-      if (realPath) await setWallpaper(realPath);
+      if (realPath) {
+        await beforeWallpaperChange();
+        await setWallpaper(realPath);
+      }
     } catch (err) {
       logger.error("[Panic] Failed to set panic wallpaper:", err);
     }
@@ -106,12 +111,31 @@ async function doPanic(): Promise<void> {
  * osascript/PowerShell/feh wallpaper commands cannot read.
  */
 function materializePanicWallpaper(): string | null {
+  const target = path.join(app.getPath("userData"), "panic_wallpaper.jpg");
+  // A pack may ship its own panic wallpaper (panic_wallpaper.png/.jpg/… at
+  // the pack root); it wins over the bundled image.
+  const packDir = activePackPath();
+  if (packDir) {
+    for (const ext of ["png", "jpg", "jpeg", "webp"]) {
+      const override = path.join(packDir, `panic_wallpaper.${ext}`);
+      if (fs.existsSync(override)) {
+        try {
+          fs.mkdirSync(path.dirname(target), { recursive: true });
+          fs.copyFileSync(override, target);
+          logger.info(`[Panic] Using pack panic wallpaper override: ${override}`);
+          return target;
+        } catch (err) {
+          logger.error("[Panic] Failed to stage pack panic wallpaper:", err);
+        }
+        break;
+      }
+    }
+  }
   const bundled = path.join(app.getAppPath(), "dist", "panic_wallpaper.jpg");
   if (!fs.existsSync(bundled)) {
     logger.error(`[Panic] Panic wallpaper asset missing: ${bundled}`);
     return null;
   }
-  const target = path.join(app.getPath("userData"), "panic_wallpaper.jpg");
   try {
     fs.mkdirSync(path.dirname(target), { recursive: true });
     fs.copyFileSync(bundled, target);

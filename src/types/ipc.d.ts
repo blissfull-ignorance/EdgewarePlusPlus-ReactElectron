@@ -233,6 +233,9 @@ export interface ElectronAPI {
     /** Search + download one Gelbooru image; null on miss/failure (fall back to pack media). */
     fetchImage: (tags: string) => Promise<string | null>;
   };
+  wallpaper: {
+    restoreOriginal: () => Promise<boolean>;
+  };
   panic: {
     /** Run panic; the hotkey path honors panicDisabled, the tray path forces. */
     trigger: (opts?: { respectDisabled?: boolean }) => Promise<{ ok: boolean; reason?: "disabled" | "lockout" }>;

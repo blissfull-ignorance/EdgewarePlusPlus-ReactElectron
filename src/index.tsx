@@ -52,7 +52,10 @@ if (typeof window !== "undefined" && !(window as unknown as Record<string, unkno
       onInject: () => () => {},
       onApplyChanges: () => () => {},
     },
-    panic: {
+    wallpaper: {
+    restoreOriginal: async () => false,
+  },
+  panic: {
       trigger: async () => ({ ok: true }),
       status: async () => ({ lockoutActive: false, accelerator: "Escape" }),
       unlock: async () => ({ ok: true }),

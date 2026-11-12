@@ -8,6 +8,7 @@ import { skipHibernate } from "./hibernate";
 import { panicFromTray } from "./panic";
 import { setDiscordPresence as discordSetPresence } from "./discord";
 import { setWallpaper } from "../utils/wallpaper";
+import { beforeWallpaperChange, restoreWallpaperIfDirty } from "../utils/wallpaperMemory";
 import { autostartFilePath, buildAutostartEntry } from "../utils/autostart";
 import { activePackDir, loadAppIcon, resolveIconFile } from "../utils/appIcon";
 import {
@@ -263,8 +264,13 @@ function registerHandlers(): void {
 
   ipcMain.handle("system:setWallpaper", async (_event, filepath: string): Promise<void> => {
     const expanded = filepath.startsWith("~") ? filepath.replace("~", app.getPath("home")) : filepath;
+    await beforeWallpaperChange();
     await setWallpaper(expanded);
   });
+
+  ipcMain.handle("wallpaper:restoreOriginal", async (): Promise<boolean> =>
+    restoreWallpaperIfDirty()
+  );
 
   // Legacy run_on_save_quit: the app exits once settings have been written.
   ipcMain.handle("system:quit", async (): Promise<void> => {

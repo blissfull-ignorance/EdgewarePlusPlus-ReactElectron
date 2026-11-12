@@ -10,8 +10,10 @@
  * best-effort behavior.
  */
 import fs from "node:fs";
+import path from "node:path";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
+import { app } from "electron";
 import { logger } from "./logger";
 
 const execFileAsync = promisify(execFile);
@@ -109,7 +111,25 @@ function setWallpaperWindows(filepath: string): Promise<void> {
     });
 }
 
+/**
+ * Test hook (EDGWARE_WALLPAPER_STUB=<initial desktop picture path>): applies
+ * are recorded into a userData log instead of touching the real desktop, and
+ * reads answer from that log — so wallpaper memory can be exercised end to
+ * end without hijacking the developer's machine.
+ */
+function stubLogPath(): string {
+  return path.join(app.getPath("userData"), "wallpaper_applied.log");
+}
+
 export async function setWallpaper(filepath: string): Promise<void> {
+  if (process.env.EDGWARE_WALLPAPER_STUB) {
+    try {
+      fs.appendFileSync(stubLogPath(), `${filepath}\n`, "utf-8");
+    } catch (err) {
+      logger.error("[Wallpaper] Stub apply failed:", err);
+    }
+    return;
+  }
   if (!fs.existsSync(filepath)) {
     logger.error("[Wallpaper] Wallpaper file does not exist:", filepath);
     return;
@@ -127,5 +147,43 @@ export async function setWallpaper(filepath: string): Promise<void> {
     }
   } catch (err) {
     logger.error("[Wallpaper] Wallpaper set failed:", err);
+  }
+}
+
+/**
+ * The desktop picture currently applied, or null when the platform cannot
+ * report it (or nothing is known). macOS reads every desktop through System
+ * Events and returns the first; other platforms report null.
+ */
+export async function getWallpaper(): Promise<string | null> {
+  const stub = process.env.EDGWARE_WALLPAPER_STUB;
+  if (stub) {
+    try {
+      const lines = fs
+        .readFileSync(stubLogPath(), "utf-8")
+        .split("\n")
+        .map((l) => l.trim())
+        .filter(Boolean);
+      if (lines.length) return lines[lines.length - 1];
+    } catch {
+      /* no apply recorded yet — fall through to the initial desktop */
+    }
+    return stub;
+  }
+  if (process.platform !== "darwin") return null;
+  try {
+    const { stdout } = await execFileAsync(
+      "osascript",
+      ["-e", 'tell application "System Events" to tell every desktop to get picture'],
+      { timeout: 15000 }
+    );
+    const first = stdout
+      .split("\n")
+      .map((l) => l.trim())
+      .find(Boolean);
+    return first ?? null;
+  } catch (err) {
+    logger.error("[Wallpaper] Failed to read current wallpaper:", err);
+    return null;
   }
 }

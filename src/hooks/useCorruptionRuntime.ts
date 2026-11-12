@@ -217,6 +217,9 @@ export function useCorruptionRuntime(active: boolean): void {
       // a later Start does not resurrect the previous run's transitions.
       useCorruptionStore.getState().reset();
       restoreSessionConfig();
+      // The session's wallpapers (levels, rotation) give the user's desktop
+      // picture back — the main process restores the cached original.
+      void window.api?.wallpaper?.restoreOriginal?.()?.catch(() => undefined);
       void window.api?.corruption.setLevel(0, null).catch(() => undefined);
     };
   }, [active]);

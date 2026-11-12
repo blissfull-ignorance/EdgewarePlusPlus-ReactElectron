@@ -170,7 +170,10 @@ export async function launchApp(page: Page, options: LaunchOptions = {}): Promis
           onInject: () => () => {},
           onApplyChanges: () => () => {},
         },
-        panic: {
+        wallpaper: {
+          restoreOriginal: async () => false,
+        },
+  panic: {
           trigger: async () => ({ ok: true }),
           status: async () => ({ lockoutActive: false, accelerator: "Escape" }),
           unlock: async () => ({ ok: true }),
