@@ -465,9 +465,11 @@ export class FengariVM {
     });
     lua_setglobal(this.L, "require");
 
-    // after(ms, callback)
+    // after(ms, callback). Node fires immediately for delays past the
+    // signed 32-bit range, so a runaway delay is clamped to ~24 days.
     lua_pushcfunction(this.L, (L: number): number => {
-      const ms = Math.max(0, lua_tonumber(L, 1));
+      const raw = lua_tonumber(L, 1);
+      const ms = Number.isFinite(raw) ? Math.min(2_147_483_647, Math.max(0, raw)) : 0;
       if (!lua_isfunction(L, 2)) return 0;
       const ref = vm.storeRef(2);
       const timer = setTimeout(() => {

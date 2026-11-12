@@ -60,8 +60,20 @@ export interface DesignerScript {
 
 export const DESIGNER_MARKER = "-- [EDGWARE-DESIGNER]";
 
+// Bounds a hostile (hand-planted) marker cannot push the renderer into
+// rendering thousands of cards or the writer past the file caps.
+export const MAX_DESIGN_LEVELS = 200;
+const MAX_ACTIONS_PER_LEVEL = 50;
+const MAX_MOODS_PER_LEVEL = 100;
+const MAX_LUA_DELAY_MS = 2_147_483_647;
+
 export function emptyDesign(): DesignerScript {
   return { version: 1, startDelaySeconds: 2, levels: [] };
+}
+
+function clampMs(ms: number): number {
+  if (!Number.isFinite(ms)) return 0;
+  return Math.min(MAX_LUA_DELAY_MS, Math.max(0, Math.round(ms)));
 }
 
 function luaString(value: string): string {
@@ -139,12 +151,12 @@ export function generateLua(design: DesignerScript): string {
       lines.push(`  audio(${luaString(advance.file)}, function() level${i + 1}() end)`);
       lines.push("end");
     } else {
-      lines.push(`  after(${Math.max(1, Math.round(advance.seconds * 1000))}, level${i + 1})`);
+      lines.push(`  after(${clampMs(advance.seconds * 1000)}, level${i + 1})`);
       lines.push("end");
     }
     lines.push("");
   }
-  lines.push(`after(${Math.max(0, Math.round(design.startDelaySeconds * 1000))}, level1)`);
+  lines.push(`after(${clampMs(design.startDelaySeconds * 1000)}, level1)`);
   return lines.join("\n") + "\n";
 }
 
@@ -271,41 +283,48 @@ function sanitizeDesign(design: DesignerScript): DesignerScript {
   return {
     version: 1,
     startDelaySeconds: Number.isFinite(design.startDelaySeconds) ? design.startDelaySeconds : 2,
-    levels: design.levels.map((level) => {
+    levels: design.levels.slice(0, MAX_DESIGN_LEVELS).map((level) => {
       const advance = level?.advance;
       const mode = advance?.mode;
       const rawConfig = (level?.config ?? {}) as Record<string, unknown>;
       const num = (v: unknown): number | undefined =>
         typeof v === "number" && Number.isFinite(v) ? v : undefined;
       return {
-        addMoods: list(level?.addMoods),
-        removeMoods: list(level?.removeMoods),
+        addMoods: list(level?.addMoods).slice(0, MAX_MOODS_PER_LEVEL),
+        removeMoods: list(level?.removeMoods).slice(0, MAX_MOODS_PER_LEVEL),
         wallpaper: typeof level?.wallpaper === "string" && level.wallpaper ? level.wallpaper : null,
         config: { popupMod: num(rawConfig.popupMod), delay: num(rawConfig.delay) },
-        actions: Array.isArray(level?.actions)
-          ? (level.actions as DesignerAction[])
-              .filter(
-                (a) =>
-                  a &&
-                  [
-                    "image",
-                    "video",
-                    "audio",
-                    "notification",
-                    "prompt",
-                    "subliminal",
-                    "web",
-                    "close_popups",
-                    "set_close_text",
-                  ].includes(a.kind)
-              )
-              .map((a) => {
-                const chance = Number.isFinite(a.chance as number)
-                  ? Math.min(99, Math.max(1, Math.round(a.chance as number)))
-                  : undefined;
-                return { ...a, chance: a.chance !== undefined ? chance : undefined };
-              })
-          : [],
+        actions: (Array.isArray(level?.actions) ? (level.actions as DesignerAction[]) : [])
+          .filter(
+            (a) =>
+              a &&
+              [
+                "image",
+                "video",
+                "audio",
+                "notification",
+                "prompt",
+                "subliminal",
+                "web",
+                "close_popups",
+                "set_close_text",
+              ].includes(a.kind)
+          )
+          .slice(0, MAX_ACTIONS_PER_LEVEL)
+          .map((a) => {
+            // Rebuild from known fields only: unknown keys (and hostile
+            // __proto__ entries) never survive a round-trip, and file/text
+            // must be strings or luaString throws on save.
+            const chance =
+              typeof a.chance === "number" && Number.isFinite(a.chance)
+                ? Math.min(99, Math.max(1, Math.round(a.chance)))
+                : undefined;
+            const clean: DesignerAction = { kind: a.kind };
+            if (typeof a.file === "string" && a.file) clean.file = a.file;
+            if (typeof a.text === "string" && a.text) clean.text = a.text;
+            if (a.chance !== undefined && chance !== undefined) clean.chance = chance;
+            return clean;
+          }),
         advance:
           mode === "audio" && advance.file
             ? { mode: "audio", file: str(advance.file) }

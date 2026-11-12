@@ -3,6 +3,7 @@ import {
   emptyDesign,
   generateCorruptionJson,
   generateLua,
+  MAX_DESIGN_LEVELS,
   normalizeDesign,
   parseDesignerScript,
   renameMoodInCorruption,
@@ -192,6 +193,73 @@ describe("designerModel", () => {
     expect(parsed!.levels[0].actions).toEqual([{ kind: "image", file: "a.png" }]);
     expect(parsed!.levels[0].advance).toEqual({ mode: "time", seconds: 10 });
     expect(parsed!.levels[0].config).toEqual({ popupMod: undefined, delay: undefined });
+  });
+
+  it("caps hostile marker dimensions", () => {
+    const huge = `-- [EDGWARE-DESIGNER]${JSON.stringify({
+      version: 1,
+      startDelaySeconds: 1,
+      levels: Array.from({ length: 10_000 }, () => ({
+        addMoods: Array.from({ length: 500 }, (_, i) => `m${i}`),
+        removeMoods: [],
+        actions: Array.from({ length: 500 }, () => ({ kind: "image" })),
+        advance: { mode: "end" },
+      })),
+    })}`;
+    const parsed = parseDesignerScript(huge);
+    expect(parsed!.levels.length).toBe(MAX_DESIGN_LEVELS);
+    expect(parsed!.levels[0].addMoods.length).toBeLessThanOrEqual(100);
+    expect(parsed!.levels[0].actions.length).toBeLessThanOrEqual(50);
+  });
+
+  it("drops non-string action fields and unknown keys instead of throwing on save", () => {
+    const dirty = `-- [EDGWARE-DESIGNER]${JSON.stringify({
+      version: 1,
+      startDelaySeconds: 1,
+      levels: [
+        {
+          addMoods: [],
+          removeMoods: [],
+          actions: [
+            { kind: "image", file: 12345 },
+            { kind: "notification", text: { a: 1 } },
+            { kind: "prompt", text: ["x"], extra: "drop-me", __proto__: { polluted: 1 } },
+          ],
+          advance: { mode: "end" },
+        },
+      ],
+    })}`;
+    const parsed = parseDesignerScript(dirty);
+    expect(parsed).not.toBeNull();
+    expect(parsed!.levels[0].actions).toEqual([
+      { kind: "image" },
+      { kind: "notification" },
+      { kind: "prompt" },
+    ]);
+    // The design is now savable: generation must not throw.
+    expect(() => generateLua(parsed!)).not.toThrow();
+    expect(({} as Record<string, unknown>).polluted).toBeUndefined();
+  });
+
+  it("clamps absurd delays into the 32-bit timer range", () => {
+    const wild: DesignerScript = {
+      version: 1,
+      startDelaySeconds: 1e9,
+      levels: [
+        {
+          addMoods: [],
+          removeMoods: [],
+          wallpaper: null,
+          actions: [],
+          advance: { mode: "time", seconds: 1e9 },
+          config: {},
+        },
+        { addMoods: [], removeMoods: [], wallpaper: null, actions: [], advance: { mode: "end" }, config: {} },
+      ],
+    };
+    const lua = generateLua(wild);
+    expect(lua).toContain(`after(${2_147_483_647}, level2)`);
+    expect(lua).toContain(`after(${2_147_483_647}, level1)`);
   });
 
   it("empty design generates a valid no-level script", () => {
