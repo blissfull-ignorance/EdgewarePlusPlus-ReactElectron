@@ -227,7 +227,9 @@ export function renameMoodInCorruption<T>(parsed: T, from: string, to: string): 
   if (!parsed || typeof parsed !== "object") return parsed;
   const root = parsed as Record<string, unknown>;
   const moods = root.moods;
-  if (!moods || typeof moods !== "object") return parsed;
+  // Only the object-keyed-by-level shape is understood; arrays and other
+  // exotic tables are left byte-for-byte alone rather than reshaped.
+  if (!moods || typeof moods !== "object" || Array.isArray(moods)) return parsed;
   const map = (list: unknown): unknown =>
     Array.isArray(list)
       ? [...new Set(list.map((m) => (m === from ? to : m)).filter((m) => m !== ""))]

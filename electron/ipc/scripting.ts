@@ -6,6 +6,7 @@ import { resolveScriptPath } from "../scripting/scriptPath";
 import { injectLevel } from "./corruption";
 import { app } from "electron";
 import { logger } from "../utils/logger";
+import { looksLikePack } from "./pack";
 import {
   createPopupWindow,
   closeAllPopups,
@@ -293,6 +294,7 @@ function registerHandlers(): void {
     async (_event, packPath: unknown): Promise<{ content: string; exists: boolean; tooLarge?: boolean } | null> => {
       if (typeof packPath !== "string" || !packPath) return null;
       const dir = path.resolve(packPath.replace(/^~/, process.env.HOME ?? packPath));
+      if (!looksLikePack(dir)) return null;
       const file = path.join(dir, "script.lua");
       if (path.dirname(file) !== dir) return null;
       const exists = fs.existsSync(file);
@@ -337,10 +339,10 @@ function registerHandlers(): void {
         } catch {
           return false;
         }
-        if (!parsed || typeof parsed !== "object") return false;
+        if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return false;
       }
       const dir = path.resolve(packPath.replace(/^~/, process.env.HOME ?? packPath));
-      if (!fs.existsSync(dir)) return false;
+      if (!looksLikePack(dir)) return false;
       try {
         writeAtomic(path.join(dir, "script.lua"), lua);
         if (parsed) {
@@ -361,7 +363,7 @@ function registerHandlers(): void {
       if (typeof packPath !== "string" || !packPath || typeof content !== "string") return false;
       if (content.length > 200_000) return false;
       const dir = path.resolve(packPath.replace(/^~/, process.env.HOME ?? packPath));
-      if (!fs.existsSync(dir)) return false;
+      if (!looksLikePack(dir)) return false;
       const file = path.join(dir, "script.lua");
       try {
         writeAtomic(file, content);

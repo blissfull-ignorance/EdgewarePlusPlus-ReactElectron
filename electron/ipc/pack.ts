@@ -368,7 +368,7 @@ function writePackJson(file: string, value: unknown): void {
 }
 
 /** A directory is browsable as a pack only if it ships pack manifests. */
-function looksLikePack(dir: string): boolean {
+export function looksLikePack(dir: string): boolean {
   return (
     fs.existsSync(path.join(dir, "info.json")) ||
     fs.existsSync(path.join(dir, "index.json")) ||
@@ -870,8 +870,13 @@ function registerHandlers(): void {
     if (typeof packPath !== "string" || !packPath) return null;
     const dir = expandTilde(packPath);
     if (!fs.existsSync(dir) || !looksLikePack(dir)) return null;
-    const index =
-      readJson<RawIndexLike>(path.join(dir, "index.json")) ?? { default: {}, moods: [] };
+    const raw = readJson<unknown>(path.join(dir, "index.json"));
+    if (raw !== null) {
+      // An index that is not a JSON object (array, string, number) cannot be
+      // edited without mangling it; refuse until the file is fixed.
+      if (typeof raw !== "object" || Array.isArray(raw)) return null;
+    }
+    const index = (raw as RawIndexLike | null) ?? { default: {}, moods: [] };
     return { dir, index };
   };
 
@@ -928,19 +933,23 @@ function registerHandlers(): void {
    */
   const propagateMoodChange = (dir: string, from: string, to: string): void => {
     const corruptionPath = path.join(dir, "corruption.json");
-    const corruption = readJson<Record<string, unknown>>(corruptionPath);
-    if (corruption) {
-      try {
-        writePackJson(corruptionPath, renameMoodInCorruption(corruption, from, to));
-      } catch (err) {
-        logger.error("[Pack] Failed to propagate mood change to corruption.json:", err);
+    try {
+      const raw = fs.readFileSync(corruptionPath, "utf-8");
+      // Unrelated files (never naming this mood) keep their exact bytes.
+      if (raw.includes(from)) {
+        const corruption = JSON.parse(raw) as Record<string, unknown>;
+        if (corruption && typeof corruption === "object" && !Array.isArray(corruption)) {
+          writePackJson(corruptionPath, renameMoodInCorruption(corruption, from, to));
+        }
       }
+    } catch {
+      /* absent, unreadable or invalid: nothing to propagate into */
     }
     const scriptPath = path.join(dir, "script.lua");
     if (fs.existsSync(scriptPath)) {
       try {
         const lua = fs.readFileSync(scriptPath, "utf-8");
-        const design = parseDesignerScript(lua);
+        const design = lua.includes(from) ? parseDesignerScript(lua) : null;
         if (design) {
           const next = replaceDesignInScript(lua, renameMoodInDesign(design, from, to));
           const tmp = `${scriptPath}.${process.pid}.tmp`;
