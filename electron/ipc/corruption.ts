@@ -1,3 +1,4 @@
+import { persistSessionBaseline, applyBaselineRevert } from "../utils/sessionBaseline";
 import { ipcMain, BrowserWindow } from "electron";
 import { logger } from "../utils/logger";
 
@@ -39,6 +40,10 @@ function injectLevel(level: number): boolean {
 }
 
 function registerHandlers(): void {
+  ipcMain.handle("corruption:persistBaseline", async (_event, baseline: unknown): Promise<boolean> =>
+    persistSessionBaseline(baseline)
+  );
+  ipcMain.handle("corruption:revertBaseline", async (): Promise<number> => applyBaselineRevert());
   ipcMain.handle("corruption:getCurrentLevel", async (): Promise<number> => mirror.level);
 
   ipcMain.handle("corruption:getNextLevelTime", async (): Promise<number | null> =>

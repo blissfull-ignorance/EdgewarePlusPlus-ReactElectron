@@ -121,6 +121,8 @@ export interface ElectronAPI {
     discord: () => Promise<{ text: string; image: string | null } | null>;
   };
   corruption: {
+    persistBaseline: (baseline: Record<string, string | number | boolean>) => Promise<boolean>;
+    revertBaseline: () => Promise<number>;
     /** Get the current corruption (guided mode) level number */
     getCurrentLevel: () => Promise<number>;
     /** Get the Unix timestamp (ms) of the next level transition, or null */

@@ -38,10 +38,20 @@ export function sessionOverriddenKeys(): string[] {
 function rememberBaseline(keys: string[]): void {
   if (!sessionConfigBaseline) sessionConfigBaseline = {};
   const state = useSettingsStore.getState() as unknown as Record<string, unknown>;
+  const captured: Record<string, string | number | boolean> = {};
   for (const key of keys) {
     if (!(key in sessionConfigBaseline) && key in state) {
       sessionConfigBaseline[key] = state[key];
+      const v = state[key];
+      if (typeof v === "string" || typeof v === "number" || typeof v === "boolean") {
+        captured[key] = v;
+      }
     }
+  }
+  // A quit/crash skips the Stop cleanup; the main process keeps the
+  // pre-session values on disk and reverts config.json on the next startup.
+  if (Object.keys(captured).length > 0) {
+    void window.api?.corruption?.persistBaseline?.(captured).catch(() => undefined);
   }
 }
 
@@ -51,6 +61,7 @@ function restoreSessionConfig(): void {
   sessionConfigBaseline = null;
   const s = useSettingsStore.getState();
   s.setRaw(snapshot);
+  void window.api?.corruption?.revertBaseline?.().catch(() => undefined);
   logger.info(
     `[corruption] restored ${Object.keys(snapshot).length} pack-overridden setting(s) on stop: ${Object.keys(snapshot).join(", ")}`
   );

@@ -35,6 +35,8 @@ const electronAPI: ElectronAPI = {
     discord: () => ipcRenderer.invoke("pack:discord"),
   },
   corruption: {
+    persistBaseline: (baseline) => ipcRenderer.invoke("corruption:persistBaseline", baseline),
+    revertBaseline: () => ipcRenderer.invoke("corruption:revertBaseline"),
     getCurrentLevel: () => ipcRenderer.invoke("corruption:getCurrentLevel"),
     getNextLevelTime: () => ipcRenderer.invoke("corruption:getNextLevelTime"),
     applyLevelChanges: (changes) =>

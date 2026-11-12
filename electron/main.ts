@@ -1,4 +1,5 @@
 import { restoreWallpaperIfDirty } from "./utils/wallpaperMemory";
+import { applyBaselineRevert } from "./utils/sessionBaseline";
 import { app, BrowserWindow } from "electron";
 import path from "path";
 
@@ -104,6 +105,10 @@ app.whenReady().then(() => {
     const dockIcon = loadAppIcon(packDir);
     if (dockIcon) app.dock.setIcon(dockIcon);
   }
+  // A quit/crash/panic mid-session leaves pack-overridden settings in
+  // config.json; the persisted baseline gives the user's values back
+  // before any window reads the file.
+  applyBaselineRevert();
   createWindow();
   // A crash or panic mid-session can leave the pack's wallpaper applied;
   // the cached original comes back on the next boot.
