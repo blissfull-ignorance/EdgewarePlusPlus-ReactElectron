@@ -24,6 +24,12 @@ export interface CorruptionState {
   transitions: string[];
   levels: Record<number, ParsedCorruptionLevel>;
   corruptionError: string | null;
+  /**
+   * Testing aid: the level a session starts at (0 = the normal start).
+   * User intent rather than session state, so reset() keeps it.
+   */
+  startLevelOverride: number;
+  setStartLevelOverride: (level: number) => void;
 
   loadCorruptionData: (rawData: Record<string, unknown>) => void;
   transitionTo: (level: number) => Record<string, string | number>;
@@ -44,6 +50,9 @@ export const useCorruptionStore = create<CorruptionState>()(
       transitions: [],
       levels: {},
       corruptionError: null,
+      startLevelOverride: 0,
+      setStartLevelOverride: (level) =>
+        set({ startLevelOverride: Math.max(0, Math.floor(Number(level) || 0)) }),
 
       loadCorruptionData: (rawData) => {
         try {

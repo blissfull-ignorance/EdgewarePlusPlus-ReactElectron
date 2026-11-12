@@ -1,4 +1,4 @@
-import { Alert, SimpleGrid } from "@mantine/core";
+import { Alert, NumberInput, SimpleGrid } from "@mantine/core";
 import { IconSkull } from "@tabler/icons-react";
 import { ConfigDropdown, ConfigSlider, ConfigToggle } from "../../../Config";
 import { useSettingsStore } from "../../../../stores";
@@ -19,6 +19,8 @@ export function CorruptionPanel() {
   const corruptionThemeCycle = useSettingsStore((s) => s.corruptionThemeCycle);
   const corruptionPurityMode = useSettingsStore((s) => s.corruptionPurityMode);
   const corruptionDevMode = useSettingsStore((s) => s.corruptionDevMode);
+  const startLevelOverride = useCorruptionStore((st) => st.startLevelOverride);
+  const setStartLevelOverride = useCorruptionStore((st) => st.setStartLevelOverride);
 
   const triggerData = [
     { label: "Timed", value: "Timed" },
@@ -66,6 +68,18 @@ export function CorruptionPanel() {
           data={triggerData}
           disabled={!corruptionMode}
           description="What triggers level transitions"
+        />
+
+        <NumberInput
+          label="Start at level"
+          description="0 starts at the first level. Set a level to jump straight there when you press Start — useful for testing deeper stages."
+          min={0}
+          step={1}
+          value={startLevelOverride}
+          onChange={(val) => setStartLevelOverride(typeof val === "number" ? val : 0)}
+          disabled={!corruptionMode}
+          data-testid="corruption-start-level"
+          maw={220}
         />
 
         <ConfigDropdown

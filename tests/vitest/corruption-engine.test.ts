@@ -276,3 +276,44 @@ describe("isConfigBlocked", () => {
     expect(isConfigBlocked("delay")).toBe(false);
   });
 });
+
+describe("legacy wallpapers map (pack/load.py shape)", () => {
+  const raw = {
+    moods: {
+      "1": { add: ["a"], remove: [] },
+      "2": { add: [], remove: [] },
+      "4": { add: [], remove: [], wallpaper: "own.png" },
+    },
+    wallpapers: { "1": "w1.png", "2": "w2.png", "4": "ignored.png", "14": "w14.png", default: "d.png" },
+    config: { "13": { panicDisabled: 1 } },
+  };
+  const parsed = parseCorruptionData(raw);
+
+  it("reads level wallpapers from the top-level map", () => {
+    expect(parsed.levels[2].wallpaper).toBe("w2.png");
+    expect(parsed.levels[14].wallpaper).toBe("w14.png");
+  });
+
+  it("prefers the level's own wallpaper entry over the map", () => {
+    expect(parsed.levels[4].wallpaper).toBe("own.png");
+  });
+
+  it("applies the default wallpaper at level 1 only when the level has none", () => {
+    expect(parsed.levels[1].wallpaper).toBe("w1.png");
+    const noOwn = parseCorruptionData({
+      moods: { "1": { add: [], remove: [] } },
+      wallpapers: { default: "d.png" },
+      config: {},
+    });
+    expect(noOwn.levels[1].wallpaper).toBe("d.png");
+  });
+
+  it("config-only levels still receive their wallpaper", () => {
+    const onlyConfig = parseCorruptionData({
+      moods: {},
+      wallpapers: { "3": "w3.png" },
+      config: { "3": { popupMod: 50 } },
+    });
+    expect(onlyConfig.levels[3].wallpaper).toBe("w3.png");
+  });
+});

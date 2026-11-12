@@ -110,10 +110,19 @@ export function useCorruptionRuntime(active: boolean): void {
       }
       if (s.corruptionMode !== 1) return;
       const purity = s.corruptionPurityMode === 1;
+      // A testing start-level applies every transition up to it in order,
+      // so moods, config overrides and the wallpaper match truly reaching
+      // that level.
+      const override = useCorruptionStore.getState().startLevelOverride;
+      const startLevel =
+        override >= 1 ? Math.min(override, maxLevel) : startLevelFor(maxLevel, purity);
+      const applyUpTo = (level: number) => {
+        for (let i = 1; i <= level; i++) applyLevel(i);
+      };
 
       switch (s.corruptionTrigger) {
         case "Timed": {
-          applyLevel(startLevelFor(maxLevel, purity));
+          applyUpTo(startLevel);
           timers.push(
             setInterval(() => {
               const cur = useCorruptionStore.getState().currentLevel;
@@ -123,7 +132,7 @@ export function useCorruptionRuntime(active: boolean): void {
           break;
         }
         case "Popup": {
-          applyLevel(startLevelFor(maxLevel, purity));
+          applyUpTo(startLevel);
           let seen = useAppStore.getState().popupsCount;
           let spawned = 0;
           const threshold = Math.max(1, s.corruptionPopups);
@@ -154,7 +163,7 @@ export function useCorruptionRuntime(active: boolean): void {
         }
         case "Script": {
           if (useCorruptionStore.getState().currentLevel === 0) {
-            applyLevel(startLevelFor(maxLevel, purity));
+            applyUpTo(startLevel);
           }
           break;
         }

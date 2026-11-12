@@ -18,6 +18,8 @@ import { SectionCard } from "../SectionCard";
 export function MetadataPanel({ onOpenPackManager }: { onOpenPackManager?: () => void }) {
   const popupsCount = useAppStore((s) => s.popupsCount);
   const isRunning = useAppStore((s) => s.isRunning);
+  const corruptionLevels = useCorruptionStore((s) => s.levels);
+  const maxLevel = Math.max(0, ...Object.keys(corruptionLevels).map(Number));
   const hibernateActive = useAppStore((s) => s.hibernateActive);
   const currentLevel = useCorruptionStore((s) => s.currentLevel);
   const activeMoods = useCorruptionStore((s) => s.activeMoods);
@@ -176,8 +178,21 @@ export function MetadataPanel({ onOpenPackManager }: { onOpenPackManager?: () =>
                 </Badge>
                 <Text size="sm" data-testid="corruption-level">
                   Level: {currentLevel}
+                  {maxLevel > 0 ? ` / ${maxLevel}` : ""}
                 </Text>
               </Group>
+              {isRunning && maxLevel > 0 && currentLevel < maxLevel ? (
+                <Group gap="xs">
+                  <Button
+                    size="xs"
+                    variant="light"
+                    data-testid="corruption-skip"
+                    onClick={() => void window.api?.scripting.advanceLevel().catch(() => undefined)}
+                  >
+                    Skip to level {currentLevel + 1}
+                  </Button>
+                </Group>
+              ) : null}
               {corruptionMode ? (
                 <>
                   <Text size="sm" c="dimmed" data-testid="driver-type">

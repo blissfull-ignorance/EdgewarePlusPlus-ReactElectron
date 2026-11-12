@@ -46,7 +46,7 @@ describe("MetadataPanel", () => {
   it("renders the metadata panel container", () => {
     mockStores(
       { popupsCount: 0, isRunning: false, hibernateActive: false },
-      { currentLevel: 0, activeMoods: [], driverType: "timer", nextLevelTime: null },
+      { levels: {}, currentLevel: 0, activeMoods: [], driverType: "timer", nextLevelTime: null },
       { corruptionMode: 0, packPath: null, hibernateMode: 0 }
     );
 
@@ -58,6 +58,7 @@ describe("MetadataPanel", () => {
     mockStores(
       { popupsCount: 3, isRunning: true, hibernateActive: false },
       {
+        levels: {},
         currentLevel: 2,
         activeMoods: ["submissive", "dominant"],
         driverType: "audio",
@@ -76,6 +77,7 @@ describe("MetadataPanel", () => {
     mockStores(
       { popupsCount: 0, isRunning: true, hibernateActive: false },
       {
+        levels: {},
         currentLevel: 1,
         activeMoods: ["beginner", "submissive"],
         driverType: "timer",
@@ -93,6 +95,7 @@ describe("MetadataPanel", () => {
     mockStores(
       { popupsCount: 5, isRunning: true, hibernateActive: false },
       {
+        levels: {},
         currentLevel: 0,
         activeMoods: [],
         driverType: "timer",
@@ -110,6 +113,7 @@ describe("MetadataPanel", () => {
     mockStores(
       { popupsCount: 0, isRunning: false, hibernateActive: false },
       {
+        levels: {},
         currentLevel: 0,
         activeMoods: [],
         driverType: "timer",
@@ -127,6 +131,7 @@ describe("MetadataPanel", () => {
     mockStores(
       { popupsCount: 0, isRunning: true, hibernateActive: false },
       {
+        levels: {},
         currentLevel: 0,
         activeMoods: [],
         driverType: "timer",
@@ -143,6 +148,7 @@ describe("MetadataPanel", () => {
     mockStores(
       { popupsCount: 0, isRunning: false, hibernateActive: false },
       {
+        levels: {},
         currentLevel: 0,
         activeMoods: [],
         driverType: "timer",
@@ -159,6 +165,7 @@ describe("MetadataPanel", () => {
     mockStores(
       { popupsCount: 0, isRunning: true, hibernateActive: false },
       {
+        levels: {},
         currentLevel: 0,
         activeMoods: [],
         driverType: "timer",
@@ -175,6 +182,7 @@ describe("MetadataPanel", () => {
     mockStores(
       { popupsCount: 0, isRunning: true, hibernateActive: true },
       {
+        levels: {},
         currentLevel: 0,
         activeMoods: [],
         driverType: "timer",

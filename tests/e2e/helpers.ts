@@ -192,6 +192,7 @@ export async function launchApp(page: Page, options: LaunchOptions = {}): Promis
           runLua: async () => false,
           runSelfTest: async () => ({ ok: false, error: 'mock bridge' }),
           stop: async () => true,
+          advanceLevel: async () => 1,
           readScript: async () => null,
           writeScript: async () => false,
           writePackDesign: async () => false,

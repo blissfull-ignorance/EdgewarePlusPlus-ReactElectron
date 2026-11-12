@@ -19,6 +19,11 @@ function broadcast(channel: string, payload: unknown): void {
   }
 }
 
+/** The last mirrored corruption level (what the renderer published or a script injected). */
+export function mirroredLevel(): number {
+  return mirror.level;
+}
+
 function injectLevel(level: number): boolean {
   const value = Number(level);
   if (!Number.isFinite(value) || value < 1) {

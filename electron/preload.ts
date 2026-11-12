@@ -80,6 +80,7 @@ const electronAPI: ElectronAPI = {
     runLua: (scriptName) => ipcRenderer.invoke("scripting:runLua", scriptName),
     runSelfTest: () => ipcRenderer.invoke("scripting:runSelfTest"),
     stop: () => ipcRenderer.invoke("scripting:stop"),
+    advanceLevel: () => ipcRenderer.invoke("scripting:advanceLevel"),
     readScript: (packPath) => ipcRenderer.invoke("scripting:readScript", packPath),
     writeScript: (packPath, content) => ipcRenderer.invoke("scripting:writeScript", packPath, content),
     writePackDesign: (packPath, lua, corruptionJson) =>

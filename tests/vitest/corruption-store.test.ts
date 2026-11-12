@@ -134,3 +134,18 @@ describe("useCorruptionStore", () => {
     expect(getNextCorruptionLevel()).toBeNull();
   });
 });
+
+describe("startLevelOverride (testing aid)", () => {
+  it("is 0 by default, clamps to a non-negative integer and survives reset", () => {
+    useCorruptionStore.getState().setStartLevelOverride(7);
+    expect(useCorruptionStore.getState().startLevelOverride).toBe(7);
+    useCorruptionStore.getState().setStartLevelOverride(-3);
+    expect(useCorruptionStore.getState().startLevelOverride).toBe(0);
+    useCorruptionStore.getState().setStartLevelOverride(2.9);
+    expect(useCorruptionStore.getState().startLevelOverride).toBe(2);
+    useCorruptionStore.getState().setStartLevelOverride(5);
+    useCorruptionStore.getState().reset();
+    expect(useCorruptionStore.getState().startLevelOverride).toBe(5);
+    useCorruptionStore.getState().setStartLevelOverride(0);
+  });
+});

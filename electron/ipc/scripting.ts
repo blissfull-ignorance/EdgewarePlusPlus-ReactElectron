@@ -3,7 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { initLuaVM, getLuaVM, LuaExecResult, EdgewareHost } from "../scripting/fengariAdapter";
 import { resolveScriptPath } from "../scripting/scriptPath";
-import { injectLevel } from "./corruption";
+import { injectLevel, mirroredLevel } from "./corruption";
 import { app } from "electron";
 import { logger } from "../utils/logger";
 import { invalidateGalleryScan, looksLikePack } from "./pack";
@@ -53,6 +53,23 @@ after(2000, function()
     corrupt()
 end)
 `;
+
+/**
+ * Advance the corruption progression by one level, keeping the Lua VM's own
+ * counter in step so a scripted chain and a manual skip agree.
+ */
+function advanceCorruptionLevel(): number {
+  const vm = getLuaVM();
+  // The higher of the VM's own counter and the published mirror: a manual
+  // skip must step from where the session actually is, even when no Lua VM
+  // (or a freshly reset one) is driving.
+  const base = Math.max(vm?.getCurrentLevel() ?? 0, mirroredLevel());
+  const next = base + 1;
+  vm?.setCurrentLevel(next);
+  injectLevel(next);
+  logger.info(`[Scripting] corrupt() advanced to level ${next}`);
+  return next;
+}
 
 function dataDir(): string {
   return path.join(app.getPath("userData"), "data");
@@ -111,11 +128,7 @@ function buildEdgewareHost(): EdgewareHost {
 
   return {
     corrupt: () => {
-      const vm = getLuaVM();
-      const next = (vm?.getCurrentLevel() ?? 0) + 1;
-      vm?.setCurrentLevel(next);
-      injectLevel(next);
-      logger.info(`[Scripting] corrupt() advanced to level ${next}`);
+      advanceCorruptionLevel();
     },
     panic: () => {
       panicFromTray();
@@ -289,6 +302,9 @@ function registerHandlers(): void {
    * Creator tools: read the pack's script.lua (or an empty starter) so the
    * in-app designer can edit it. Paths stay inside the pack directory.
    */
+  /** Manual "skip": advance the corruption level by one (testing aid). */
+  ipcMain.handle("scripting:advanceLevel", async (): Promise<number> => advanceCorruptionLevel());
+
   ipcMain.handle(
     "scripting:readScript",
     async (_event, packPath: unknown): Promise<{ content: string; exists: boolean; tooLarge?: boolean } | null> => {

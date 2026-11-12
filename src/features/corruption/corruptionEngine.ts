@@ -92,6 +92,18 @@ export function parseCorruptionData(
 
   const moodsRaw = rawData.moods as Record<string, Record<string, unknown>> | undefined;
   const configRaw = rawData.config as Record<string, Record<string, unknown>> | undefined;
+  // Legacy packs carry wallpapers as a separate top-level map keyed by level
+  // number, with an optional "default" entry applied at level 1 (pack/load.py).
+  const wallpapersRaw = rawData.wallpapers as Record<string, unknown> | undefined;
+  const legacyWallpaper = (level: number): string | null => {
+    if (!wallpapersRaw || typeof wallpapersRaw !== "object") return null;
+    const own = wallpapersRaw[String(level)];
+    if (typeof own === "string" && own) return own;
+    if (level === 1 && typeof wallpapersRaw["default"] === "string" && wallpapersRaw["default"]) {
+      return wallpapersRaw["default"] as string;
+    }
+    return null;
+  };
 
   if (moodsRaw) {
     for (const [levelStr, levelData] of Object.entries(moodsRaw)) {
@@ -104,7 +116,10 @@ export function parseCorruptionData(
       const removeMoods = new MoodSet(
         (levelData.remove as string[] | undefined) ?? []
       );
-      const wallpaper = (levelData.wallpaper as string | null | undefined) ?? null;
+      const wallpaper =
+        (typeof levelData.wallpaper === "string" && levelData.wallpaper
+          ? (levelData.wallpaper as string)
+          : null) ?? legacyWallpaper(level);
 
       const levelConfig: Record<string, string | number> = {};
       if (configRaw && configRaw[levelStr]) {
@@ -117,6 +132,23 @@ export function parseCorruptionData(
       }
 
       levels[level] = { level, addMoods, removeMoods, wallpaper, config: levelConfig };
+    }
+  }
+
+  // Levels that exist only to change the wallpaper (legacy counted the
+  // wallpapers map into the level list as well).
+  if (wallpapersRaw && typeof wallpapersRaw === "object") {
+    for (const [levelStr, file] of Object.entries(wallpapersRaw)) {
+      const level = parseInt(levelStr, 10);
+      if (isNaN(level) || level < 1 || level in levels) continue;
+      if (typeof file !== "string" || !file) continue;
+      levels[level] = {
+        level,
+        addMoods: new MoodSet(),
+        removeMoods: new MoodSet(),
+        wallpaper: file,
+        config: {},
+      };
     }
   }
 
@@ -137,7 +169,7 @@ export function parseCorruptionData(
           level,
           addMoods: new MoodSet(),
           removeMoods: new MoodSet(),
-          wallpaper: null,
+          wallpaper: legacyWallpaper(level),
           config: levelConfig,
         };
       } else {

@@ -168,6 +168,8 @@ export interface ElectronAPI {
     runSelfTest: () => Promise<{ ok: boolean; error?: string }>;
     /** Tear down the Lua session: pending timers, callbacks and audio chains stop */
     stop: () => Promise<boolean>;
+    /** Advance the corruption level by one (same path as Lua corrupt()). */
+    advanceLevel: () => Promise<number>;
     /** Creator tools: the pack's script.lua content (starter text if absent) */
     readScript: (packPath: string) => Promise<{ content: string; exists: boolean; tooLarge?: boolean } | null>;
     /** Creator tools: save the pack's script.lua */
