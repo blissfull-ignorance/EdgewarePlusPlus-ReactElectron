@@ -18,6 +18,8 @@ import { selectMedia, type SelectedMedia } from "../../features/popup/selectMedi
 import { SafewordModal } from "../../features/panic/SafewordModal";
 import { collectCorruptionDangers, type DangerReport } from "../../features/corruption/danger";
 import { CorruptionDangerModal } from "../../features/corruption/CorruptionDangerModal";
+import { SpawnWarningModal } from "../../features/popup/SpawnWarningModal";
+import { collectSpawnBlockers } from "../../features/popup/spawnWarning";
 import { useCorruptionRuntime } from "../../hooks/useCorruptionRuntime";
 import { useCorruptionStore } from "../../stores/corruptionStore";
 import { useWallpaperRotation } from "../../hooks/useWallpaperRotation";
@@ -210,6 +212,13 @@ export function MainAppPage() {
   }, []);
 
   const [dangerReport, setDangerReport] = useState<DangerReport | null>(null);
+  const [spawnIssues, setSpawnIssues] = useState<string[] | null>(null);
+
+  const openPopupSettings = useCallback(() => {
+    setSpawnIssues(null);
+    setConfigTab("annoyance");
+    setView("config");
+  }, []);
 
   // Legacy panic_key: an in-window panic hotkey (needs app focus), separate
   // from the globalPanicButton system hotkey handled in the main process.
@@ -300,6 +309,25 @@ export function MainAppPage() {
         });
       return;
     }
+    // Outside corruption mode the user's own settings alone decide whether
+    // the roll loop spawns anything; a pack session that left a huge delay
+    // behind would otherwise look like a broken Start button. A pack script
+    // drives its own popups, so it counts as a live spawn source.
+    if (s.corruptionMode !== 1) {
+      void (window.api?.pack.hasScript() ?? Promise.resolve(false))
+        .then((hasScript) => {
+          // A Start during the await must not be double-handled.
+          if (useAppStore.getState().isRunning) return;
+          const issues = collectSpawnBlockers(s, hasScript);
+          if (issues.length > 0) {
+            setSpawnIssues(issues);
+            return;
+          }
+          startRuntime();
+        })
+        .catch(() => startRuntime());
+      return;
+    }
     startRuntime();
   }, [startRuntime]);
 
@@ -350,6 +378,16 @@ export function MainAppPage() {
       )}
       </AppFrame>
       <SafewordModal opened={safewordOpen} onClose={() => setSafewordOpen(false)} />
+      <SpawnWarningModal
+        opened={spawnIssues !== null}
+        issues={spawnIssues ?? []}
+        onProceed={() => {
+          setSpawnIssues(null);
+          startRuntime();
+        }}
+        onOpenSettings={openPopupSettings}
+        onClose={() => setSpawnIssues(null)}
+      />
       <CorruptionDangerModal
         opened={dangerReport !== null}
         report={dangerReport}

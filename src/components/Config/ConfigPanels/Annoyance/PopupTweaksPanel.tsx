@@ -17,6 +17,7 @@ export function PopupTweaksPanel() {
   const movingChance = useSettingsStore((s) => s.movingChance);
   const movingSpeed = useSettingsStore((s) => s.movingSpeed);
   const clickthroughPopups = useSettingsStore((s) => s.clickthroughPopups);
+  const delay = useSettingsStore((s) => s.delay);
 
   return (
     <SectionCard
@@ -30,6 +31,17 @@ export function PopupTweaksPanel() {
           value={showCaptions}
           onChange={(val) => setRaw({ showCaptions: val })}
           description="Display captions in popups"
+        />
+
+        <ConfigSlider
+          label="Spawn Delay"
+          value={delay}
+          onChange={(val) => setRaw({ delay: val })}
+          min={100}
+          max={60000}
+          step={100}
+          description="Milliseconds between popup rolls — lower means more popups. At 100% image chance one popup spawns per roll (default 5000)."
+          testId="config-spawn-delay"
         />
 
         <ConfigSlider

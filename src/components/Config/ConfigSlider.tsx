@@ -11,6 +11,7 @@ interface ConfigSliderProps {
   step?: number;
   description?: string;
   disabled?: boolean;
+  testId?: string;
 }
 
 export function ConfigSlider({
@@ -22,6 +23,7 @@ export function ConfigSlider({
   step = 1,
   description,
   disabled,
+  testId,
 }: ConfigSliderProps) {
   const [manualValue, setManualValue] = useState<string>(value.toString());
 
@@ -64,6 +66,8 @@ export function ConfigSlider({
         step={step}
         disabled={disabled}
         w={84}
+        data-testid={testId}
+        aria-label={label}
       />
     </Group>
   );

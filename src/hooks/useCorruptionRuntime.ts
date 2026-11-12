@@ -22,6 +22,40 @@ import {
 } from "../features/corruption/runtime";
 import { logger } from "../utils/logger";
 
+/**
+ * Pack level configs mutate real settings (delay, popupMod, buttonless, …).
+ * Those mutations are session-scoped: the first time a level touches a key
+ * the pre-session value is captured, and Stop restores every captured key,
+ * so a pack can never permanently rewrite the user's base configuration.
+ */
+let sessionConfigBaseline: Record<string, unknown> | null = null;
+
+/** Diagnostic view: the settings keys the running session has overridden. */
+export function sessionOverriddenKeys(): string[] {
+  return sessionConfigBaseline ? Object.keys(sessionConfigBaseline) : [];
+}
+
+function rememberBaseline(keys: string[]): void {
+  if (!sessionConfigBaseline) sessionConfigBaseline = {};
+  const state = useSettingsStore.getState() as unknown as Record<string, unknown>;
+  for (const key of keys) {
+    if (!(key in sessionConfigBaseline) && key in state) {
+      sessionConfigBaseline[key] = state[key];
+    }
+  }
+}
+
+function restoreSessionConfig(): void {
+  if (!sessionConfigBaseline) return;
+  const snapshot = sessionConfigBaseline;
+  sessionConfigBaseline = null;
+  const s = useSettingsStore.getState();
+  s.setRaw(snapshot);
+  logger.info(
+    `[corruption] restored ${Object.keys(snapshot).length} pack-overridden setting(s) on stop: ${Object.keys(snapshot).join(", ")}`
+  );
+}
+
 export function useCorruptionRuntime(active: boolean): void {
   useEffect(() => {
     if (!active) return;
@@ -42,7 +76,10 @@ export function useCorruptionRuntime(active: boolean): void {
         fullPerm: s.corruptionFullPerm === 1,
         themeCycle: s.corruptionThemeCycle === 0,
       });
-      if (Object.keys(allowed).length > 0) s.setRaw(allowed);
+      if (Object.keys(allowed).length > 0) {
+        rememberBaseline(Object.keys(allowed));
+        s.setRaw(allowed);
+      }
 
       if (levelData?.wallpaper && s.corruptionWallpaperCycle === 0 && s.packPath) {
         const root = String(s.packPath).replace(/\/+$/, "");
@@ -179,6 +216,7 @@ export function useCorruptionRuntime(active: boolean): void {
       // A stopped session releases its moods and level: content re-locks and
       // a later Start does not resurrect the previous run's transitions.
       useCorruptionStore.getState().reset();
+      restoreSessionConfig();
       void window.api?.corruption.setLevel(0, null).catch(() => undefined);
     };
   }, [active]);
