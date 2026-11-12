@@ -10,22 +10,21 @@ import {
   Group,
   Modal,
   ScrollArea,
+  SegmentedControl,
   SimpleGrid,
   Stack,
   Text,
   TextInput,
 } from "@mantine/core";
-import { IconPalette, IconCode, IconPlus, IconTrash, IconPencil } from "@tabler/icons-react";
+import { IconPalette, IconCode, IconPlus, IconTrash, IconPencil, IconStarFilled } from "@tabler/icons-react";
 import { DesignerSection } from "./DesignerSection";
 import type { GalleryEntry, GalleryResult } from "../../types/pack";
-import { resolvePackMediaUrl, type MediaDir } from "../popup/resolveMediaUrl";
+import { resolvePackMediaUrl } from "../popup/resolveMediaUrl";
+import { KIND_DIR, favouriteKey } from "../gallery/favouriteKey";
 import { useSettingsStore } from "../../stores/settingsStore";
 
-const KIND_DIR: Record<GalleryEntry["kind"], MediaDir> = {
-  image: "img",
-  video: "vid",
-  audio: "aud",
-};
+/** Cards render in pages so a 1000+ file pack opens instantly. */
+const GRID_PAGE = 150;
 
 interface RawMood {
   mood: string;
@@ -170,6 +169,9 @@ function TaggingSection({ onPackChanged }: { onPackChanged?: () => void }) {
   const [renaming, setRenaming] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");
   const [savedAt, setSavedAt] = useState<number>(0);
+  const [typeFilter, setTypeFilter] = useState<"all" | "image" | "video" | "audio">("all");
+  const [favouritesOnly, setFavouritesOnly] = useState(false);
+  const [shown, setShown] = useState(GRID_PAGE);
 
   const reload = useCallback(async () => {
     if (!packPath) return;
@@ -228,17 +230,49 @@ function TaggingSection({ onPackChanged }: { onPackChanged?: () => void }) {
 
   const moodOf = useMemo(() => new Map(moods.map((m) => [m.mood, m])), [moods]);
 
+  // One pass over the mood tables; per-card lookups stay O(1) even for a
+  // thousand-file pack re-rendering on every filter change.
+  const tagsByFile = useMemo(() => {
+    const map = new Map<string, string[]>();
+    for (const m of moods) {
+      if (!Array.isArray(m.media)) continue;
+      for (const file of m.media) {
+        if (typeof file !== "string") continue;
+        const list = map.get(file);
+        if (list) list.push(m.mood);
+        else map.set(file, [m.mood]);
+      }
+    }
+    return map;
+  }, [moods]);
+  const tagsOf = useCallback((file: string): string[] => tagsByFile.get(file) ?? [], [tagsByFile]);
+
+  // Hypno spirals are overlay-only media with their own gallery class;
+  // they are never mood-tagged, so they never appear in this grid.
+  const taggable = useMemo(
+    () => gallery.entries.filter((e) => e.kind !== "hypno"),
+    [gallery.entries]
+  );
+  const favouriteKeys = useMemo(() => new Set(gallery.favourites), [gallery.favourites]);
+
   const uncategorizedCount = useMemo(
-    () => gallery.entries.filter((e) => tagsFor(moods, e.file).length === 0).length,
-    [gallery.entries, moods]
+    () => taggable.filter((e) => tagsOf(e.file).length === 0).length,
+    [taggable, tagsOf]
   );
   const visibleEntries = useMemo(
     () =>
-      onlyUncategorized
-        ? gallery.entries.filter((e) => tagsFor(moods, e.file).length === 0)
-        : gallery.entries,
-    [gallery.entries, moods, onlyUncategorized]
+      taggable.filter((e) => {
+        if (onlyUncategorized && tagsOf(e.file).length > 0) return false;
+        if (typeFilter !== "all" && e.kind !== typeFilter) return false;
+        if (favouritesOnly && !favouriteKeys.has(favouriteKey(e))) return false;
+        return true;
+      }),
+    [taggable, tagsOf, onlyUncategorized, typeFilter, favouritesOnly, favouriteKeys]
   );
+
+  useEffect(() => {
+    setShown(GRID_PAGE);
+  }, [packPath, onlyUncategorized, typeFilter, favouritesOnly]);
 
   const commitRename = (): void => {
     if (!packPath || !renaming || !renameValue.trim() || renameValue.trim() === renaming) {
@@ -288,9 +322,34 @@ function TaggingSection({ onPackChanged }: { onPackChanged?: () => void }) {
           data-testid="creator-uncategorized-chip"
         >
           <span data-testid="creator-uncategorized-label">
-            Uncategorised ({uncategorizedCount} of {gallery.entries.length})
+            Uncategorised ({uncategorizedCount} of {taggable.length})
           </span>
         </Chip>
+        <Chip
+          checked={favouritesOnly}
+          onClick={() => setFavouritesOnly((v) => !v)}
+          size="xs"
+          data-testid="creator-favourites-chip"
+        >
+          <span data-testid="creator-favourites-label">
+            <Group gap={4} wrap="nowrap">
+              <IconStarFilled size={12} />
+              Favourites ({taggable.filter((e) => favouriteKeys.has(favouriteKey(e))).length})
+            </Group>
+          </span>
+        </Chip>
+        <SegmentedControl
+          data={[
+            { label: "All", value: "all" },
+            { label: "Images", value: "image" },
+            { label: "Videos", value: "video" },
+            { label: "Audio", value: "audio" },
+          ]}
+          value={typeFilter}
+          onChange={(v) => setTypeFilter(v as typeof typeFilter)}
+          size="xs"
+          data-testid="creator-type-filter"
+        />
       </Group>
 
       <Group gap="xs" wrap="wrap">
@@ -347,8 +406,8 @@ function TaggingSection({ onPackChanged }: { onPackChanged?: () => void }) {
       ) : (
         <ScrollArea h="calc(100vh - 420px)" type="auto">
           <SimpleGrid cols={{ base: 3, sm: 4, md: 5, lg: 6 }} spacing="md" verticalSpacing="md">
-            {visibleEntries.map((entry) => {
-              const fileTags = tagsFor(moods, entry.file);
+            {visibleEntries.slice(0, shown).map((entry) => {
+              const fileTags = tagsOf(entry.file);
               return (
                 <Stack
                   key={`${entry.kind}:${entry.file}`}
@@ -378,6 +437,19 @@ function TaggingSection({ onPackChanged }: { onPackChanged?: () => void }) {
               );
             })}
           </SimpleGrid>
+          {visibleEntries.length > shown ? (
+            <Group justify="center" mt="md">
+              <Button
+                size="xs"
+                variant="light"
+                onClick={() => setShown((n) => n + GRID_PAGE)}
+                data-testid="creator-load-more"
+              >
+                Load {Math.min(GRID_PAGE, visibleEntries.length - shown)} more (
+                {visibleEntries.length - shown} hidden)
+              </Button>
+            </Group>
+          ) : null}
         </ScrollArea>
       )}
 

@@ -8,6 +8,7 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   Badge,
+  Button,
   Center,
   Chip,
   Group,
@@ -19,33 +20,27 @@ import {
   Text,
   UnstyledButton,
 } from "@mantine/core";
-import { IconPhoto, IconVideo, IconMusic, IconLock, IconStar, IconStarFilled } from "@tabler/icons-react";
+import { IconPhoto, IconVideo, IconMusic, IconSpiral, IconLock, IconStar, IconStarFilled } from "@tabler/icons-react";
 import type { GalleryEntry, GalleryResult } from "../../types/pack";
-import { resolvePackMediaUrl, type MediaDir } from "../popup/resolveMediaUrl";
+import { resolvePackMediaUrl } from "../popup/resolveMediaUrl";
+import { KIND_DIR, favouriteKey } from "./favouriteKey";
 import { useSettingsStore } from "../../stores/settingsStore";
 import { useCorruptionStore } from "../../stores/corruptionStore";
 import { useAppStore } from "../../stores/appStore";
-
-const KIND_DIR: Record<GalleryEntry["kind"], MediaDir> = {
-  image: "img",
-  video: "vid",
-  audio: "aud",
-};
 
 const KIND_ICON: Record<GalleryEntry["kind"], React.ReactNode> = {
   image: <IconPhoto size={40} stroke={1.2} />,
   video: <IconVideo size={40} stroke={1.2} />,
   audio: <IconMusic size={40} stroke={1.2} />,
+  hypno: <IconSpiral size={40} stroke={1.2} />,
 };
 
-/** Stable cross-pack identity for a media file: "<dir>/<file>". */
-export function favouriteKey(entry: GalleryEntry): string {
-  return `${KIND_DIR[entry.kind]}/${entry.file}`;
-}
+/** Cards render in pages so a 1000+ file pack opens instantly. */
+const GRID_PAGE = 150;
 
 function Thumb({ entry }: { entry: GalleryEntry }) {
   const url = resolvePackMediaUrl(entry.file, KIND_DIR[entry.kind]);
-  if (entry.kind === "image") {
+  if (entry.kind === "image" || entry.kind === "hypno") {
     return (
       <img
         src={url}
@@ -81,6 +76,7 @@ export function GalleryPanel() {
   const [favouritesOnly, setFavouritesOnly] = useState(false);
   const [typeFilter, setTypeFilter] = useState<"all" | GalleryEntry["kind"]>("all");
   const [selected, setSelected] = useState<GalleryEntry | null>(null);
+  const [shown, setShown] = useState(GRID_PAGE);
 
   useEffect(() => {
     let alive = true;
@@ -114,7 +110,7 @@ export function GalleryPanel() {
   const favouriteKeys = useMemo(() => new Set(data.favourites), [data.favourites]);
 
   const typeCounts = useMemo(() => {
-    const counts = { image: 0, video: 0, audio: 0 };
+    const counts = { image: 0, video: 0, audio: 0, hypno: 0 };
     for (const e of data.entries) counts[e.kind] += 1;
     return counts;
   }, [data.entries]);
@@ -135,6 +131,10 @@ export function GalleryPanel() {
       }),
     [data.entries, moodFilter, typeFilter, favouritesOnly, favouriteKeys]
   );
+
+  useEffect(() => {
+    setShown(GRID_PAGE);
+  }, [packPath, moodFilter, typeFilter, favouritesOnly]);
 
   const toggleFavourite = (entry: GalleryEntry): void => {
     const key = favouriteKey(entry);
@@ -160,8 +160,8 @@ export function GalleryPanel() {
           </Text>
           <Text size="sm" c="dimmed" data-testid="gallery-count">
             {data.entries.length} files ({typeCounts.image} images, {typeCounts.video} videos,{" "}
-            {typeCounts.audio} audio) · {data.moods.length} moods · active moods unlock their
-            content for popups
+            {typeCounts.audio} audio, {typeCounts.hypno} hypno) · {data.moods.length} moods ·
+            active moods unlock their content for popups
           </Text>
         </div>
         <Group gap="sm" wrap="nowrap">
@@ -184,6 +184,7 @@ export function GalleryPanel() {
             { label: "Images", value: "image" },
             { label: "Videos", value: "video" },
             { label: "Audio", value: "audio" },
+            { label: "Hypno", value: "hypno" },
           ]}
             value={typeFilter}
             onChange={(v) => setTypeFilter(v as typeof typeFilter)}
@@ -248,7 +249,7 @@ export function GalleryPanel() {
       ) : (
         <ScrollArea h="calc(100vh - 260px)" type="auto">
           <SimpleGrid cols={{ base: 3, sm: 4, md: 5, lg: 6 }} spacing="md" verticalSpacing="md">
-            {visible.map((entry) => (
+            {visible.slice(0, shown).map((entry) => (
               <Stack
                 key={`${entry.kind}:${entry.file}`}
                 gap={4}
@@ -278,7 +279,11 @@ export function GalleryPanel() {
                   {entry.file}
                 </Text>
                 <Group gap={4} wrap="wrap">
-                  {entry.moods.length === 0 ? (
+                  {entry.kind === "hypno" ? (
+                    <Badge size="xs" variant="light" color="violet" leftSection={<IconSpiral size={9} />}>
+                      hypno overlay
+                    </Badge>
+                  ) : entry.moods.length === 0 ? (
                     <Badge size="xs" variant="light" color="dark">
                       default
                     </Badge>
@@ -299,6 +304,18 @@ export function GalleryPanel() {
               </Stack>
             ))}
           </SimpleGrid>
+          {visible.length > shown ? (
+            <Group justify="center" mt="md">
+              <Button
+                size="xs"
+                variant="light"
+                onClick={() => setShown((n) => n + GRID_PAGE)}
+                data-testid="gallery-load-more"
+              >
+                Load {Math.min(GRID_PAGE, visible.length - shown)} more ({visible.length - shown} hidden)
+              </Button>
+            </Group>
+          ) : null}
         </ScrollArea>
       )}
 
@@ -311,7 +328,7 @@ export function GalleryPanel() {
         closeButtonProps={{ "aria-label": "Close gallery view" }}
       >
         <div data-testid="gallery-modal">
-          {selected?.kind === "image" ? (
+          {selected?.kind === "image" || selected?.kind === "hypno" ? (
             <img src={selectedUrl} alt="" style={{ width: "100%", objectFit: "contain" }} />
           ) : selected?.kind === "video" ? (
             <video src={selectedUrl} controls autoPlay style={{ width: "100%" }} />

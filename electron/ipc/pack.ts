@@ -360,10 +360,17 @@ function readFavouritesList(): string[] {
 }
 
 /** Gallery favourite keys are "<dir>/<file>" under a known media dir. */
-const GALLERY_DIR_BY_KIND = new Set(["img/", "vid/", "aud/"]);
+const GALLERY_DIR_BY_KIND = new Set(["img/", "vid/", "aud/", "hypno/"]);
 
 function favouriteKey(entry: GalleryEntry): string {
-  const dir = entry.kind === "image" ? "img/" : entry.kind === "video" ? "vid/" : "aud/";
+  const dir =
+    entry.kind === "image"
+      ? "img/"
+      : entry.kind === "video"
+        ? "vid/"
+        : entry.kind === "hypno"
+          ? "hypno/"
+          : "aud/";
   return `${dir}${entry.file}`;
 }
 
@@ -828,13 +835,16 @@ function registerHandlers(): void {
           ["img", "image", /\.(png|jpg|jpeg|gif|webp)$/i],
           ["vid", "video", /\.(mp4|webm|mkv)$/i],
           ["aud", "audio", /\.(mp3|wav|ogg|flac)$/i],
+          // Hypno spirals are their own class: overlay-only media, never
+          // regular popup content, never mood-tagged.
+          ["hypno", "hypno", /\.(gif|png|jpe?g|webp)$/i],
         ];
         const entries: GalleryEntry[] = [];
         for (const [subdir, kind, pattern] of dirs) {
           const dirPath = path.join(packDir, subdir);
           if (!fs.existsSync(dirPath)) continue;
           for (const file of fs.readdirSync(dirPath).filter((f) => pattern.test(f) && !f.startsWith("."))) {
-            entries.push({ file, kind, moods: fileMoods[file] ?? [] });
+            entries.push({ file, kind, moods: kind === "hypno" ? [] : fileMoods[file] ?? [] });
           }
         }
         galleryScan = {

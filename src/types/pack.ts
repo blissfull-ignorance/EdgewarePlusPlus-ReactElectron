@@ -140,7 +140,7 @@ export interface Info {
  */
 export interface GalleryEntry {
   file: string;
-  kind: "image" | "video" | "audio";
+  kind: "image" | "video" | "audio" | "hypno";
   moods: string[];
 }
 
