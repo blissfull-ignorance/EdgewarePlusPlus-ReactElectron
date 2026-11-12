@@ -109,7 +109,10 @@ html[data-popup] #root {
   flex-shrink: 0;
   border-radius: 8px;
   background-color: var(--mantine-color-dark-5);
-  color: var(--mantine-primary-color-filled);
+  /* The primary accent is too dark against the themed surfaces in some
+     variants (Ransom, Goth); the surface ramp's own secondary tone stays
+     readable on dark-5 in every theme. */
+  color: var(--mantine-color-dark-1);
 }
 
 /* ── Running indicator ────────────────────────────────────────────────────── */

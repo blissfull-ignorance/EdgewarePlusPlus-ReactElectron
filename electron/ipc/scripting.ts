@@ -302,6 +302,49 @@ function registerHandlers(): void {
    * Creator tools: read the pack's script.lua (or an empty starter) so the
    * in-app designer can edit it. Paths stay inside the pack directory.
    */
+  /**
+   * Creator tools: archive a hand-written script.lua (as script.lua.bak,
+   * then .bak-2 … .bak-9, then a timestamped name) and replace it with the
+   * given designed script, so the pack becomes editable in the designer
+   * without losing the original.
+   */
+  ipcMain.handle(
+    "scripting:backupAndWriteScript",
+    async (_event, packPath: unknown, newLua: unknown): Promise<string | null> => {
+      if (
+        typeof packPath !== "string" ||
+        !packPath ||
+        typeof newLua !== "string" ||
+        newLua.length > 200_000
+      ) {
+        return null;
+      }
+      const dir = path.resolve(packPath.replace(/^~/, process.env.HOME ?? packPath));
+      if (!looksLikePack(dir)) return null;
+      const script = path.join(dir, "script.lua");
+      let backupName = "";
+      try {
+        if (fs.existsSync(script)) {
+          const candidates = [
+            "script.lua.bak",
+            ...Array.from({ length: 8 }, (_, i) => `script.lua.bak-${i + 2}`),
+            `script.lua.bak-${Date.now()}`,
+          ];
+          const target = candidates.find((name) => !fs.existsSync(path.join(dir, name)));
+          if (!target) return null;
+          fs.copyFileSync(script, path.join(dir, target));
+          backupName = target;
+        }
+        writeAtomic(script, newLua);
+        logger.info(`[Scripting] Hand-written script archived (${backupName || "none"}) and designed script installed`);
+        return backupName;
+      } catch (err) {
+        logger.error("[Scripting] Failed to archive and replace pack script:", err);
+        return null;
+      }
+    }
+  );
+
   /** Manual "skip": advance the corruption level by one (testing aid). */
   ipcMain.handle("scripting:advanceLevel", async (): Promise<number> => advanceCorruptionLevel());
 

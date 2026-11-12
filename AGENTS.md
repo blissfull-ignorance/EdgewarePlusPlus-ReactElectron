@@ -44,6 +44,20 @@ npm run test        # Vitest unit suite
 npm run test:e2e    # Playwright: browser layer + real-Electron layer
 ```
 
+During iteration, run the slice that matches the change instead of the full
+suites; the full gate still decides. The e2e groups partition every spec, so
+one group per touched area plus the unit suite is fast and sufficient:
+
+```bash
+npm run test:e2e:creator     # creator tools, designer, moods (also :corruption :popup :pack :runtime)
+npm run test:e2e:browser     # browser layer only  (or :electron)
+npm run test:unit:creator    # unit slice (also :corruption :popup :pack)
+npx vitest run <filter>      # any unit substring; npx playwright test <file|regex>
+```
+
+Never run two Playwright invocations concurrently — they share the dev server
+and Electron launches, and the contention produces flakes.
+
 ## Development Workflow
 
 - Work proceeds in numbered steps under `work/<NN-slug>/` (local only). Each

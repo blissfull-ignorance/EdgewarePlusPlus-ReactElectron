@@ -407,6 +407,7 @@ export function DesignerSection({ packRevision = 0 }: { packRevision?: number })
   const [designDirty, setDesignDirty] = useState(false);
   const [codeDirty, setCodeDirty] = useState(false);
   const [scriptTooLarge, setScriptTooLarge] = useState(false);
+  const [importedBackup, setImportedBackup] = useState<string | null>(null);
   // The pack whose design/code the current state describes; draft writes
   // before the first load (or mid pack-switch) would corrupt another pack's
   // draft, so they are skipped until a load completes for this pack.
@@ -646,10 +647,42 @@ export function DesignerSection({ packRevision = 0 }: { packRevision?: number })
       ) : null}
 
       {hasExistingScript && !designed ? (
-        <Text size="sm" c="orange" data-testid="designer-handwritten-banner">
-          This pack ships a hand-written script. The visual editor starts a new
-          design; saving replaces the pack's script.lua (the code tab still
-          shows the current file).
+        <Group gap="sm" wrap="wrap" data-testid="designer-handwritten-banner">
+          <Text size="sm" c="orange">
+            This pack ships a hand-written script. Keep editing it on the code
+            tab, or archive it and start a designed script.
+          </Text>
+          <Button
+            size="xs"
+            variant="light"
+            color="orange"
+            disabled={scriptTooLarge}
+            onClick={() => {
+              if (!packPath) return;
+              void window.api?.scripting
+                .backupAndWriteScript(packPath, generateLua(emptyDesign()))
+                .then((backup) => {
+                  if (backup === null) {
+                    setStatus("failed");
+                    return;
+                  }
+                  setImportedBackup(backup);
+                  setStatus("saved");
+                  void reload().catch(() => undefined);
+                })
+                .catch(() => setStatus("failed"));
+            }}
+            data-testid="designer-import-script"
+          >
+            Back up and start designed script
+          </Button>
+        </Group>
+      ) : null}
+
+      {importedBackup ? (
+        <Text size="xs" c="teal" data-testid="designer-imported-note">
+          Original script archived as {importedBackup}. Design your sequence
+          below and save it to the pack.
         </Text>
       ) : null}
 

@@ -5,7 +5,7 @@ import { ipcMain } from "electron";
 import { logger } from "../utils/logger";
 import { pickSubliminalText, pickNotificationText } from "../utils/textPool";
 import { getActiveMoods, isMoodEligible, setActiveMoods } from "../utils/moodState";
-import { loadAppIconDataUrl } from "../utils/appIcon";
+import { applyPackIcons, loadAppIconDataUrl } from "../utils/appIcon";
 import { parseDiscordDat } from "../utils/discordDat";
 import { resolveBlacklistSource, computeBlacklistTarget } from "../utils/blacklist";
 
@@ -853,6 +853,11 @@ function registerHandlers(): void {
   });
 
   // ── Gallery favourites (user stars, persisted across packs and boots) ──
+
+  /** Re-apply the current pack's icon to dock and windows (pack switch). */
+  ipcMain.handle("pack:refreshAppIcon", async (): Promise<void> => {
+    applyPackIcons(currentPackDir());
+  });
 
   ipcMain.handle("pack:listFavourites", async (): Promise<string[]> => readFavouritesList());
 

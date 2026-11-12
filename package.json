@@ -15,6 +15,17 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
+    "test:e2e:browser": "playwright test --project=chromium",
+    "test:e2e:electron": "playwright test --project=electron",
+    "test:e2e:creator": "playwright test creator mood-script multi-mood",
+    "test:e2e:corruption": "playwright test corruption schedule",
+    "test:e2e:popup": "playwright test popup real-pack blacklist notification",
+    "test:e2e:pack": "playwright test pack-loading pack-import app-icon splash wallpaper booru theme visual-regression",
+    "test:e2e:runtime": "playwright test runtime-hardening quit panic persistence config edgeware-api self-test smoke error-handling integration warning-box hibernate mitosis",
+    "test:unit:creator": "vitest run designer pack-edit gallery",
+    "test:unit:corruption": "vitest run corruption legacy-config mood",
+    "test:unit:popup": "vitest run popup mediaGuard packmedia",
+    "test:unit:pack": "vitest run pack- app-icon icon",
     "electron:dev": "vite --config vite.config.ts"
   },
   "dependencies": {

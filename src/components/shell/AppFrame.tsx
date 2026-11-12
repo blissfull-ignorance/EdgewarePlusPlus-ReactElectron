@@ -2,6 +2,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import { Group, Title, Badge, Text, UnstyledButton } from "@mantine/core";
 import { IconLayoutDashboard, IconSettings, IconPhoto, IconWand } from "@tabler/icons-react";
 import defaultAppIcon from "../../assets/app_icon.png";
+import { useSettingsStore } from "../../stores/settingsStore";
 
 export type MainView = "status" | "config" | "gallery" | "creator";
 
@@ -35,7 +36,10 @@ interface AppFrameProps {
 
 export function AppFrame({ view, onViewChange, actions, children }: AppFrameProps) {
   const [appIcon, setAppIcon] = useState<string | null>(null);
+  const packPath = useSettingsStore((s) => s.packPath);
 
+  // The pack owns the header logo and the window/dock icon; both follow the
+  // active pack, including switches made while the app runs.
   useEffect(() => {
     let alive = true;
     void window.api?.pack
@@ -44,10 +48,11 @@ export function AppFrame({ view, onViewChange, actions, children }: AppFrameProp
         if (alive && url) setAppIcon(url);
       })
       .catch(() => undefined);
+    void window.api?.pack.refreshAppIcon().catch(() => undefined);
     return () => {
       alive = false;
     };
-  }, []);
+  }, [packPath]);
 
   return (
     <div style={{ height: "100vh", display: "flex", flexDirection: "column", overflow: "hidden" }}>

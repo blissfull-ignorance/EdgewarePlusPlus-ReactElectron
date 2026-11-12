@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import {
   cleanupTempState,
@@ -332,6 +332,74 @@ test("a colliding mood rename changes nothing and claims nothing", async () => {
     await expect(running.window.locator("[data-testid='creator-saved']")).toHaveCount(0);
     await expect(running.window.locator("[data-testid='creator-mood-alpha']")).toBeVisible();
     expect(readFileSync(path.join(dir, "index.json"), "utf-8")).toBe(index);
+  } finally {
+    await quitApp(running);
+    cleanupTempState(state);
+  }
+});
+
+test("importing a hand-written script archives it and installs a designed one", async () => {
+  const state: TempState = createTempState();
+  const dir = path.join(state.packsDir, "CT-Import");
+  mkdirSync(path.join(dir, "img"), { recursive: true });
+  writeFileSync(path.join(dir, "img", "one.png"), "png");
+  writeFileSync(
+    path.join(dir, "info.json"),
+    JSON.stringify({ name: "CT-Import", id: "ctimport", creator: "e2e", version: "1", description: "x" })
+  );
+  writeFileSync(path.join(dir, "index.json"), JSON.stringify({ default: {}, moods: [] }));
+  const handwritten = 'require("edgeware_v0")\n-- ancient hand-written magic\ncorrupt()\n';
+  writeFileSync(path.join(dir, "script.lua"), handwritten);
+  seedConfig(state, {
+    packPath: dir,
+    popupRenderMode: "electron",
+    popupMod: 0,
+    showLoadingFlair: 0,
+    corruptionMode: 0,
+    corruptionTrigger: "Script",
+    delay: 60000,
+  });
+  const running = await launchApp(state, {
+    EDGWARE_STUB_BROWSER: "1",
+    EDGWARE_PANIC_SKIP_WALLPAPER: "1",
+  });
+  try {
+    await openDesigner(running.window);
+    await expect(running.window.locator("[data-testid='designer-handwritten-banner']")).toBeVisible();
+    await running.window.locator("[data-testid='designer-import-script']").click();
+    await expect(running.window.locator("[data-testid='designer-imported-note']")).toContainText(
+      "script.lua.bak"
+    );
+    // The original survives on disk; the live script is now designer-owned.
+    expect(readFileSync(path.join(dir, "script.lua.bak"), "utf-8")).toBe(handwritten);
+    const installed = readFileSync(path.join(dir, "script.lua"), "utf-8");
+    expect(installed).toContain("EDGWARE-DESIGNER");
+    // The banner is gone and the visual editor owns the (empty) design.
+    await expect(running.window.locator("[data-testid='designer-handwritten-banner']")).toHaveCount(0);
+    await running.window.locator("[data-testid='designer-add-level']").click();
+    await running.window.locator("[data-testid='designer-save']").click();
+    await expect(running.window.locator("[data-testid='designer-status']")).toContainText("Saved");
+    // A second import archives again without clobbering the first backup.
+    await running.window.evaluate((lua) => {
+      (
+        window as unknown as {
+          api: { scripting: { writeScript: (p: string, c: string) => Promise<boolean> } };
+        }
+      ).api.scripting.writeScript(
+        lua,
+        'require("edgeware_v0")\n-- second hand edit\n'
+      );
+    }, dir);
+    await running.window.reload();
+    await running.window.locator("[data-testid='main-tab-creator']").click();
+    await running.window.locator("[data-testid='creator-tab-script']").click();
+    await expect(running.window.locator("[data-testid='designer-import-script']")).toBeVisible();
+    await running.window.locator("[data-testid='designer-import-script']").click();
+    await expect(running.window.locator("[data-testid='designer-imported-note']")).toContainText(
+      "script.lua.bak-2"
+    );
+    expect(existsSync(path.join(dir, "script.lua.bak"))).toBe(true);
+    expect(readFileSync(path.join(dir, "script.lua.bak"), "utf-8")).toBe(handwritten);
   } finally {
     await quitApp(running);
     cleanupTempState(state);

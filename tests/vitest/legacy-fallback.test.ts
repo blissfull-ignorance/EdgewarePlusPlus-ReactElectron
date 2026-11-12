@@ -330,6 +330,8 @@ describe("Desktop notification IPC via system:sendNotification", () => {
           if (key === "userData") return "/mock/user/data";
           return "";
         },
+        getAppPath: () => "/mock/app",
+        dock: undefined,
       },
       Notification: MockNotification,
       Tray: vi.fn(),

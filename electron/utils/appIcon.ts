@@ -1,4 +1,4 @@
-import { app, nativeImage, type NativeImage } from "electron";
+import { app, BrowserWindow, nativeImage, type NativeImage } from "electron";
 import fs from "node:fs";
 import path from "node:path";
 import { logger } from "./logger";
@@ -48,6 +48,25 @@ export function activePackDir(): string | null {
     return raw.startsWith("~") ? raw.replace("~", app.getPath("home")) : raw;
   } catch {
     return null;
+  }
+}
+
+/** The icon file the app resolves for this pack (pack icon.ico/png first). */
+export function resolveIconFile(packDir: string | null): string | null {
+  return firstExisting(packDir);
+}
+
+/** Re-apply the pack's icon to the dock and every open window (pack switch). */
+export function applyPackIcons(packDir: string | null): void {
+  const image = loadAppIcon(packDir);
+  if (!image) return;
+  if (process.platform === "darwin" && app.dock) app.dock.setIcon(image);
+  for (const win of BrowserWindow.getAllWindows()) {
+    try {
+      if (!win.isDestroyed()) win.setIcon(image);
+    } catch {
+      /* windows mid-teardown */
+    }
   }
 }
 

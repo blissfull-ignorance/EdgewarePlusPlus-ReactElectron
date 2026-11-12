@@ -9,7 +9,7 @@ import { panicFromTray } from "./panic";
 import { setDiscordPresence as discordSetPresence } from "./discord";
 import { setWallpaper } from "../utils/wallpaper";
 import { autostartFilePath, buildAutostartEntry } from "../utils/autostart";
-import { activePackDir, loadAppIcon } from "../utils/appIcon";
+import { activePackDir, loadAppIcon, resolveIconFile } from "../utils/appIcon";
 import {
   extractPackZip,
   parsePackInfo,
@@ -213,10 +213,15 @@ function sendNotification(title: string, message: string, attachmentPath?: strin
     attachmentPath && attachmentPath.startsWith("~")
       ? attachmentPath.replace("~", app.getPath("home"))
       : attachmentPath;
+  // Notification art: the pack's own icon, overridden by an attached image.
+  // (macOS draws its banner icon from the app bundle and ignores this field;
+  // Windows and Linux show it.)
+  const iconFile =
+    (expanded && fs.existsSync(expanded) ? expanded : null) ?? resolveIconFile(activePackDir());
   const notification = new Notification({
     title,
     body: message,
-    ...(expanded && fs.existsSync(expanded) ? { icon: expanded } : {}),
+    ...(iconFile ? { icon: iconFile } : {}),
   });
   notification.show();
   logger.info(`[System] Notification shown: "${title}: ${message}"${expanded && fs.existsSync(expanded) ? " (with image)" : ""}`);

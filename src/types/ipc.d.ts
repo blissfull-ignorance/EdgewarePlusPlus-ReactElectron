@@ -107,6 +107,8 @@ export interface ElectronAPI {
     listGallery: (packPath?: string | null) => Promise<import("./pack").GalleryResult>;
     /** Star/unstar a gallery file ("<dir>/<file>"); resolves the new list. */
     setFavourite: (key: string, favourite: boolean) => Promise<string[]>;
+    /** Re-apply the current pack's icon to the dock and windows. */
+    refreshAppIcon: () => Promise<void>;
     /** The pack's startup splash image as a data URL, or null when the pack ships none. */
     splashImage: () => Promise<string | null>;
     /** The app icon (pack icon or bundled default) as a data URL, or null. */
@@ -170,6 +172,8 @@ export interface ElectronAPI {
     stop: () => Promise<boolean>;
     /** Advance the corruption level by one (same path as Lua corrupt()). */
     advanceLevel: () => Promise<number>;
+    /** Archive script.lua as script.lua.bak* and install the designed one. */
+    backupAndWriteScript: (packPath: string, newLua: string) => Promise<string | null>;
     /** Creator tools: the pack's script.lua content (starter text if absent) */
     readScript: (packPath: string) => Promise<{ content: string; exists: boolean; tooLarge?: boolean } | null>;
     /** Creator tools: save the pack's script.lua */

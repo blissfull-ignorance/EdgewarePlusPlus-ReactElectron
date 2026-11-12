@@ -22,6 +22,7 @@ const electronAPI: ElectronAPI = {
     setRuntimePack: (dir) => ipcRenderer.invoke("pack:setRuntimePack", dir),
     listGallery: (packPath) => ipcRenderer.invoke("pack:listGallery", packPath),
     setFavourite: (key, favourite) => ipcRenderer.invoke("pack:setFavourite", key, favourite),
+    refreshAppIcon: () => ipcRenderer.invoke("pack:refreshAppIcon"),
     getEditableIndex: (packPath) => ipcRenderer.invoke("pack:getEditableIndex", packPath),
     setFileTags: (packPath, file, tags) => ipcRenderer.invoke("pack:setFileTags", packPath, file, tags),
     addMood: (packPath, name) => ipcRenderer.invoke("pack:addMood", packPath, name),
@@ -81,6 +82,8 @@ const electronAPI: ElectronAPI = {
     runSelfTest: () => ipcRenderer.invoke("scripting:runSelfTest"),
     stop: () => ipcRenderer.invoke("scripting:stop"),
     advanceLevel: () => ipcRenderer.invoke("scripting:advanceLevel"),
+    backupAndWriteScript: (packPath, newLua) =>
+      ipcRenderer.invoke("scripting:backupAndWriteScript", packPath, newLua),
     readScript: (packPath) => ipcRenderer.invoke("scripting:readScript", packPath),
     writeScript: (packPath, content) => ipcRenderer.invoke("scripting:writeScript", packPath, content),
     writePackDesign: (packPath, lua, corruptionJson) =>
