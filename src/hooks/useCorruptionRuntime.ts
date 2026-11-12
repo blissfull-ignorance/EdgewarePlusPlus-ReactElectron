@@ -38,14 +38,11 @@ export function sessionOverriddenKeys(): string[] {
 function rememberBaseline(keys: string[]): void {
   if (!sessionConfigBaseline) sessionConfigBaseline = {};
   const state = useSettingsStore.getState() as unknown as Record<string, unknown>;
-  const captured: Record<string, string | number | boolean> = {};
+  const captured: Record<string, unknown> = {};
   for (const key of keys) {
     if (!(key in sessionConfigBaseline) && key in state) {
       sessionConfigBaseline[key] = state[key];
-      const v = state[key];
-      if (typeof v === "string" || typeof v === "number" || typeof v === "boolean") {
-        captured[key] = v;
-      }
+      captured[key] = state[key];
     }
   }
   // A quit/crash skips the Stop cleanup; the main process keeps the
@@ -83,10 +80,19 @@ export function useCorruptionRuntime(active: boolean): void {
       const s = useSettingsStore.getState();
       // Legacy negation: corruptionWallpaperCycle/corruptionThemeCycle are
       // stored inverted — a stored 0 means the cycle is enabled.
-      const allowed = gateOverrides(overrides, {
+      const gated = gateOverrides(overrides, {
         fullPerm: s.corruptionFullPerm === 1,
         themeCycle: s.corruptionThemeCycle === 0,
       });
+      // Only keys the settings schema knows may be touched: an unknown key
+      // has no pre-session value to restore, so applying it would strand a
+      // pack-injected entry in config.json forever.
+      const state = s as unknown as Record<string, unknown>;
+      const allowed: Record<string, string | number> = {};
+      for (const [key, value] of Object.entries(gated)) {
+        if (key in state) allowed[key] = value;
+        else logger.warn(`[corruption] level ${level} config key "${key}" is not a known setting — ignored`);
+      }
       if (Object.keys(allowed).length > 0) {
         rememberBaseline(Object.keys(allowed));
         s.setRaw(allowed);

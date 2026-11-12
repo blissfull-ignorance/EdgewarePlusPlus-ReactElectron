@@ -20,11 +20,9 @@ function configFile(): string {
   return path.join(app.getPath("userData"), "data", "config.json");
 }
 
-function isBaseline(value: unknown): value is Record<string, string | number | boolean> {
-  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
-  return Object.values(value).every(
-    (v) => typeof v === "string" || typeof v === "number" || typeof v === "boolean"
-  );
+/** The file only ever holds JSON round-trips of settings values. */
+function isBaseline(value: unknown): value is Record<string, unknown> {
+  return !!value && typeof value === "object" && !Array.isArray(value);
 }
 
 /** Record the pre-session values a running session can restore. */
@@ -41,7 +39,7 @@ export function persistSessionBaseline(value: unknown): boolean {
   }
 }
 
-export function readSessionBaseline(): Record<string, string | number | boolean> | null {
+export function readSessionBaseline(): Record<string, unknown> | null {
   try {
     const parsed = JSON.parse(fs.readFileSync(baselineFile(), "utf-8")) as unknown;
     return isBaseline(parsed) ? parsed : null;

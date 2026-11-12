@@ -201,3 +201,81 @@ test.describe("Pack config overrides survive a quit without Stop", () => {
     }
   });
 });
+
+test.describe("Pack config cannot inject or strand unknown values", () => {
+  test("unknown config keys are never applied; array values revert after a hard exit", async () => {
+    ensureElectronBuild();
+    const state = createTempState({ kind: "media" });
+    writeFileSync(
+      path.join(state.seedPath, "corruption.json"),
+      JSON.stringify({
+        moods: { "1": { add: [], remove: [] } },
+        wallpapers: {},
+        config: { "1": { delay: 2500, zzUnknownKey: 7, packFolders: "evil" } },
+      })
+    );
+    seedConfig(state, {
+      packPath: state.seedPath,
+      popupRenderMode: "electron",
+      popupMod: 0,
+      vidMod: 0,
+      audioMod: 0,
+      promptMod: 0,
+      webMod: 0,
+      capPopChance: 0,
+      subliminalsChance: 0,
+      mitosisMode: 0,
+      showLoadingFlair: 0,
+      corruptionMode: 1,
+      corruptionFullPerm: 1,
+      corruptionTrigger: "Script",
+      delay: 60000,
+      packFolders: [],
+    });
+    const env = { EDGWARE_STUB_BROWSER: "1", EDGWARE_PANIC_SKIP_WALLPAPER: "1" };
+    const readConfig = () =>
+      JSON.parse(readFileSync(path.join(state.dir, "data", "config.json"), "utf-8")) as Record<
+        string,
+        unknown
+      >;
+    const storeValue = (app: RunningApp, key: string) =>
+      app.window.evaluate(
+        (k) =>
+          (
+            window as unknown as { __settingsStore: { getState: () => Record<string, unknown> } }
+          ).__settingsStore.getState()[k],
+        key
+      );
+
+    let app = await launchApp(state, env);
+    try {
+      await app.window.locator("[data-testid='start-stop-button']").click();
+      await expect(app.window.locator("[data-testid='start-stop-button']")).toHaveText("Stop");
+      await app.window.evaluate(() =>
+        (window as unknown as { api: { scripting: { advanceLevel: () => Promise<number> } } })
+          .api.scripting.advanceLevel()
+      );
+      await expect.poll(() => storeValue(app, "delay"), { timeout: 30_000 }).toBe(2500);
+      // A key outside the settings schema is never applied at all.
+      expect(await storeValue(app, "zzUnknownKey")).toBeUndefined();
+      expect(readConfig().zzUnknownKey).toBeUndefined();
+      // Non-primitive values are session-scoped too: the hard-exit baseline
+      // must carry them. Wait for the autosave to put the mutation on disk.
+      await expect
+        .poll(() => readConfig().packFolders, { timeout: 15_000 })
+        .toBe("evil");
+
+      // Quit WITHOUT Stop: startup revert restores the array value as well.
+      await quitApp(app);
+      app = await launchApp(state, env);
+      await expect
+        .poll(() => readConfig().delay, { timeout: 15_000 })
+        .toBe(60000);
+      expect(readConfig().packFolders).toEqual([]);
+      expect(await storeValue(app, "packFolders")).toEqual([]);
+    } finally {
+      await quitApp(app);
+      cleanupTempState(state);
+    }
+  });
+});
