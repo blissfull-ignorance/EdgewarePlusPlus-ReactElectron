@@ -8,7 +8,7 @@
  * always be reopened for editing; hand-written scripts stay editable on the
  * code tab.
  */
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Badge,
   Button,
@@ -40,6 +40,21 @@ interface RawMood {
   mood: string;
   [key: string]: unknown;
 }
+
+/**
+ * Unsaved work in progress, keyed by pack. Creator Tools unmount when the
+ * user visits another main tab or switches packs; the draft lets a dirty
+ * design survive that round trip instead of silently reverting to disk.
+ */
+interface DesignerDraft {
+  design: DesignerScript;
+  code: string;
+  designDirty: boolean;
+  codeDirty: boolean;
+}
+const drafts = new Map<string, DesignerDraft>();
+
+
 
 function parseIndexMoods(index: Record<string, unknown> | null): RawMood[] {
   const moods = index?.moods;
@@ -392,6 +407,10 @@ export function DesignerSection({ packRevision = 0 }: { packRevision?: number })
   const [designDirty, setDesignDirty] = useState(false);
   const [codeDirty, setCodeDirty] = useState(false);
   const [scriptTooLarge, setScriptTooLarge] = useState(false);
+  // The pack whose design/code the current state describes; draft writes
+  // before the first load (or mid pack-switch) would corrupt another pack's
+  // draft, so they are skipped until a load completes for this pack.
+  const loadedForRef = useRef<string | null>(null);
 
   /** Refresh the pack's file/mood inventory without touching the design. */
   const reloadPackData = useCallback(async () => {
@@ -412,11 +431,21 @@ export function DesignerSection({ packRevision = 0 }: { packRevision?: number })
     if (script) {
       setHasExistingScript(script.exists);
       setScriptTooLarge(script.tooLarge === true);
+      const draft = drafts.get(packPath);
+      if (draft && (draft.designDirty || draft.codeDirty)) {
+        setDesign(draft.design);
+        setCode(draft.code);
+        setDesignDirty(draft.designDirty);
+        setCodeDirty(draft.codeDirty);
+        loadedForRef.current = packPath;
+        return;
+      }
       const designed = parseDesignerScript(script.content);
       setDesign(designed ?? emptyDesign());
       setCode(script.content);
       setDesignDirty(false);
       setCodeDirty(false);
+      loadedForRef.current = packPath;
     }
   }, [packPath, reloadPackData]);
 
@@ -431,6 +460,15 @@ export function DesignerSection({ packRevision = 0 }: { packRevision?: number })
     // renames and removals propagated by the tagging view are picked up.
     void (designDirty || codeDirty ? reloadPackData() : reload()).catch(() => undefined);
   }, [packRevision, reloadPackData, reload, designDirty, codeDirty]);
+
+  useEffect(() => {
+    if (!packPath || loadedForRef.current !== packPath) return;
+    if (designDirty || codeDirty) {
+      drafts.set(packPath, { design, code, designDirty, codeDirty });
+    } else {
+      drafts.delete(packPath);
+    }
+  }, [packPath, design, code, designDirty, codeDirty]);
 
   const images = useMemo(() => filesOf(gallery, "image"), [gallery]);
   const videos = useMemo(() => filesOf(gallery, "video"), [gallery]);
@@ -583,6 +621,11 @@ export function DesignerSection({ packRevision = 0 }: { packRevision?: number })
           >
             Save & test run
           </Button>
+          {designDirty || codeDirty ? (
+            <Text size="xs" c="yellow" data-testid="designer-unsaved">
+              Unsaved changes
+            </Text>
+          ) : null}
           {status === "saved" ? (
             <Text size="sm" c="teal" data-testid="designer-status">
               Saved script.lua + corruption.json.

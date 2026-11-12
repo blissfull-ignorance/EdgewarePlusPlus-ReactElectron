@@ -100,9 +100,15 @@ export function GalleryPanel() {
   }, [packPath, isRunning]);
 
   const sessionMoods = useCorruptionStore((s) => s.activeMoods);
+  // Moods are only ever active while a session runs. When stopped, the
+  // reactive (empty) set is the truth; merging the snapshot there would
+  // race the async setActiveMoods([]) flush to the main process.
   const active = useMemo(
-    () => new Set([...data.activeMoods, ...sessionMoods]),
-    [data.activeMoods, sessionMoods]
+    () =>
+      isRunning
+        ? new Set([...data.activeMoods, ...sessionMoods])
+        : new Set(sessionMoods),
+    [data.activeMoods, sessionMoods, isRunning]
   );
 
   const favouriteKeys = useMemo(() => new Set(data.favourites), [data.favourites]);

@@ -3,6 +3,7 @@ import { cleanup, screen, waitFor } from "@testing-library/react";
 import { renderWithMantine } from "./setup";
 import { GalleryPanel } from "../../src/features/gallery/GalleryPanel";
 import { useSettingsStore } from "../../src/stores/settingsStore";
+import { useAppStore } from "../../src/stores/appStore";
 
 const api = () =>
   (window as unknown as { api: { pack: { listGallery: ReturnType<typeof vi.fn> } } }).api.pack;
@@ -22,7 +23,11 @@ const result = {
 beforeEach(() => {
   api().listGallery.mockReset().mockResolvedValue(result);
   useSettingsStore.setState({ packPath: "/packs/demo" });
+  // Snapshot mood badges only count while a session runs.
+  useAppStore.setState({ isRunning: true });
 });
+
+afterEach(() => useAppStore.setState({ isRunning: false }));
 
 afterEach(cleanup);
 
