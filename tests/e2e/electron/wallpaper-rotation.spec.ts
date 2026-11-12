@@ -7,6 +7,7 @@ import {
   ensureElectronBuild,
   launchApp,
   quitApp,
+  clickStart,
   seedConfig,
 } from "./launch";
 
@@ -77,7 +78,7 @@ test.describe("wallpaper rotation (rotateWallpaper + wallpaperDat + timer/varian
     });
 
     await running.window.locator("[data-testid='pack-info']").waitFor({ timeout: 30000 });
-    await running.window.locator("[data-testid='start-stop-button']").click();
+    await clickStart(running.window);
 
     // Rotation must reach the OS apply step. The apply itself is gated by
     // macOS Automation permission (osascript -1743 when denied) and may take

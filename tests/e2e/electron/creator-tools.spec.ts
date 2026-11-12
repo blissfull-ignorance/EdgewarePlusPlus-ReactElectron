@@ -83,6 +83,7 @@ test.describe("Creator Tools authoring flow", () => {
       packPath: packDir,
       popupRenderMode: "electron",
       popupMod: 0,
+      vidMod: 0,
       showLoadingFlair: 0,
       corruptionMode: 0,
       corruptionTrigger: "Script",

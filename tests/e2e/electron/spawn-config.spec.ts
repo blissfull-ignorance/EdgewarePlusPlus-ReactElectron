@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { mkdirSync, writeFileSync } from "node:fs";
+import { writeFileSync } from "node:fs";
 import path from "node:path";
 import {
   cleanupTempState,
@@ -12,8 +12,6 @@ import {
   type TempState,
 } from "./launch";
 
-const REPO_ROOT = path.join(__dirname, "..", "..", "..");
-const IMG_DIR = path.join(REPO_ROOT, "tests", "e2e", "fixtures", "Real Test Pack", "img");
 
 let state: TempState | null = null;
 let running: RunningApp | null = null;

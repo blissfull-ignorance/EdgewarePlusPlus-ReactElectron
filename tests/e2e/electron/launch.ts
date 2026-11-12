@@ -236,3 +236,18 @@ export async function listPacksViaBridge(window: Page): Promise<PackListing[] | 
     return (await api.system.listPacks()) as PackListing[] | null;
   });
 }
+
+/**
+ * Click Start and accept the spawn-warning modal when the seeded settings
+ * would keep popups from appearing. Tests whose subject is not the popup
+ * frequency use this instead of a bare button click.
+ */
+export async function clickStart(window: import("@playwright/test").Page): Promise<void> {
+  await window.locator("[data-testid='start-stop-button']").click();
+  const proceed = window.locator("[data-testid='spawn-warning-start']");
+  const shown = await proceed
+    .waitFor({ state: "visible", timeout: 1500 })
+    .then(() => true)
+    .catch(() => false);
+  if (shown) await proceed.click();
+}
