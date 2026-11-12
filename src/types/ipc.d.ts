@@ -169,7 +169,7 @@ export interface ElectronAPI {
     /** Tear down the Lua session: pending timers, callbacks and audio chains stop */
     stop: () => Promise<boolean>;
     /** Creator tools: the pack's script.lua content (starter text if absent) */
-    readScript: (packPath: string) => Promise<{ content: string; exists: boolean } | null>;
+    readScript: (packPath: string) => Promise<{ content: string; exists: boolean; tooLarge?: boolean } | null>;
     /** Creator tools: save the pack's script.lua */
     writeScript: (packPath: string, content: string) => Promise<boolean>;
     /** Creator tools: save script.lua and (unless null) corruption.json as one design */

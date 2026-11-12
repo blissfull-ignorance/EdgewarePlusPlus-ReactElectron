@@ -290,7 +290,7 @@ function registerHandlers(): void {
    */
   ipcMain.handle(
     "scripting:readScript",
-    async (_event, packPath: unknown): Promise<{ content: string; exists: boolean } | null> => {
+    async (_event, packPath: unknown): Promise<{ content: string; exists: boolean; tooLarge?: boolean } | null> => {
       if (typeof packPath !== "string" || !packPath) return null;
       const dir = path.resolve(packPath.replace(/^~/, process.env.HOME ?? packPath));
       const file = path.join(dir, "script.lua");
@@ -301,7 +301,7 @@ function registerHandlers(): void {
         const content = fs.readFileSync(file, "utf-8");
         if (content.length > 200_000) {
           logger.warn("[Scripting] Pack script too large to edit in-app");
-          return null;
+          return { content: "", exists: true, tooLarge: true };
         }
         return { content, exists: true };
       } catch (err) {
@@ -364,7 +364,7 @@ function registerHandlers(): void {
       if (!fs.existsSync(dir)) return false;
       const file = path.join(dir, "script.lua");
       try {
-        fs.writeFileSync(file, content, "utf-8");
+        writeAtomic(file, content);
         logger.info(`[Scripting] Pack script saved (${content.length} chars)`);
         return true;
       } catch (err) {

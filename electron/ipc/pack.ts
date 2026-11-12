@@ -360,6 +360,13 @@ function favouriteKey(entry: GalleryEntry): string {
   return `${dir}${entry.file}`;
 }
 
+/** Write JSON via temp file + rename so a crash never leaves a half-written file. */
+function writePackJson(file: string, value: unknown): void {
+  const tmp = `${file}.${process.pid}.tmp`;
+  fs.writeFileSync(tmp, JSON.stringify(value, null, 2), "utf-8");
+  fs.renameSync(tmp, file);
+}
+
 /** A directory is browsable as a pack only if it ships pack manifests. */
 function looksLikePack(dir: string): boolean {
   return (
@@ -869,7 +876,7 @@ function registerHandlers(): void {
   };
 
   const writeIndex = (dir: string, index: RawIndexLike): void => {
-    fs.writeFileSync(path.join(dir, "index.json"), JSON.stringify(index, null, 2), "utf-8");
+    writePackJson(path.join(dir, "index.json"), index);
   };
 
   ipcMain.handle(
@@ -924,11 +931,7 @@ function registerHandlers(): void {
     const corruption = readJson<Record<string, unknown>>(corruptionPath);
     if (corruption) {
       try {
-        fs.writeFileSync(
-          corruptionPath,
-          JSON.stringify(renameMoodInCorruption(corruption, from, to), null, 2),
-          "utf-8"
-        );
+        writePackJson(corruptionPath, renameMoodInCorruption(corruption, from, to));
       } catch (err) {
         logger.error("[Pack] Failed to propagate mood change to corruption.json:", err);
       }
@@ -939,11 +942,10 @@ function registerHandlers(): void {
         const lua = fs.readFileSync(scriptPath, "utf-8");
         const design = parseDesignerScript(lua);
         if (design) {
-          fs.writeFileSync(
-            scriptPath,
-            replaceDesignInScript(lua, renameMoodInDesign(design, from, to)),
-            "utf-8"
-          );
+          const next = replaceDesignInScript(lua, renameMoodInDesign(design, from, to));
+          const tmp = `${scriptPath}.${process.pid}.tmp`;
+          fs.writeFileSync(tmp, next, "utf-8");
+          fs.renameSync(tmp, scriptPath);
         }
       } catch (err) {
         logger.error("[Pack] Failed to propagate mood change to script.lua:", err);
@@ -957,6 +959,9 @@ function registerHandlers(): void {
       const ctx = editableIndex(packPath);
       if (!ctx || typeof from !== "string" || typeof to !== "string" || !to.trim()) return null;
       const next = renameMood(ctx.index, from, to);
+      // A colliding or blank target returns the index unchanged; propagating
+      // such a no-op would rewire the design to a mood the index never got.
+      if (next === ctx.index) return next;
       try {
         writeIndex(ctx.dir, next);
       } catch (err) {
@@ -974,6 +979,7 @@ function registerHandlers(): void {
       const ctx = editableIndex(packPath);
       if (!ctx || typeof name !== "string" || !name) return null;
       const next = removeMood(ctx.index, name);
+      if (JSON.stringify(next) === JSON.stringify(ctx.index)) return next;
       try {
         writeIndex(ctx.dir, next);
       } catch (err) {

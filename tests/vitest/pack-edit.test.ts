@@ -80,6 +80,9 @@ describe("packEdit", () => {
   });
 
   it("rename is a no-op for blank, identical or colliding names", () => {
+    const b = base();
+    // The IPC layer relies on reference identity to skip propagation.
+    expect(renameMood(b, "vanilla", "goon")).toBe(b);
     expect(listMoodNames(renameMood(base(), "vanilla", "  "))).toEqual(["vanilla", "goon"]);
     expect(listMoodNames(renameMood(base(), "vanilla", "vanilla"))).toEqual(["vanilla", "goon"]);
     expect(listMoodNames(renameMood(base(), "vanilla", "goon"))).toEqual(["vanilla", "goon"]);

@@ -390,6 +390,8 @@ export function DesignerSection({ packRevision = 0 }: { packRevision?: number })
   // True once the visual design diverged from the script on disk; only then
   // does switching to the code tab regenerate the source from the design.
   const [designDirty, setDesignDirty] = useState(false);
+  const [codeDirty, setCodeDirty] = useState(false);
+  const [scriptTooLarge, setScriptTooLarge] = useState(false);
 
   /** Refresh the pack's file/mood inventory without touching the design. */
   const reloadPackData = useCallback(async () => {
@@ -409,10 +411,12 @@ export function DesignerSection({ packRevision = 0 }: { packRevision?: number })
     const script = await window.api?.scripting.readScript(packPath);
     if (script) {
       setHasExistingScript(script.exists);
+      setScriptTooLarge(script.tooLarge === true);
       const designed = parseDesignerScript(script.content);
       setDesign(designed ?? emptyDesign());
       setCode(script.content);
       setDesignDirty(false);
+      setCodeDirty(false);
     }
   }, [packPath, reloadPackData]);
 
@@ -425,8 +429,8 @@ export function DesignerSection({ packRevision = 0 }: { packRevision?: number })
     // With unsaved visual edits the design stays as authored (stale mood
     // references surface as warnings); otherwise re-read the disk so
     // renames and removals propagated by the tagging view are picked up.
-    void (designDirty ? reloadPackData() : reload()).catch(() => undefined);
-  }, [packRevision, reloadPackData, reload, designDirty]);
+    void (designDirty || codeDirty ? reloadPackData() : reload()).catch(() => undefined);
+  }, [packRevision, reloadPackData, reload, designDirty, codeDirty]);
 
   const images = useMemo(() => filesOf(gallery, "image"), [gallery]);
   const videos = useMemo(() => filesOf(gallery, "video"), [gallery]);
@@ -514,6 +518,7 @@ export function DesignerSection({ packRevision = 0 }: { packRevision?: number })
         setCode(lua);
         setDesign(effective);
         setDesignDirty(false);
+        setCodeDirty(false);
         if (andRun) void window.api?.scripting.runLua("script.lua").catch(() => undefined);
         void reload().catch(() => undefined);
       })
@@ -566,13 +571,14 @@ export function DesignerSection({ packRevision = 0 }: { packRevision?: number })
           />
         </Group>
         <Group gap="sm">
-          <Button size="xs" onClick={() => save()} data-testid="designer-save">
+          <Button size="xs" onClick={() => save()} disabled={scriptTooLarge} data-testid="designer-save">
             Save design to pack
           </Button>
           <Button
             size="xs"
             variant="light"
             onClick={() => save(true)}
+            disabled={scriptTooLarge}
             data-testid="designer-test-run"
           >
             Save & test run
@@ -588,6 +594,13 @@ export function DesignerSection({ packRevision = 0 }: { packRevision?: number })
           ) : null}
         </Group>
       </Group>
+
+      {scriptTooLarge ? (
+        <Text size="sm" c="orange" data-testid="designer-toolarge-banner">
+          This pack's script.lua is larger than the 200 KB in-app editing limit;
+          saving is disabled so the file cannot be truncated.
+        </Text>
+      ) : null}
 
       {hasExistingScript && !designed ? (
         <Text size="sm" c="orange" data-testid="designer-handwritten-banner">
@@ -612,6 +625,7 @@ export function DesignerSection({ packRevision = 0 }: { packRevision?: number })
           value={code}
           onChange={(e) => {
             setCode(e.currentTarget.value);
+            setCodeDirty(true);
             setStatus("idle");
           }}
           spellCheck={false}
