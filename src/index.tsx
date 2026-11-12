@@ -76,7 +76,7 @@ if (typeof window !== "undefined" && !(window as unknown as Record<string, unkno
       runSelfTest: async () => ({ ok: false, error: 'no lua host in this mode' }),
       stop: async () => true,
       advanceLevel: async () => 1,
-      backupAndWriteScript: async () => null,
+      convertScript: async () => null,
       readScript: async () => null,
       writeScript: async () => false,
       writePackDesign: async () => false,

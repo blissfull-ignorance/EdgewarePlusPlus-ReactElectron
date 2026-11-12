@@ -173,7 +173,9 @@ export interface ElectronAPI {
     /** Advance the corruption level by one (same path as Lua corrupt()). */
     advanceLevel: () => Promise<number>;
     /** Archive script.lua as script.lua.bak* and install the designed one. */
-    backupAndWriteScript: (packPath: string, newLua: string) => Promise<string | null>;
+    convertScript: (
+      packPath: string
+    ) => Promise<{ backupName: string; notes: string[]; levelCount: number } | null>;
     /** Creator tools: the pack's script.lua content (starter text if absent) */
     readScript: (packPath: string) => Promise<{ content: string; exists: boolean; tooLarge?: boolean } | null>;
     /** Creator tools: save the pack's script.lua */

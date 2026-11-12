@@ -405,3 +405,80 @@ test("importing a hand-written script archives it and installs a designed one", 
     cleanupTempState(state);
   }
 });
+
+test("converting a hand-written script yields editable levels and an honest report", async () => {
+  const state: TempState = createTempState();
+  const dir = path.join(state.packsDir, "CT-Convert");
+  mkdirSync(path.join(dir, "img"), { recursive: true });
+  mkdirSync(path.join(dir, "aud"), { recursive: true });
+  writeFileSync(path.join(dir, "img", "one.png"), "png");
+  writeFileSync(path.join(dir, "aud", "a.mp3"), "mp3");
+  writeFileSync(
+    path.join(dir, "info.json"),
+    JSON.stringify({ name: "CT-Convert", id: "ctconvert", creator: "e2e", version: "1", description: "x" })
+  );
+  writeFileSync(
+    path.join(dir, "index.json"),
+    JSON.stringify({ default: {}, moods: [{ mood: "cool", media: { images: ["one.png"] } }] })
+  );
+  writeFileSync(
+    path.join(dir, "corruption.json"),
+    JSON.stringify({ moods: { "1": { add: ["cool"], remove: [] } }, config: {} })
+  );
+  const handwritten = [
+    'require("edgeware_v0")',
+    "function intro()",
+    '  image("one.png")',
+    "  corrupt()",
+    '  audio("a.mp3", outro)',
+    "end",
+    "function outro()",
+    '  notification("done")',
+    "  multiple_popups(90, 2)",
+    "end",
+    "intro()",
+    "",
+  ].join("\n");
+  writeFileSync(path.join(dir, "script.lua"), handwritten);
+  seedConfig(state, {
+    packPath: dir,
+    popupRenderMode: "electron",
+    popupMod: 0,
+    showLoadingFlair: 0,
+    corruptionMode: 0,
+    corruptionTrigger: "Script",
+    delay: 60000,
+  });
+  const running = await launchApp(state, {
+    EDGWARE_STUB_BROWSER: "1",
+    EDGWARE_PANIC_SKIP_WALLPAPER: "1",
+  });
+  try {
+    await openDesigner(running.window);
+    await running.window.locator("[data-testid='designer-import-script']").click();
+    await expect(running.window.locator("[data-testid='designer-imported-note']")).toContainText(
+      "script.lua.bak"
+    );
+    // The report names what could not be represented.
+    await expect(running.window.locator("[data-testid='designer-convert-report']")).toContainText(
+      "multiple_popups() call(s) dropped"
+    );
+    // Original archived verbatim; the live script is designer-owned.
+    expect(readFileSync(path.join(dir, "script.lua.bak"), "utf-8")).toBe(handwritten);
+    expect(readFileSync(path.join(dir, "script.lua"), "utf-8")).toContain("EDGWARE-DESIGNER");
+    // The corruption tables survive the conversion (mood add kept).
+    const tables = JSON.parse(readFileSync(path.join(dir, "corruption.json"), "utf-8"));
+    expect(tables.moods["1"].add).toEqual(["cool"]);
+    // The converted level is editable: all three actions show on the card.
+    await expect(running.window.locator("[data-testid='designer-level-0']")).toBeVisible();
+    for (const i of [0, 1, 2]) {
+      await expect(running.window.locator(`[data-testid='designer-action-0-${i}']`)).toBeVisible();
+    }
+    await expect(running.window.getByRole("textbox", { name: "Action 1 file" })).toHaveValue("one.png");
+    await expect(running.window.getByRole("textbox", { name: "Action 2 file" })).toHaveValue("a.mp3");
+    await expect(running.window.getByRole("textbox", { name: "Action 3 text" })).toHaveValue("done");
+  } finally {
+    await quitApp(running);
+    cleanupTempState(state);
+  }
+});

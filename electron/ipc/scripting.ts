@@ -3,6 +3,11 @@ import fs from "node:fs";
 import path from "node:path";
 import { initLuaVM, getLuaVM, LuaExecResult, EdgewareHost } from "../scripting/fengariAdapter";
 import { resolveScriptPath } from "../scripting/scriptPath";
+import {
+  designFromScript,
+  generateCorruptionJson,
+  generateLua,
+} from "../../src/features/creator/designerModel";
 import { injectLevel, mirroredLevel } from "./corruption";
 import { app } from "electron";
 import { logger } from "../utils/logger";
@@ -303,27 +308,48 @@ function registerHandlers(): void {
    * in-app designer can edit it. Paths stay inside the pack directory.
    */
   /**
-   * Creator tools: archive a hand-written script.lua (as script.lua.bak,
-   * then .bak-2 … .bak-9, then a timestamped name) and replace it with the
-   * given designed script, so the pack becomes editable in the designer
-   * without losing the original.
+   * Creator tools: turn the pack's hand-written script.lua into a designed
+   * script. The original is archived (script.lua.bak, then .bak-2 … .bak-9,
+   * then a timestamped name), its literal popup actions and the corruption
+   * tables are converted into a design, and the generated script plus its
+   * corruption.json replace the hand-written pair. Unrepresentable control
+   * flow is reported, never guessed.
    */
   ipcMain.handle(
-    "scripting:backupAndWriteScript",
-    async (_event, packPath: unknown, newLua: unknown): Promise<string | null> => {
-      if (
-        typeof packPath !== "string" ||
-        !packPath ||
-        typeof newLua !== "string" ||
-        newLua.length > 200_000
-      ) {
-        return null;
-      }
+    "scripting:convertScript",
+    async (
+      _event,
+      packPath: unknown
+    ): Promise<{ backupName: string; notes: string[]; levelCount: number } | null> => {
+      if (typeof packPath !== "string" || !packPath) return null;
       const dir = path.resolve(packPath.replace(/^~/, process.env.HOME ?? packPath));
       if (!looksLikePack(dir)) return null;
       const script = path.join(dir, "script.lua");
-      let backupName = "";
+      const corruptionFile = path.join(dir, "corruption.json");
       try {
+        let lua = "";
+        if (fs.existsSync(script)) {
+          lua = fs.readFileSync(script, "utf-8");
+          if (lua.length > 200_000) {
+            logger.warn("[Scripting] Pack script too large to convert in-app");
+            return null;
+          }
+        }
+        let corruption: unknown = {};
+        if (fs.existsSync(corruptionFile)) {
+          try {
+            corruption = JSON.parse(fs.readFileSync(corruptionFile, "utf-8"));
+          } catch {
+            // A malformed hand-authored table file is preserved, not reshaped.
+            logger.warn("[Scripting] Pack corruption.json is malformed; refusing to convert");
+            return null;
+          }
+          if (!corruption || typeof corruption !== "object" || Array.isArray(corruption)) {
+            return null;
+          }
+        }
+        const { design, notes } = designFromScript(lua, corruption);
+        let backupName = "";
         if (fs.existsSync(script)) {
           const candidates = [
             "script.lua.bak",
@@ -335,11 +361,14 @@ function registerHandlers(): void {
           fs.copyFileSync(script, path.join(dir, target));
           backupName = target;
         }
-        writeAtomic(script, newLua);
-        logger.info(`[Scripting] Hand-written script archived (${backupName || "none"}) and designed script installed`);
-        return backupName;
+        writeAtomic(script, generateLua(design));
+        writeAtomic(corruptionFile, generateCorruptionJson(design));
+        logger.info(
+          `[Scripting] Hand-written script converted to design (${design.levels.length} level(s), backup ${backupName || "none"})`
+        );
+        return { backupName, notes, levelCount: design.levels.length };
       } catch (err) {
-        logger.error("[Scripting] Failed to archive and replace pack script:", err);
+        logger.error("[Scripting] Failed to convert pack script:", err);
         return null;
       }
     }

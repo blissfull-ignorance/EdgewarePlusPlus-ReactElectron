@@ -227,7 +227,13 @@ function LevelCard({
           size="xs"
           label="Wallpaper"
           w={200}
-          data={[{ value: "", label: "— none —" }, ...images.map((f) => ({ value: f, label: f }))]}
+          data={[
+            { value: "", label: "— none —" },
+            ...images.map((f) => ({ value: f, label: f })),
+            ...(level.wallpaper && !images.includes(level.wallpaper)
+              ? [{ value: level.wallpaper, label: `${level.wallpaper} (pack file)` }]
+              : []),
+          ]}
           value={level.wallpaper ?? ""}
           onChange={(v) => patch({ wallpaper: v ? v : null })}
           data-testid={`designer-wallpaper-${index}`}
@@ -285,7 +291,13 @@ function LevelCard({
               <Select
                 size="xs"
                 w={200}
-                data={action.kind === "image" ? images : action.kind === "video" ? videos : audios}
+                data={(() => {
+                  const list =
+                    action.kind === "image" ? images : action.kind === "video" ? videos : audios;
+                  // Converted scripts can name files the pack does not (yet)
+                  // have; keep the reference visible instead of blanking it.
+                  return action.file && !list.includes(action.file) ? [...list, action.file] : list;
+                })()}
                 value={action.file ?? null}
                 placeholder="random from pool"
                 clearable
@@ -408,6 +420,7 @@ export function DesignerSection({ packRevision = 0 }: { packRevision?: number })
   const [codeDirty, setCodeDirty] = useState(false);
   const [scriptTooLarge, setScriptTooLarge] = useState(false);
   const [importedBackup, setImportedBackup] = useState<string | null>(null);
+  const [convertNotes, setConvertNotes] = useState<string[] | null>(null);
   // The pack whose design/code the current state describes; draft writes
   // before the first load (or mid pack-switch) would corrupt another pack's
   // draft, so they are skipped until a load completes for this pack.
@@ -650,7 +663,8 @@ export function DesignerSection({ packRevision = 0 }: { packRevision?: number })
         <Group gap="sm" wrap="wrap" data-testid="designer-handwritten-banner">
           <Text size="sm" c="orange">
             This pack ships a hand-written script. Keep editing it on the code
-            tab, or archive it and start a designed script.
+            tab, or convert it into a designed script: the original is
+            archived and its popup actions become editable levels.
           </Text>
           <Button
             size="xs"
@@ -660,13 +674,14 @@ export function DesignerSection({ packRevision = 0 }: { packRevision?: number })
             onClick={() => {
               if (!packPath) return;
               void window.api?.scripting
-                .backupAndWriteScript(packPath, generateLua(emptyDesign()))
-                .then((backup) => {
-                  if (backup === null) {
+                .convertScript(packPath)
+                .then((result) => {
+                  if (result === null) {
                     setStatus("failed");
                     return;
                   }
-                  setImportedBackup(backup);
+                  setImportedBackup(result.backupName || null);
+                  setConvertNotes(result.notes);
                   setStatus("saved");
                   void reload().catch(() => undefined);
                 })
@@ -674,16 +689,29 @@ export function DesignerSection({ packRevision = 0 }: { packRevision?: number })
             }}
             data-testid="designer-import-script"
           >
-            Back up and start designed script
+            Convert to designed script
           </Button>
         </Group>
       ) : null}
 
       {importedBackup ? (
         <Text size="xs" c="teal" data-testid="designer-imported-note">
-          Original script archived as {importedBackup}. Design your sequence
-          below and save it to the pack.
+          Original script archived as {importedBackup}. Review the conversion
+          report, then edit the levels and save them to the pack.
         </Text>
+      ) : null}
+
+      {convertNotes ? (
+        <Stack gap={2} data-testid="designer-convert-report">
+          <Text size="xs" fw={600}>
+            Conversion report
+          </Text>
+          {convertNotes.map((note) => (
+            <Text key={note} size="xs" c="dimmed">
+              {"\u2022"} {note}
+            </Text>
+          ))}
+        </Stack>
       ) : null}
 
       {sourceMode === "visual" && warnings.length > 0 ? (

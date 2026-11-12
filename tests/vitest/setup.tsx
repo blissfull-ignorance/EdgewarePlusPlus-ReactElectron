@@ -138,7 +138,7 @@ if (typeof window !== "undefined") {
       runSelfTest: vi.fn().mockResolvedValue({ ok: false }),
       stop: vi.fn().mockResolvedValue(true),
       advanceLevel: vi.fn().mockResolvedValue(1),
-      backupAndWriteScript: vi.fn().mockResolvedValue(null),
+      convertScript: vi.fn().mockResolvedValue(null),
       readScript: vi.fn().mockResolvedValue(null),
       writeScript: vi.fn().mockResolvedValue(false),
       writePackDesign: vi.fn().mockResolvedValue(false),

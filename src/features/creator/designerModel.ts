@@ -41,6 +41,11 @@ export interface DesignerAction {
 export interface DesignerLevel {
   addMoods: string[];
   removeMoods: string[];
+  /**
+   * Wallpaper file, pack-root-relative. A bare name lives in img/ (the
+   * designer picker's world); a value containing "/" points elsewhere in the
+   * pack (legacy packs keep wallpapers at the pack root).
+   */
   wallpaper: string | null;
   actions: DesignerAction[];
   advance: DesignerAdvance;
@@ -184,9 +189,11 @@ export function generateCorruptionJson(design: DesignerScript): string {
       add: level.addMoods,
       remove: level.removeMoods,
     };
-    // The runtime resolves the level wallpaper relative to the pack root,
-    // so the bare img/ filename is stored with its directory.
-    if (level.wallpaper) entry.wallpaper = `img/${level.wallpaper}`;
+    // Wallpapers are stored pack-root-relative: a bare name lives in img/
+    // (the designer picker's world), a path with a directory points elsewhere
+    // in the pack (legacy packs keep wallpapers at the pack root).
+    if (level.wallpaper)
+      entry.wallpaper = level.wallpaper.includes("/") ? level.wallpaper : `img/${level.wallpaper}`;
     moods[String(i + 1)] = entry;
     const config = level.config ?? {};
     if (config.popupMod !== undefined || config.delay !== undefined) {
@@ -341,4 +348,483 @@ function sanitizeDesign(design: DesignerScript): DesignerScript {
       };
     }),
   };
+}
+
+/* ------------------------------------------------------------------ */
+/*  Hand-written script conversion                                     */
+/* ------------------------------------------------------------------ */
+
+/** Outcome of converting a hand-written pack script into a design. */
+export interface ConversionResult {
+  design: DesignerScript;
+  /** What was preserved, flattened or dropped — shown to the user. */
+  notes: string[];
+}
+
+const API_CALL_NAMES = [
+  "image",
+  "video",
+  "audio",
+  "notification",
+  "prompt",
+  "subliminal",
+  "web",
+  "close_popups",
+  "set_popup_close_text",
+] as const;
+
+const API_KIND_BY_NAME: Record<string, DesignerActionKind> = {
+  image: "image",
+  video: "video",
+  audio: "audio",
+  notification: "notification",
+  prompt: "prompt",
+  subliminal: "subliminal",
+  web: "web",
+  close_popups: "close_popups",
+  set_popup_close_text: "set_close_text",
+};
+
+/** Blank Lua comments while preserving line structure and string literals. */
+function blankComments(lua: string): string {
+  const out: string[] = [];
+  let i = 0;
+  const n = lua.length;
+  while (i < n) {
+    const ch = lua[i];
+    if (ch === '"' || ch === "'") {
+      const quote = ch;
+      out.push(ch);
+      i++;
+      while (i < n) {
+        if (lua[i] === "\\" && i + 1 < n) {
+          out.push(lua[i], lua[i + 1]);
+          i += 2;
+          continue;
+        }
+        out.push(lua[i]);
+        i++;
+        if (lua[i - 1] === quote) break;
+      }
+      continue;
+    }
+    if (ch === "-" && lua[i + 1] === "-") {
+      if (lua.startsWith("--[[", i)) {
+        const end = lua.indexOf("]]", i + 4);
+        const stop = end === -1 ? n : end + 2;
+        for (const c of lua.slice(i, stop)) out.push(c === "\n" ? "\n" : " ");
+        i = stop;
+        continue;
+      }
+      while (i < n && lua[i] !== "\n") {
+        out.push(" ");
+        i++;
+      }
+      continue;
+    }
+    out.push(ch);
+    i++;
+  }
+  return out.join("");
+}
+
+/** Read a Lua string literal starting at the quote; returns value and end. */
+function readLuaString(src: string, start: number): { value: string; end: number } | null {
+  const quote = src[start];
+  if (quote !== '"' && quote !== "'") return null;
+  let value = "";
+  let i = start + 1;
+  while (i < src.length) {
+    const ch = src[i];
+    if (ch === "\\" && i + 1 < src.length) {
+      const esc = src[i + 1];
+      value += esc === "n" ? "\n" : esc === "t" ? "\t" : esc;
+      i += 2;
+      continue;
+    }
+    if (ch === quote) return { value, end: i + 1 };
+    value += ch;
+    i++;
+  }
+  return null;
+}
+
+/**
+ * Scan a balanced call starting at the "(" index; returns the inner argument
+ * text and the index just past the closing ")".
+ */
+function scanCallArgs(code: string, openIdx: number): { args: string; end: number } | null {
+  let depth = 0;
+  let i = openIdx;
+  while (i < code.length) {
+    const ch = code[i];
+    if (ch === '"' || ch === "'") {
+      const str = readLuaString(code, i);
+      if (!str) return null;
+      i = str.end;
+      continue;
+    }
+    if (ch === "(") depth++;
+    else if (ch === ")") {
+      depth--;
+      if (depth === 0) return { args: code.slice(openIdx + 1, i), end: i + 1 };
+    }
+    i++;
+  }
+  return null;
+}
+
+/** Split an argument list at top-level commas (strings/parens/braces aware). */
+function splitArgs(args: string): string[] {
+  const parts: string[] = [];
+  let depth = 0;
+  let cur = "";
+  let i = 0;
+  while (i < args.length) {
+    const ch = args[i];
+    if (ch === '"' || ch === "'") {
+      const str = readLuaString(args, i);
+      if (str) {
+        cur += args.slice(i, str.end);
+        i = str.end;
+        continue;
+      }
+    }
+    if (ch === "(" || ch === "{") depth++;
+    if (ch === ")" || ch === "}") depth--;
+    if (ch === "," && depth === 0) {
+      parts.push(cur);
+      cur = "";
+      i++;
+      continue;
+    }
+    cur += ch;
+    i++;
+  }
+  parts.push(cur);
+  return parts;
+}
+
+/** First string literal inside a text, or null. */
+function firstLiteral(src: string): string | null {
+  for (let i = 0; i < src.length; i++) {
+    if (src[i] === '"' || src[i] === "'") {
+      const str = readLuaString(src, i);
+      if (str) return str.value;
+    }
+  }
+  return null;
+}
+
+interface ScannedCall {
+  kind: DesignerActionKind;
+  /** Literal first argument (media file or text), if any. */
+  literal: string | null;
+  /** True when the call passes a second argument (callback/chaining). */
+  chained: boolean;
+  chance?: number;
+  /** Position in the comment-blanked source. */
+  pos: number;
+}
+
+/** Span of `function <name>(...) ... end`, or null when not defined. */
+function functionBodySpan(code: string, name: string): { start: number; end: number } | null {
+  const def = new RegExp(`\\bfunction\\s+${name}\\s*\\(`);
+  const m = def.exec(code);
+  if (!m) return null;
+  let depth = 0;
+  const re = /\bfunction\b|\bend\b/g;
+  re.lastIndex = m.index;
+  let match: RegExpExecArray | null;
+  while ((match = re.exec(code))) {
+    if (match[0] === "function") depth++;
+    else {
+      depth--;
+      if (depth === 0) return { start: m.index, end: match.index + match[0].length };
+    }
+  }
+  return null;
+}
+
+/**
+ * Convert a hand-written pack script plus its corruption.json tables into an
+ * editable design.
+ *
+ * Level structure (moods, config overrides, wallpapers) is taken from the
+ * tables — they are the runtime truth. Popup actions are recovered by a
+ * literal scan of the script: direct API calls and script-local helpers that
+ * wrap exactly one API call (e.g. `delayed_audio` → audio) are converted in
+ * textual order, split at each `corrupt()` occurrence. Control flow that the
+ * design model cannot express (loops, roll() with computed chances, bulk
+ * spawners, callback chains, API redefinitions) is reported, never guessed.
+ */
+export function designFromScript(lua: string, corruption: unknown): ConversionResult {
+  const notes: string[] = [];
+  const code = blankComments(lua);
+
+  /* ---- level skeleton from the corruption tables ---- */
+  const root = (corruption && typeof corruption === "object" ? corruption : {}) as Record<
+    string,
+    unknown
+  >;
+  const moodsRaw = (root.moods ?? {}) as Record<string, Record<string, unknown>>;
+  const configRaw = (root.config ?? {}) as Record<string, Record<string, unknown>>;
+  const wallpapersRaw = (root.wallpapers ?? {}) as Record<string, unknown>;
+  const tableLevels = new Set<number>();
+  for (const src of [moodsRaw, configRaw]) {
+    for (const key of Object.keys(src)) {
+      const lvl = parseInt(key, 10);
+      if (Number.isFinite(lvl) && lvl >= 1) tableLevels.add(lvl);
+    }
+  }
+  for (const key of Object.keys(wallpapersRaw)) {
+    const lvl = parseInt(key, 10);
+    if (Number.isFinite(lvl) && lvl >= 1) tableLevels.add(lvl);
+  }
+
+  /* ---- split the script at corrupt() occurrences ---- */
+  const corruptRe = /\bcorrupt\s*\(\s*\)/g;
+  const corruptAt: number[] = [];
+  let cm: RegExpExecArray | null;
+  while ((cm = corruptRe.exec(code))) corruptAt.push(cm.index);
+  const corruptCount = corruptAt.length;
+
+  const maxLevel = Math.max(corruptCount, ...[0, ...tableLevels]);
+  const levelCount =
+    corruptCount === 0 && tableLevels.size === 0 ? 1 : Math.min(maxLevel, MAX_DESIGN_LEVELS);
+  if (maxLevel > MAX_DESIGN_LEVELS) {
+    notes.push(`Design capped at ${MAX_DESIGN_LEVELS} levels (script implies ${maxLevel}).`);
+  }
+  if (corruptCount !== tableLevels.size && corruptCount > 0 && tableLevels.size > 0) {
+    notes.push(
+      `The script calls corrupt() ${corruptCount} time(s) but the pack tables define ${tableLevels.size} level(s); the design uses ${maxLevel}.`
+    );
+  }
+
+  /* ---- scan API calls (direct + single-API script-local helpers) ---- */
+  const definedFns = new Set<string>();
+  const fnRe = /\bfunction\s+([A-Za-z_]\w*)\s*\(/g;
+  let fm: RegExpExecArray | null;
+  while ((fm = fnRe.exec(code))) definedFns.add(fm[1]);
+
+  const redefined = new Set<string>();
+  for (const name of API_CALL_NAMES) {
+    if (new RegExp(`\\bfunction\\s+${name}\\s*\\(`).test(code)) redefined.add(name);
+  }
+
+  // Definitions of helpers and API wrappers are implementation, not usage:
+  // calls inside them must not be extracted as actions.
+  const definitionSpans: Array<{ start: number; end: number }> = [];
+  for (const name of [...redefined]) {
+    const span = functionBodySpan(code, name);
+    if (span) definitionSpans.push(span);
+  }
+
+  const helperApi = new Map<string, DesignerActionKind>();
+  const helperLiteral = new Map<string, string | null>();
+  for (const name of definedFns) {
+    if ((API_CALL_NAMES as readonly string[]).includes(name) || name === "corrupt") continue;
+    // A wrapper is called WITH arguments somewhere. Functions used only as
+    // callbacks or kicked off empty (voice_7(), binaural_audio) are chain
+    // links: their bodies are scanned as ordinary usage, in place.
+    const argCallSites = (code.match(new RegExp(`\\b${name}\\s*\\(\\s*[^)\\s]`, "g")) ?? []).length;
+    if (argCallSites < 2) continue;
+    const span = functionBodySpan(code, name);
+    const body = span ? code.slice(span.start, span.end) : "";
+    const inner = [...body.matchAll(new RegExp(`\\b(${API_CALL_NAMES.join("|")})\\s*\\(`, "g"))];
+    const kinds = new Set(inner.map((m) => API_KIND_BY_NAME[m[1]]));
+    if (kinds.size === 1 && span) {
+      helperApi.set(name, API_KIND_BY_NAME[inner[0][1]]);
+      helperLiteral.set(name, firstLiteral(body));
+      definitionSpans.push(span);
+    }
+  }
+  const insideDefinition = (pos: number): boolean =>
+    definitionSpans.some((d) => pos >= d.start && pos < d.end);
+
+  const calls: ScannedCall[] = [];
+  let droppedRandomWeb = 0;
+  let droppedBulk = 0;
+  let droppedHelpers = 0;
+  let chainedCalls = 0;
+  let computedRolls = 0;
+
+  const callRe = /\b([A-Za-z_]\w*)\s*\(/g;
+  let callm: RegExpExecArray | null;
+  while ((callm = callRe.exec(code))) {
+    const name = callm[1];
+    const openIdx = callm.index + callm[0].length - 1;
+    const before = code.slice(Math.max(0, callm.index - 20), callm.index);
+    if (/\bfunction\s+$/.test(before)) continue;
+    if (insideDefinition(callm.index)) continue;
+    let kind: DesignerActionKind | null = null;
+    let argsText = "";
+    if ((API_CALL_NAMES as readonly string[]).includes(name)) {
+      kind = API_KIND_BY_NAME[name];
+    } else if (helperApi.has(name)) {
+      kind = helperApi.get(name)!;
+    } else {
+      continue;
+    }
+    const scanned = scanCallArgs(code, openIdx);
+    if (!scanned) continue;
+    argsText = scanned.args;
+    const parts = splitArgs(argsText);
+    const first = (parts[0] ?? "").trim();
+    let literal: string | null = null;
+    if (helperApi.has(name)) {
+      // A helper's payload may sit in any argument (delayed_audio(ms, file,
+      // cb)); fall back to the literal pinned in the helper's own body
+      // (binaural_audio() → audio("binaural.wav", ...)).
+      literal =
+        parts.map((a) => a.trim()).find((a) => a.startsWith('"') || a.startsWith("'")) !== undefined
+          ? firstLiteral(argsText)
+          : helperLiteral.get(name) ?? null;
+      if (literal === null) droppedHelpers++;
+    } else if (first.startsWith('"') || first.startsWith("'")) {
+      const str = readLuaString(first, 0);
+      literal = str ? str.value : null;
+    }
+    // Direct calls with a nil or computed first argument carry no literal.
+    const chained = parts.length > 1 && (parts[1] ?? "").trim() !== "";
+    if (chained) chainedCalls++;
+    if (kind === "web" && literal === null) droppedRandomWeb++;
+
+    // roll(N) guard on the call's line or the one or two lines above it.
+    let chance: number | undefined;
+    {
+      let pos = callm.index;
+      for (let back = 0; back < 3; back++) {
+        const probe = back === 0 ? pos : pos - 2;
+        if (probe < 0) break;
+        const lineStart = code.lastIndexOf("\n", probe) + 1;
+        const lineEnd = code.indexOf("\n", lineStart);
+        const line = code.slice(lineStart, lineEnd === -1 ? code.length : lineEnd);
+        const rollMatch = /^\s*if\s+roll\((\d+)\)\s+then\b/.exec(line);
+        if (rollMatch) {
+          chance = Number(rollMatch[1]);
+          break;
+        }
+        pos = lineStart;
+        if (pos === 0) break;
+      }
+    }
+
+    calls.push({ kind, literal, chained, chance, pos: callm.index });
+  }
+
+  const bulkRe = /\bmultiple_popups\s*\(/g;
+  droppedBulk = (code.match(bulkRe) ?? []).length;
+  const computedRollRe = /\broll\(\s*[^)\d\s]/g;
+  computedRolls = (code.match(computedRollRe) ?? []).length;
+
+  /* ---- assign calls to levels by corrupt() position ---- */
+  const segOf = (pos: number): number => {
+    let seg = 0;
+    for (const at of corruptAt) if (pos > at) seg++;
+    return seg;
+  };
+
+  const levels: DesignerLevel[] = [];
+  for (let lvl = 1; lvl <= levelCount; lvl++) {
+    const key = String(lvl);
+    const moodEntry = moodsRaw[key] ?? {};
+    // Designer tables store "img/<file>"; the legacy wallpapers map is
+    // pack-root-relative, so a bare name there means a file at the pack root
+    // ("./x.png" keeps it out of the designer's img/ convention).
+    const legacyWallpaper = (v: string): string => (v.includes("/") ? v : `./${v}`);
+    const tableWallpaper =
+      typeof moodEntry.wallpaper === "string" && moodEntry.wallpaper
+        ? moodEntry.wallpaper.startsWith("img/")
+          ? moodEntry.wallpaper.slice(4)
+          : moodEntry.wallpaper
+        : typeof wallpapersRaw[key] === "string" && wallpapersRaw[key]
+          ? legacyWallpaper(wallpapersRaw[key] as string)
+          : lvl === 1 && typeof wallpapersRaw["default"] === "string" && wallpapersRaw["default"]
+            ? legacyWallpaper(wallpapersRaw["default"] as string)
+            : null;
+    const cfg = configRaw[key] ?? {};
+    const num = (v: unknown): number | undefined =>
+      typeof v === "number" && Number.isFinite(v) ? v : undefined;
+    levels.push({
+      addMoods: Array.isArray(moodEntry.add) ? (moodEntry.add as string[]) : [],
+      removeMoods: Array.isArray(moodEntry.remove) ? (moodEntry.remove as string[]) : [],
+      wallpaper: tableWallpaper,
+      actions: [],
+      advance: lvl === levelCount ? { mode: "end" } : { mode: "time", seconds: 10 },
+      config: { popupMod: num(cfg.popupMod), delay: num(cfg.delay) },
+    });
+  }
+
+  let preFirstCorrupt = 0;
+  for (const call of calls) {
+    const seg = segOf(call.pos);
+    const lvl = seg === 0 ? 1 : seg;
+    if (lvl > levelCount) continue;
+    if (seg === 0) preFirstCorrupt++;
+    const target = levels[lvl - 1];
+    if (target.actions.length >= MAX_ACTIONS_PER_LEVEL) continue;
+    if (call.kind === "web" && call.literal === null) continue;
+    const action: DesignerAction = { kind: call.kind };
+    if (call.kind === "image" || call.kind === "video" || call.kind === "audio") {
+      if (call.literal) action.file = call.literal;
+    } else if (call.kind !== "close_popups") {
+      if (call.literal) action.text = call.literal;
+    }
+    if (call.chance !== undefined) action.chance = Math.min(99, Math.max(1, call.chance));
+    target.actions.push(action);
+
+    // Advance hint: an audio with a callback carries the chain onward.
+    if (call.kind === "audio" && call.literal && call.chained && lvl < levelCount) {
+      target.advance = { mode: "audio", file: call.literal };
+    }
+  }
+
+  // after(ms, corrupt) as a level driver — only where no audio chain already
+  // owns the transition.
+  const audioDriven = new Set<number>();
+  for (let i = 0; i < levels.length; i++) {
+    if (levels[i].advance.mode === "audio") audioDriven.add(i + 1);
+  }
+  const afterCorruptRe = /\bafter\(\s*(\d+)\s*,\s*corrupt\s*\)/g;
+  let acm: RegExpExecArray | null;
+  while ((acm = afterCorruptRe.exec(code))) {
+    const seg = segOf(acm.index);
+    const lvl = seg === 0 ? 1 : seg;
+    if (lvl >= 1 && lvl < levelCount && !audioDriven.has(lvl)) {
+      levels[lvl - 1].advance = { mode: "time", seconds: Math.max(1, Math.round(Number(acm[1]) / 1000)) };
+    }
+  }
+
+  /* ---- notes ---- */
+  if (corruptCount === 0 && tableLevels.size === 0) {
+    notes.push(
+      "No corrupt() calls or corruption tables found — all actions were placed on a single level."
+    );
+  }
+  if (preFirstCorrupt > 0) {
+    notes.push(
+      `${preFirstCorrupt} action(s) ran before the first corrupt() and were attached to level 1.`
+    );
+  }
+  if (redefined.size > 0) {
+    notes.push(
+      `The script redefines built-in API(s): ${[...redefined].join(", ")}. Wrapper logic (skipping, gating) cannot be converted.`
+    );
+  }
+  const loops = (code.match(/\bwhile\b/g) ?? []).length + (code.match(/\bfor\b[^\n]*\bdo\b/g) ?? []).length;
+  if (loops > 0) notes.push(`${loops} loop(s) dropped — bulk or conditional spawning is not designer-representable.`);
+  if (droppedBulk > 0) notes.push(`${droppedBulk} multiple_popups() call(s) dropped — bulk spawning has no designer equivalent.`);
+  if (droppedRandomWeb > 0) notes.push(`${droppedRandomWeb} web(nil) random-URL call(s) dropped — set explicit URLs in the designer.`);
+  if (droppedHelpers > 0) notes.push(`${droppedHelpers} helper call(s) with computed arguments dropped — the value was not a literal.`);
+  if (computedRolls > 0) notes.push(`${computedRolls} roll() with a computed chance — those guards were not converted.`);
+  if (chainedCalls > 0) {
+    notes.push("Callback chains were flattened into level order — check each level's Advance setting.");
+  }
+  const totalActions = levels.reduce((sum, l) => sum + l.actions.length, 0);
+  notes.unshift(
+    `Converted ${totalActions} action(s) across ${levels.length} level(s). The original script is archived unchanged.`
+  );
+
+  return { design: { version: 1, startDelaySeconds: 2, levels }, notes };
 }
