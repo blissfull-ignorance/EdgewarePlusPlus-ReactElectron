@@ -6,7 +6,7 @@ import { resolveScriptPath } from "../scripting/scriptPath";
 import { injectLevel } from "./corruption";
 import { app } from "electron";
 import { logger } from "../utils/logger";
-import { looksLikePack } from "./pack";
+import { invalidateGalleryScan, looksLikePack } from "./pack";
 import {
   createPopupWindow,
   closeAllPopups,
@@ -348,6 +348,7 @@ function registerHandlers(): void {
         if (parsed) {
           writeAtomic(path.join(dir, "corruption.json"), JSON.stringify(parsed, null, 2));
         }
+        invalidateGalleryScan();
         logger.info("[Scripting] Pack design saved");
         return true;
       } catch (err) {

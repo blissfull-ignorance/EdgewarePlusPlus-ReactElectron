@@ -104,3 +104,27 @@ export function isPathConstrained(
     return false;
   }
 }
+
+/**
+ * Parse a single `bytes=start-end` range (also `start-` and `-suffix`
+ * forms) against a known file size. null means "no usable Range header"
+ * (serve the whole file); "unsatisfiable" means the range cannot be met.
+ */
+export function parseByteRange(
+  header: string | null,
+  size: number
+): { start: number; end: number } | "unsatisfiable" | null {
+  if (!header) return null;
+  const match = /^bytes=(\d*)-(\d*)$/.exec(header.trim());
+  if (!match || (!match[1] && !match[2])) return null;
+  if (match[1]) {
+    const start = Number(match[1]);
+    if (start >= size || !Number.isFinite(start)) return "unsatisfiable";
+    const end = match[2] ? Math.min(Number(match[2]), size - 1) : size - 1;
+    return end >= start ? { start, end } : "unsatisfiable";
+  }
+  const suffix = Number(match[2]);
+  if (!Number.isFinite(suffix) || suffix === 0) return "unsatisfiable";
+  const start = Math.max(0, size - suffix);
+  return { start, end: size - 1 };
+}

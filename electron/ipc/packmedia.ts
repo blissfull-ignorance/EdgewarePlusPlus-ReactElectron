@@ -16,6 +16,7 @@ import { Readable } from "node:stream";
 import { logger } from "../utils/logger";
 import {
   PACK_MEDIA_SCHEME,
+  parseByteRange,
   resolvePackMediaPath,
   contentTypeForFile,
 } from "../utils/mediaGuard";
@@ -100,16 +101,50 @@ export function registerPackMediaProtocol(): void {
 
       filePath = real;
 
+      const etag = `"${stat.size.toString(16)}-${Math.round(stat.mtimeMs).toString(16)}"`;
+      const baseHeaders: Record<string, string> = {
+        "content-type": contentTypeForFile(filePath),
+        // Revalidate every visit: unchanged files answer as a bare 304, so
+        // gallery grids do not re-transfer or re-decode megabytes, while
+        // creator edits (new mtime/size) are picked up immediately.
+        "cache-control": "no-cache",
+        "accept-ranges": "bytes",
+        etag,
+        "access-control-allow-origin": "*",
+      };
+      if (request.headers.get("if-none-match") === etag) {
+        return new Response(null, { status: 304, headers: baseHeaders });
+      }
+
+      // Byte-range serving: <video> seeks with Range requests (an mp4's
+      // index sits at the file end), and without 206 support playback and
+      // even metadata thumbnails fail.
+      const range = parseByteRange(request.headers.get("range"), stat.size);
+      if (range === "unsatisfiable") {
+        return new Response(null, {
+          status: 416,
+          headers: { ...baseHeaders, "content-range": `bytes */${stat.size}` },
+        });
+      }
+      if (range) {
+        const { start, end } = range;
+        const stream = Readable.toWeb(
+          fs.createReadStream(filePath, { start, end })
+        ) as unknown as ReadableStream;
+        return new Response(stream, {
+          status: 206,
+          headers: {
+            ...baseHeaders,
+            "content-length": String(end - start + 1),
+            "content-range": `bytes ${start}-${end}/${stat.size}`,
+          },
+        });
+      }
+
       const stream = Readable.toWeb(fs.createReadStream(filePath)) as unknown as ReadableStream;
       return new Response(stream, {
         status: 200,
-        headers: {
-          "content-type": contentTypeForFile(filePath),
-          "cache-control": "no-store",
-          "accept-ranges": "bytes",
-          "content-length": String(stat.size),
-          "access-control-allow-origin": "*",
-        },
+        headers: { ...baseHeaders, "content-length": String(stat.size) },
       });
     } catch (err) {
       logger.error("[PackMedia] Failed to serve media:", err);

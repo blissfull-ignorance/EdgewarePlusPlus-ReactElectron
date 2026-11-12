@@ -47,7 +47,7 @@ function ensureMoverLoop(): void {
       }
       const display = screen.getDisplayMatching(win.getBounds());
       const size = win.getBounds();
-      movers.set(id, stepMove(state, display.bounds, size.width, size.height));
+      movers.set(id, stepMove(state, display.workArea, size.width, size.height));
       const next = movers.get(id)!;
       win.setPosition(next.x, next.y);
     }
@@ -101,7 +101,10 @@ function getPopupUrl(): string {
  * to the renderer-side geometry calculation for consistency.
  */
 function getPrimaryMonitorBounds() {
-  return screen.getPrimaryDisplay().bounds;
+  // The work area (not the full display bounds): a popup whose bottom-right
+  // corner carries the close button must never spawn under the menu bar or
+  // the dock, where the button would be unreachable.
+  return screen.getPrimaryDisplay().workArea;
 }
 
 /** Read a raw numeric/boolean setting value from the persisted config. */
@@ -149,12 +152,12 @@ function createPopupWindow(
     ? Math.floor(bounds.x + (bounds.width - width) / 2)
     : lowkey
       ? lowkey.x
-      : Math.floor(Math.random() * Math.max(0, bounds.width - defaultWidth));
+      : Math.floor(bounds.x + Math.random() * Math.max(0, bounds.width - defaultWidth));
   const y = isSubliminal
     ? Math.floor(bounds.y + (bounds.height - height) / 2)
     : lowkey
       ? lowkey.y
-      : Math.floor(Math.random() * Math.max(0, bounds.height - defaultHeight));
+      : Math.floor(bounds.y + Math.random() * Math.max(0, bounds.height - defaultHeight));
 
   const popupWin = new BrowserWindow({
     x,
@@ -169,8 +172,10 @@ function createPopupWindow(
     hasShadow: false,
     // Popups take mouse clicks but never window focus: focusable popups
     // starve the main window's input routing once many are open, which can
-    // leave the user unable to click Stop during a storm.
-    focusable: false,
+    // leave the user unable to click Stop during a storm. Prompt popups are
+    // the exception — they carry a text field the user must be able to type
+    // into — and they are rare enough not to storm.
+    focusable: type === "prompt",
     webPreferences: {
       contextIsolation: true,
       nodeIntegration: false,
@@ -182,6 +187,11 @@ function createPopupWindow(
   const url = getPopupUrl();
   const hypnoSeg = hypnoGif ? `?h=${encodeURIComponent(hypnoGif)}` : "";
   popupWin.loadURL(`${url}#/popup/${type}/${encodeURIComponent(mediaId)}/${id}${hypnoSeg}`);
+  if (type === "prompt") {
+    popupWin.webContents.once("did-finish-load", () => {
+      if (!popupWin.isDestroyed()) popupWin.focus();
+    });
+  }
 
   popupWin.on("closed", () => {
     stopMoving(id);
@@ -288,6 +298,14 @@ function registerHandlers(): void {
         const width = Math.max(32, Math.min(target.width, display.workAreaSize.width));
         const height = Math.max(32, Math.min(target.height, display.workAreaSize.height));
         win.setContentSize(width, height);
+        // The window grows around its top-left corner; pull it back inside
+        // the work area so the close button at its bottom-right stays
+        // reachable (an off-screen popup cannot be dismissed).
+        const wa = display.workArea;
+        const placed = win.getBounds();
+        const nx = Math.max(wa.x, Math.min(placed.x, wa.x + Math.max(0, wa.width - placed.width)));
+        const ny = Math.max(wa.y, Math.min(placed.y, wa.y + Math.max(0, wa.height - placed.height)));
+        if (nx !== placed.x || ny !== placed.y) win.setPosition(nx, ny);
         return { width, height };
       } catch (err) {
         logger.error("[Popup] Failed to size popup to media:", err);

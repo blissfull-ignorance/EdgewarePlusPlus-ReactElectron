@@ -342,6 +342,13 @@ function loadPackIndex(packDir: string): Index {
   return loadIndexFallback(packDir);
 }
 
+let galleryRevision = 0;
+
+/** Invalidate the memoized gallery directory scan (creator file writes). */
+export function invalidateGalleryScan(): void {
+  galleryRevision += 1;
+}
+
 /** User-starred gallery files, shared by the gallery view and the toggle. */
 function readFavouritesList(): string[] {
   try {
@@ -788,7 +795,12 @@ function registerHandlers(): void {
   });
 
   /** Whether the active pack ships a script.lua (scripted corruption). */
-  /**
+    // The directory scan is memoized per pack: switching to the Gallery or
+  // Creator tab repeatedly must not re-walk thousands of files. Creator
+  // writes bump the revision; a pack-path change misses the key naturally.
+  let galleryScan: { key: string; entries: GalleryEntry[]; moods: string[] } | null = null;
+
+/**
    * Every media file the active pack ships, tagged with its moods, for the
    * gallery browser. Untagged files are default content; the mood list and
    * currently-active moods let the UI group and badge entries.
@@ -805,26 +817,33 @@ function registerHandlers(): void {
       return { entries: [], moods: [], activeMoods, favourites };
     }
     try {
-      const indexRaw = readJson<{ moods?: Array<{ mood?: unknown; media?: unknown }> }>(
-        path.join(packDir, "index.json")
-      );
-      const legacyMedia = readJson<Record<string, unknown>>(path.join(packDir, "media.json"));
-      const fileMoods = buildFileMoods(indexRaw?.moods, legacyMedia ?? undefined);
+      if (!galleryScan || galleryScan.key !== `${packDir}#${galleryRevision}`) {
+        const indexRaw = readJson<{ moods?: Array<{ mood?: unknown; media?: unknown }> }>(
+          path.join(packDir, "index.json")
+        );
+        const legacyMedia = readJson<Record<string, unknown>>(path.join(packDir, "media.json"));
+        const fileMoods = buildFileMoods(indexRaw?.moods, legacyMedia ?? undefined);
 
-      const dirs: Array<[string, GalleryEntry["kind"], RegExp]> = [
-        ["img", "image", /\.(png|jpg|jpeg|gif|webp)$/i],
-        ["vid", "video", /\.(mp4|webm|mkv)$/i],
-        ["aud", "audio", /\.(mp3|wav|ogg|flac)$/i],
-      ];
-      const entries: GalleryEntry[] = [];
-      for (const [subdir, kind, pattern] of dirs) {
-        const dirPath = path.join(packDir, subdir);
-        if (!fs.existsSync(dirPath)) continue;
-        for (const file of fs.readdirSync(dirPath).filter((f) => pattern.test(f) && !f.startsWith("."))) {
-          entries.push({ file, kind, moods: fileMoods[file] ?? [] });
+        const dirs: Array<[string, GalleryEntry["kind"], RegExp]> = [
+          ["img", "image", /\.(png|jpg|jpeg|gif|webp)$/i],
+          ["vid", "video", /\.(mp4|webm|mkv)$/i],
+          ["aud", "audio", /\.(mp3|wav|ogg|flac)$/i],
+        ];
+        const entries: GalleryEntry[] = [];
+        for (const [subdir, kind, pattern] of dirs) {
+          const dirPath = path.join(packDir, subdir);
+          if (!fs.existsSync(dirPath)) continue;
+          for (const file of fs.readdirSync(dirPath).filter((f) => pattern.test(f) && !f.startsWith("."))) {
+            entries.push({ file, kind, moods: fileMoods[file] ?? [] });
+          }
         }
+        galleryScan = {
+          key: `${packDir}#${galleryRevision}`,
+          entries,
+          moods: [...new Set(entries.flatMap((e) => e.moods))].sort(),
+        };
       }
-      const moods = [...new Set(entries.flatMap((e) => e.moods))].sort();
+      const { entries, moods } = galleryScan;
       const keys = new Set(entries.map(favouriteKey));
       return { entries, moods, activeMoods, favourites: favourites.filter((k) => keys.has(k)) };
     } catch (err) {
@@ -882,6 +901,7 @@ function registerHandlers(): void {
 
   const writeIndex = (dir: string, index: RawIndexLike): void => {
     writePackJson(path.join(dir, "index.json"), index);
+    invalidateGalleryScan();
   };
 
   ipcMain.handle(

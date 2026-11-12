@@ -113,6 +113,17 @@ export function GalleryPanel() {
 
   const favouriteKeys = useMemo(() => new Set(data.favourites), [data.favourites]);
 
+  const typeCounts = useMemo(() => {
+    const counts = { image: 0, video: 0, audio: 0 };
+    for (const e of data.entries) counts[e.kind] += 1;
+    return counts;
+  }, [data.entries]);
+  const moodCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const e of data.entries) for (const m of e.moods) counts.set(m, (counts.get(m) ?? 0) + 1);
+    return counts;
+  }, [data.entries]);
+
   const visible = useMemo(
     () =>
       data.entries.filter((e) => {
@@ -147,9 +158,10 @@ export function GalleryPanel() {
           <Text fw={700} size="lg">
             Pack Gallery
           </Text>
-          <Text size="sm" c="dimmed">
-            {data.entries.length} files · {data.moods.length} moods · active moods unlock
-            their content for popups
+          <Text size="sm" c="dimmed" data-testid="gallery-count">
+            {data.entries.length} files ({typeCounts.image} images, {typeCounts.video} videos,{" "}
+            {typeCounts.audio} audio) · {data.moods.length} moods · active moods unlock their
+            content for popups
           </Text>
         </div>
         <Group gap="sm" wrap="nowrap">
@@ -206,7 +218,7 @@ export function GalleryPanel() {
             data-testid={`gallery-mood-${mood}`}
           >
             <Group gap={4} wrap="nowrap" data-testid={`gallery-chip-${mood}`}>
-              {mood}
+              {mood} ({moodCounts.get(mood) ?? 0})
               {active.has(mood) ? (
                 <Badge size="xs" color="teal" variant="light">
                   active
@@ -221,7 +233,7 @@ export function GalleryPanel() {
         ))}
       </Group>
 
-      {loading ? (
+      {loading && data.entries.length === 0 ? (
         <Text c="dimmed">Loading pack contents…</Text>
       ) : visible.length === 0 ? (
         <Center h={200}>

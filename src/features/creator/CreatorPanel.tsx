@@ -93,16 +93,45 @@ function TagEditor({
   onToggle: (file: string, mood: string, on: boolean) => void;
 }) {
   const current = new Set(tagsFor(moods, entry.file));
+  const url = resolvePackMediaUrl(entry.file, KIND_DIR[entry.kind]);
   return (
     <Modal
       opened
       onClose={() => onToggle(entry.file, "", false)}
       title={entry.file}
-      size="sm"
+      size="lg"
       centered
       closeButtonProps={{ "aria-label": "Close tag editor" }}
     >
       <Stack gap="sm" data-testid={`tag-editor-${entry.file}`}>
+        <div
+          data-testid={`tag-preview-${entry.file}`}
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            maxHeight: "45vh",
+            overflow: "hidden",
+            borderRadius: 8,
+            backgroundColor: "var(--mantine-color-dark-8)",
+          }}
+        >
+          {entry.kind === "image" ? (
+            <img src={url} alt="" style={{ maxWidth: "100%", maxHeight: "45vh", objectFit: "contain" }} />
+          ) : entry.kind === "video" ? (
+            <video
+              src={url}
+              controls
+              autoPlay
+              muted
+              playsInline
+              style={{ width: "100%", maxHeight: "45vh" }}
+              data-testid={`tag-preview-video-${entry.file}`}
+            />
+          ) : (
+            <audio src={url} controls autoPlay data-testid={`tag-preview-audio-${entry.file}`} style={{ width: "100%" }} />
+          )}
+        </div>
         <Text size="xs" c="dimmed">
           Which moods does this file belong to? Mood-tagged content only appears
           in popups while its mood is active.
