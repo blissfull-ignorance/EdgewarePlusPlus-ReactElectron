@@ -5,6 +5,9 @@ import {
   generateLua,
   normalizeDesign,
   parseDesignerScript,
+  renameMoodInCorruption,
+  renameMoodInDesign,
+  replaceDesignInScript,
   type DesignerScript,
 } from "../../src/features/creator/designerModel";
 import { parseCorruptionData } from "../../src/features/corruption/corruptionEngine";
@@ -22,13 +25,15 @@ const design: DesignerScript = {
         { kind: "image", file: "a.png" },
       ],
       advance: { mode: "audio", file: "voice.wav" },
+      config: { popupMod: 80 },
     },
     {
       addMoods: ["goon"],
       removeMoods: ["vanilla"],
       wallpaper: null,
-      actions: [{ kind: "subliminal", text: "obey" }],
+      actions: [{ kind: "subliminal", text: "obey", chance: 40 }],
       advance: { mode: "time", seconds: 7 },
+      config: {},
     },
     {
       addMoods: [],
@@ -36,6 +41,7 @@ const design: DesignerScript = {
       wallpaper: null,
       actions: [],
       advance: { mode: "end" },
+      config: {},
     },
   ],
 };
@@ -65,6 +71,63 @@ describe("designerModel", () => {
     expect([...parsed.levels[2].removeMoods]).toEqual(["vanilla"]);
     expect(parsed.levels[2].wallpaper).toBeNull();
     expect(parsed.levels[3].wallpaper).toBeNull();
+    expect(parsed.levels[1].config).toEqual({ popupMod: 80 });
+    expect(parsed.levels[2].config).toEqual({});
+  });
+
+  it("wraps chance-gated actions in roll()", () => {
+    const lua = generateLua(design);
+    expect(lua).toContain("if roll(40) then\n    subliminal(\"obey\")\n  end");
+  });
+
+  it("generates the extended action kinds", () => {
+    const lua = generateLua({
+      version: 1,
+      startDelaySeconds: 1,
+      levels: [
+        {
+          addMoods: [],
+          removeMoods: [],
+          wallpaper: null,
+          actions: [
+            { kind: "audio", file: "a.wav" },
+            { kind: "web", text: "https://example.com" },
+            { kind: "close_popups" },
+            { kind: "set_close_text", text: "Nope" },
+            { kind: "web" },
+          ],
+          advance: { mode: "end" },
+          config: {},
+        },
+      ],
+    });
+    expect(lua).toContain('audio("a.wav")');
+    expect(lua).toContain('web("https://example.com")');
+    expect(lua).toContain("close_popups()");
+    expect(lua).toContain('set_popup_close_text("Nope")');
+    // A web action without a URL generates nothing.
+    expect(lua.match(/web\(/g)?.length).toBe(1);
+  });
+
+  it("propagates mood renames into designs, corruption tables and markers", () => {
+    const renamed = renameMoodInDesign(design, "vanilla", "classic");
+    expect(renamed.levels[0].addMoods).toEqual(["classic"]);
+    expect(renamed.levels[1].removeMoods).toEqual(["classic"]);
+    const removed = renameMoodInDesign(design, "vanilla", "");
+    expect(removed.levels[0].addMoods).toEqual([]);
+    expect(removed.levels[1].removeMoods).toEqual([]);
+
+    const parsed = JSON.parse(generateCorruptionJson(design));
+    const after = renameMoodInCorruption(parsed, "vanilla", "classic");
+    expect(after.moods["1"].add).toEqual(["classic"]);
+    expect(after.moods["2"].remove).toEqual(["classic"]);
+    expect(renameMoodInCorruption(after, "classic", "").moods["1"].add).toEqual([]);
+
+    const lua = replaceDesignInScript(generateLua(design), renamed);
+    expect(parseDesignerScript(lua)).toEqual(renamed);
+    // Hand-written scripts without a marker pass through untouched.
+    const plain = 'require("edgeware_v0")\ncorrupt()\n';
+    expect(replaceDesignInScript(plain, renamed)).toBe(plain);
   });
 
   it("normalizes the last level to a terminal advance", () => {
@@ -128,6 +191,7 @@ describe("designerModel", () => {
     expect(parsed!.levels[0].wallpaper).toBeNull();
     expect(parsed!.levels[0].actions).toEqual([{ kind: "image", file: "a.png" }]);
     expect(parsed!.levels[0].advance).toEqual({ mode: "time", seconds: 10 });
+    expect(parsed!.levels[0].config).toEqual({ popupMod: undefined, delay: undefined });
   });
 
   it("empty design generates a valid no-level script", () => {

@@ -12,6 +12,12 @@ import { resolveBlacklistSource, computeBlacklistTarget } from "../utils/blackli
 import { Index, Mood, Web, DEFAULT_INDEX, GalleryEntry, GalleryResult } from "../../src/types/pack";
 import { buildFileMoods } from "../utils/galleryIndex";
 import { addMood, removeMood, renameMood, setFileTags, type RawIndexLike } from "../utils/packEdit";
+import {
+  parseDesignerScript,
+  renameMoodInCorruption,
+  renameMoodInDesign,
+  replaceDesignInScript,
+} from "../../src/features/creator/designerModel";
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -907,6 +913,44 @@ function registerHandlers(): void {
     }
   );
 
+/**
+   * A mood rename/removal (to = "" means removed) must reach the artifacts
+   * that name moods by string: the corruption.json level tables and the
+   * design embedded in a generated script.lua. Hand-written scripts without
+   * a designer marker are left alone.
+   */
+  const propagateMoodChange = (dir: string, from: string, to: string): void => {
+    const corruptionPath = path.join(dir, "corruption.json");
+    const corruption = readJson<Record<string, unknown>>(corruptionPath);
+    if (corruption) {
+      try {
+        fs.writeFileSync(
+          corruptionPath,
+          JSON.stringify(renameMoodInCorruption(corruption, from, to), null, 2),
+          "utf-8"
+        );
+      } catch (err) {
+        logger.error("[Pack] Failed to propagate mood change to corruption.json:", err);
+      }
+    }
+    const scriptPath = path.join(dir, "script.lua");
+    if (fs.existsSync(scriptPath)) {
+      try {
+        const lua = fs.readFileSync(scriptPath, "utf-8");
+        const design = parseDesignerScript(lua);
+        if (design) {
+          fs.writeFileSync(
+            scriptPath,
+            replaceDesignInScript(lua, renameMoodInDesign(design, from, to)),
+            "utf-8"
+          );
+        }
+      } catch (err) {
+        logger.error("[Pack] Failed to propagate mood change to script.lua:", err);
+      }
+    }
+  };
+
   ipcMain.handle(
     "pack:renameMood",
     async (_event, packPath: unknown, from: unknown, to: unknown): Promise<RawIndexLike | null> => {
@@ -919,6 +963,7 @@ function registerHandlers(): void {
         logger.error("[Pack] Failed to rename mood:", err);
         return null;
       }
+      propagateMoodChange(ctx.dir, from, to.trim());
       return next;
     }
   );
@@ -935,6 +980,7 @@ function registerHandlers(): void {
         logger.error("[Pack] Failed to remove mood:", err);
         return null;
       }
+      propagateMoodChange(ctx.dir, name, "");
       return next;
     }
   );

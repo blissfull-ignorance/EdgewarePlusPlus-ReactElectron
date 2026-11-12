@@ -17,12 +17,25 @@ export type DesignerAdvance =
   | { mode: "audio"; file: string }
   | { mode: "end" };
 
+export type DesignerActionKind =
+  | "image"
+  | "video"
+  | "audio"
+  | "notification"
+  | "prompt"
+  | "subliminal"
+  | "web"
+  | "close_popups"
+  | "set_close_text";
+
 export interface DesignerAction {
-  kind: "image" | "video" | "notification" | "prompt" | "subliminal";
-  /** Media file for image/video actions (pack-relative name). */
+  kind: DesignerActionKind;
+  /** Media file for image/video/audio actions (pack-relative name). */
   file?: string;
-  /** Text for notification/prompt/subliminal actions. */
+  /** Text for notification/prompt/subliminal/web/close-label actions. */
   text?: string;
+  /** When set (1-99), the action only fires with this percent chance. */
+  chance?: number;
 }
 
 export interface DesignerLevel {
@@ -31,6 +44,11 @@ export interface DesignerLevel {
   wallpaper: string | null;
   actions: DesignerAction[];
   advance: DesignerAdvance;
+  /**
+   * Settings this level overrides while active (applied at the transition,
+   * only when the user granted corruption config permission).
+   */
+  config: { popupMod?: number; delay?: number };
 }
 
 export interface DesignerScript {
@@ -59,19 +77,36 @@ function luaString(value: string): string {
   );
 }
 
-function actionLine(action: DesignerLevel["actions"][number]): string | null {
+function actionCall(action: DesignerLevel["actions"][number]): string | null {
   switch (action.kind) {
     case "image":
-      return action.file ? `  image(${luaString(action.file)})` : "  image(nil)";
+      return action.file ? `image(${luaString(action.file)})` : "image(nil)";
     case "video":
-      return action.file ? `  video(${luaString(action.file)})` : "  video(nil)";
+      return action.file ? `video(${luaString(action.file)})` : "video(nil)";
+    case "audio":
+      return action.file ? `audio(${luaString(action.file)})` : "audio(nil)";
     case "notification":
-      return action.text ? `  notification(${luaString(action.text)})` : "  notification()";
+      return action.text ? `notification(${luaString(action.text)})` : "notification()";
     case "prompt":
-      return action.text ? `  prompt(${luaString(action.text)})` : "  prompt()";
+      return action.text ? `prompt(${luaString(action.text)})` : "prompt()";
     case "subliminal":
-      return action.text ? `  subliminal(${luaString(action.text)})` : "  subliminal()";
+      return action.text ? `subliminal(${luaString(action.text)})` : "subliminal()";
+    case "web":
+      return action.text ? `web(${luaString(action.text)})` : null;
+    case "close_popups":
+      return "close_popups()";
+    case "set_close_text":
+      return action.text ? `set_popup_close_text(${luaString(action.text)})` : null;
   }
+}
+
+function actionLine(action: DesignerLevel["actions"][number]): string | null {
+  const call = actionCall(action);
+  if (!call) return null;
+  if (action.chance !== undefined && action.chance >= 1 && action.chance <= 99) {
+    return `  if roll(${Math.round(action.chance)}) then\n    ${call}\n  end`;
+  }
+  return `  ${call}`;
 }
 
 export function generateLua(design: DesignerScript): string {
@@ -128,6 +163,7 @@ export function normalizeDesign(design: DesignerScript): DesignerScript {
 
 export function generateCorruptionJson(design: DesignerScript): string {
   const moods: Record<string, { add: string[]; remove: string[]; wallpaper?: string }> = {};
+  const levelConfig: Record<string, Record<string, number>> = {};
   for (let i = 0; i < design.levels.length; i++) {
     const level = design.levels[i];
     const entry: { add: string[]; remove: string[]; wallpaper?: string } = {
@@ -138,8 +174,75 @@ export function generateCorruptionJson(design: DesignerScript): string {
     // so the bare img/ filename is stored with its directory.
     if (level.wallpaper) entry.wallpaper = `img/${level.wallpaper}`;
     moods[String(i + 1)] = entry;
+    const config = level.config ?? {};
+    if (config.popupMod !== undefined || config.delay !== undefined) {
+      levelConfig[String(i + 1)] = {
+        ...(config.popupMod !== undefined ? { popupMod: config.popupMod } : {}),
+        ...(config.delay !== undefined ? { delay: config.delay } : {}),
+      };
+    }
   }
-  return JSON.stringify({ moods, config: {} }, null, 2);
+  return JSON.stringify({ moods, config: levelConfig }, null, 2);
+}
+
+/**
+ * Mood renames and removals must reach every artifact that names moods:
+ * the design embedded in script.lua and the corruption.json level tables.
+ * These helpers are pure so the main process can apply them on disk.
+ */
+
+/** Rewrite mood names inside a design (rename: from→to; remove: to=""). */
+export function renameMoodInDesign(design: DesignerScript, from: string, to: string): DesignerScript {
+  const map = (list: string[]): string[] =>
+    list
+      .map((m) => (m === from ? to : m))
+      .filter((m) => m !== "");
+  return {
+    ...design,
+    levels: design.levels.map((l) => ({
+      ...l,
+      addMoods: [...new Set(map(l.addMoods))],
+      removeMoods: [...new Set(map(l.removeMoods))],
+    })),
+  };
+}
+
+/**
+ * Rewrite mood names in a parsed corruption.json object's level tables.
+ * Unknown shapes pass through unchanged.
+ */
+export function renameMoodInCorruption<T>(parsed: T, from: string, to: string): T {
+  if (!parsed || typeof parsed !== "object") return parsed;
+  const root = parsed as Record<string, unknown>;
+  const moods = root.moods;
+  if (!moods || typeof moods !== "object") return parsed;
+  const map = (list: unknown): unknown =>
+    Array.isArray(list)
+      ? [...new Set(list.map((m) => (m === from ? to : m)).filter((m) => m !== ""))]
+      : list;
+  const next: Record<string, unknown> = {};
+  for (const [level, entry] of Object.entries(moods as Record<string, unknown>)) {
+    if (entry && typeof entry === "object" && !Array.isArray(entry)) {
+      const rec = entry as Record<string, unknown>;
+      next[level] = { ...rec, add: map(rec.add), remove: map(rec.remove) };
+    } else {
+      next[level] = entry;
+    }
+  }
+  return { ...root, moods: next } as T;
+}
+
+/**
+ * Replace the design embedded in a generated script's marker line.
+ * Returns the input unchanged when the script carries no (valid) marker.
+ */
+export function replaceDesignInScript(lua: string, design: DesignerScript): string {
+  if (parseDesignerScript(lua) === null) return lua;
+  const marker = `${DESIGNER_MARKER}${JSON.stringify(design)}`;
+  return lua
+    .split("\n")
+    .map((line) => (line.startsWith(DESIGNER_MARKER) ? marker : line))
+    .join("\n");
 }
 
 export function parseDesignerScript(lua: string): DesignerScript | null {
@@ -171,14 +274,37 @@ function sanitizeDesign(design: DesignerScript): DesignerScript {
     levels: design.levels.map((level) => {
       const advance = level?.advance;
       const mode = advance?.mode;
+      const rawConfig = (level?.config ?? {}) as Record<string, unknown>;
+      const num = (v: unknown): number | undefined =>
+        typeof v === "number" && Number.isFinite(v) ? v : undefined;
       return {
         addMoods: list(level?.addMoods),
         removeMoods: list(level?.removeMoods),
         wallpaper: typeof level?.wallpaper === "string" && level.wallpaper ? level.wallpaper : null,
+        config: { popupMod: num(rawConfig.popupMod), delay: num(rawConfig.delay) },
         actions: Array.isArray(level?.actions)
-          ? (level.actions as DesignerAction[]).filter(
-              (a) => a && ["image", "video", "notification", "prompt", "subliminal"].includes(a.kind)
-            )
+          ? (level.actions as DesignerAction[])
+              .filter(
+                (a) =>
+                  a &&
+                  [
+                    "image",
+                    "video",
+                    "audio",
+                    "notification",
+                    "prompt",
+                    "subliminal",
+                    "web",
+                    "close_popups",
+                    "set_close_text",
+                  ].includes(a.kind)
+              )
+              .map((a) => {
+                const chance = Number.isFinite(a.chance as number)
+                  ? Math.min(99, Math.max(1, Math.round(a.chance as number)))
+                  : undefined;
+                return { ...a, chance: a.chance !== undefined ? chance : undefined };
+              })
           : [],
         advance:
           mode === "audio" && advance.file

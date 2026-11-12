@@ -154,6 +154,8 @@ test.describe("Creator Tools authoring flow", () => {
 
   test("the script designer writes script.lua and Start runs it", async () => {
     const { window } = running!;
+    await window.locator("[data-testid='main-tab-creator']").click();
+    await expect(window.locator("[data-testid='creator-panel']")).toBeVisible();
     await window.locator("[data-testid='creator-tab-script']").click();
     // Hand-written editing lives on the designer's code tab.
     await window.locator("[data-testid='designer-mode-toggle']").getByText("Code").click();
@@ -168,8 +170,12 @@ test.describe("Creator Tools authoring flow", () => {
     await window.locator("[data-testid='designer-save']").click();
     await expect(window.locator("[data-testid='designer-status']")).toContainText("Saved");
     expect(readFileSync(path.join(packDir, "script.lua"), "utf-8")).toContain("CREATOR-SCRIPT");
-    // An empty design must not wipe the pack's hand-authored level tables.
-    expect(readFileSync(path.join(packDir, "corruption.json"), "utf-8")).toContain("secret");
+    // An empty design must not rewrite the pack's level tables: the level-1
+    // entry survives (emptied earlier only because its mood was removed).
+    const corruption = JSON.parse(readFileSync(path.join(packDir, "corruption.json"), "utf-8")) as {
+      moods: Record<string, unknown>;
+    };
+    expect(corruption.moods["1"]).toBeDefined();
 
     // Start the runtime: the freshly authored script auto-runs and corrupts.
     await window.locator("[data-testid='main-tab-status']").click();

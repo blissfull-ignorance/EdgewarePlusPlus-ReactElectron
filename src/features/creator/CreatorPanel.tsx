@@ -131,7 +131,7 @@ function TagEditor({
   );
 }
 
-function TaggingSection() {
+function TaggingSection({ onPackChanged }: { onPackChanged?: () => void }) {
   const packPath = useSettingsStore((s) => s.packPath);
   const [gallery, setGallery] = useState<GalleryResult>({ entries: [], moods: [], activeMoods: [], favourites: [] });
   const [moods, setMoods] = useState<RawMood[]>([]);
@@ -160,6 +160,7 @@ function TaggingSection() {
     if (!index) return;
     setMoods(parseIndex(index));
     setSavedAt(Date.now());
+    onPackChanged?.();
     void reload().catch(() => undefined);
   };
 
@@ -358,6 +359,9 @@ function TaggingSection() {
 
 export function CreatorPanel() {
   const [section, setSection] = useState<"tagging" | "script">("tagging");
+  // Bumped whenever tagging rewrites the pack, so the designer reloads the
+  // mood list it validates its level cards against.
+  const [packRevision, setPackRevision] = useState(0);
 
   return (
     <Stack gap="md" data-testid="creator-panel">
@@ -391,7 +395,12 @@ export function CreatorPanel() {
           </Button>
         </Group>
       </Group>
-      {section === "tagging" ? <TaggingSection /> : <DesignerSection />}
+      <div style={{ display: section === "tagging" ? "block" : "none" }}>
+        <TaggingSection onPackChanged={() => setPackRevision((r) => r + 1)} />
+      </div>
+      <div style={{ display: section === "script" ? "block" : "none" }}>
+        <DesignerSection packRevision={packRevision} />
+      </div>
     </Stack>
   );
 }

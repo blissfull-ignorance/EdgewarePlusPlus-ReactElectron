@@ -156,6 +156,71 @@ test.describe("No-code corruption designer", () => {
       .toBe(false);
   });
 
+  test("mood renames reach the designed artifacts; removal warns in the editor", async () => {
+    const { window } = running!;
+    await window.locator("[data-testid='main-tab-creator']").click();
+    await expect(window.locator("[data-testid='creator-panel']")).toBeVisible();
+    // Rename vault -> cellar from the tagging view.
+    await window.locator("[data-testid='creator-tab-tagging']").click();
+    await window.locator("[data-testid='creator-mood-rename-vault']").click();
+    await window.locator("[data-testid='creator-mood-rename-input-vault']").fill("cellar");
+    await window.keyboard.press("Enter");
+    await expect(window.locator("[data-testid='creator-mood-cellar']")).toBeVisible();
+
+    // The rename propagated to both designed artifacts on disk.
+    await expect
+      .poll(() => readFileSync(path.join(packDir, "corruption.json"), "utf-8"))
+      .toContain("cellar");
+    expect(readFileSync(path.join(packDir, "corruption.json"), "utf-8")).not.toContain("vault");
+    expect(readFileSync(path.join(packDir, "script.lua"), "utf-8")).toContain("cellar");
+
+    // The designer's level card now offers the renamed mood.
+    await window.locator("[data-testid='creator-tab-script']").click();
+    await expect(window.locator("[data-testid='designer-add-1-cellar']")).toBeVisible();
+
+    // Removing a mood the design still references (with unsaved edits)
+    // leaves a visible stale reference, not a silent one.
+    await window.locator("[data-testid='creator-tab-script']").click();
+    await window.locator("[data-testid='designer-add-level']").click();
+    await window.locator("[data-testid='creator-tab-tagging']").click();
+    await window.locator("[data-testid='creator-mood-remove-cellar']").click();
+    await expect(window.locator("[data-testid='creator-mood-cellar']")).toHaveCount(0);
+    await window.locator("[data-testid='creator-tab-script']").click();
+    await expect(window.locator("[data-testid='designer-stale-1-cellar']")).toBeVisible();
+    await expect(window.locator("[data-testid='designer-warnings']")).toContainText("cellar");
+
+    // Clicking the ghost chip drops the stale reference.
+    await window.locator("[data-testid='designer-stale-1-cellar']").click();
+    await expect(window.locator("[data-testid='designer-stale-1-cellar']")).toHaveCount(0);
+    await expect(window.locator("[data-testid='designer-warnings']")).toHaveCount(0);
+  });
+
+  test("duplicate, per-level intensity and Save & test run", async () => {
+    const { window } = running!;
+    await window.locator("[data-testid='creator-tab-script']").click();
+    await expect(window.locator("[data-testid='designer-level-1']")).toBeVisible();
+    await window.locator("[data-testid='designer-level-duplicate-0']").click();
+    await expect(window.locator("[data-testid='designer-level-2']")).toBeVisible();
+
+    await window.locator("[data-testid='designer-popupmod-0']").fill("50");
+
+    await window.locator("[data-testid='designer-test-run']").click();
+    await expect(window.locator("[data-testid='designer-status']")).toContainText("Saved");
+
+    const corruption = JSON.parse(readFileSync(path.join(packDir, "corruption.json"), "utf-8")) as {
+      moods: Record<string, { add: string[] }>;
+      config: Record<string, { popupMod?: number }>;
+    };
+    expect(corruption.config["1"].popupMod).toBe(50);
+    expect(corruption.moods["3"].add).toEqual([]);
+
+    // The saved script runs immediately: level 1 corrupts within seconds.
+    await expect.poll(level, { timeout: 30000 }).toBeGreaterThanOrEqual(1);
+    await window.evaluate(() =>
+      (window as unknown as { api: { scripting: { stop: () => Promise<boolean> } } }).api.scripting.stop()
+    );
+  });
+
   test("the design reopens losslessly in the visual editor", async () => {
     const { window } = running!;
     await window.locator("[data-testid='main-tab-creator']").click();
@@ -163,6 +228,7 @@ test.describe("No-code corruption designer", () => {
     await window.locator("[data-testid='creator-tab-script']").click();
     await expect(window.locator("[data-testid='designer-level-0']")).toBeVisible();
     await expect(window.locator("[data-testid='designer-level-1']")).toBeVisible();
-    await expect(window.locator("[data-testid='designer-add-1-vault']")).toBeVisible();
+    await expect(window.locator("[data-testid='designer-level-2']")).toBeVisible();
+    await expect(window.locator("[data-testid='designer-popupmod-0']")).toHaveValue("50");
   });
 });
