@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { copyFileSync, mkdirSync, writeFileSync } from "node:fs";
+import { copyFileSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import {
   cleanupTempState,
@@ -74,7 +74,7 @@ function writeMoodPack(packsDir: string): string {
   );
   writeFileSync(
     path.join(packDir, "config.json"),
-    JSON.stringify({ delay: 123, movingChance: 0, version: "9.9", packPath: "/nowhere" })
+    JSON.stringify({ delay: 123, movingChance: 0, bogusKey: 9, version: "9.9", packPath: "/nowhere" })
   );
   writeFileSync(
     path.join(packDir, "script.lua"),
@@ -184,55 +184,92 @@ test.describe("Pack moods, preset and script auto-run (AAP-shaped pack)", () => 
     await running.window.locator("[data-testid='main-tab-status']").click();
   });
 
-  test("mood-tagged media stays locked while its mood is inactive", async () => {
-    await running!.window.evaluate(() =>
-      (window as unknown as { api: { pack: { setActiveMoods: (m: string[]) => Promise<void> } } }).api.pack.setActiveMoods([])
-    );
-    const picks = await randomImages(40);
-    expect(picks.length).toBe(40);
-    expect(picks).not.toContain("locked.png");
-    expect(picks).toContain("free.png");
-  });
+  test("pool membership follows the active mood", async () => {
+    const setActiveMoods = (moods: string[]) =>
+      running!.window.evaluate(
+        (m: string[]) =>
+          (
+            window as unknown as { api: { pack: { setActiveMoods: (m: string[]) => Promise<void> } } }
+          ).api.pack.setActiveMoods(m),
+        moods
+      );
 
-  test("activating the mood unlocks its media pool", async () => {
-    await running!.window.evaluate(() =>
-      (window as unknown as { api: { pack: { setActiveMoods: (m: string[]) => Promise<void> } } }).api.pack.setActiveMoods(["locked"])
-    );
-    const picks = await randomImages(40);
-    expect(picks).toContain("locked.png");
+    await setActiveMoods([]);
+    const lockedOut = await randomImages(40);
+    expect(lockedOut.length).toBe(40);
+    expect(lockedOut).not.toContain("locked.png");
+    expect(lockedOut).toContain("free.png");
+
+    await setActiveMoods(["locked"]);
+    const unlocked = await randomImages(40);
+    expect(unlocked).toContain("locked.png");
+
+    await setActiveMoods([]);
   });
 
   test("the pack mood catalogue is visible to the moods panel", async () => {
-    const moods = await running!.window.evaluate(() =>
+    const { window } = running!;
+    const moods = await window.evaluate(() =>
       (window as unknown as { api: { pack: { listMoods: () => Promise<unknown> } } }).api.pack.listMoods()
     );
     expect(moods).toEqual([{ name: "locked", mediaCount: 1, captionCount: 1 }]);
+
+    // The panel itself: card, counts, and the Locked badge while stopped.
+    await window.locator("[data-testid='main-tabs']").getByRole("button", { name: "Config" }).click();
+    await window.getByRole("tab", { name: "Annoyance / Runtime" }).click();
+    await window.getByRole("tab", { name: "Moods" }).click();
+    const card = window.locator("[data-testid='mood-locked']");
+    await expect(card).toBeVisible();
+    await expect(card).toContainText("1 media · 1 captions");
+    await expect(card).toContainText("Locked");
+    await window.locator("[data-testid='main-tabs']").getByRole("button", { name: "Status" }).click();
   });
 
   test("the pack config.json surfaces as a preset without version markers", async () => {
     const preset = await running!.window.evaluate(() =>
       (window as unknown as { api: { pack: { loadPackConfig: () => Promise<Record<string, unknown> | null> } } }).api.pack.loadPackConfig()
     );
-    expect(preset).toEqual({ delay: 123, movingChance: 0 });
+    // The IPC surfaces the pack file minus version markers; unknown keys are
+    // contained at Apply time (see the next test).
+    expect(preset).toEqual({ delay: 123, movingChance: 0, bogusKey: 9 });
   });
 
   test("the Start tab offers the pack preset and applying it updates settings", async () => {
     const { window } = running!;
     await window.locator("[data-testid='main-tabs']").getByRole("button", { name: "Config" }).click();
+    await window.getByRole("tab", { name: "General" }).click();
     await window.getByRole("tab", { name: "Start" }).click();
     const apply = window.locator("[data-testid='apply-pack-preset']");
     await expect(apply).toBeVisible({ timeout: 10000 });
     await apply.click();
     await expect(window.locator("[data-testid='preset-applied']")).toBeVisible();
-    const delay = await window.evaluate(
-      () =>
-        (
-          (window as unknown as {
-            __settingsStore: { getState: () => { delay: number } };
-          }).__settingsStore.getState().delay
-        )
-    );
-    expect(delay).toBe(123);
+    const applied = await window.evaluate(() => {
+      const s = (
+        window as unknown as {
+          __settingsStore: { getState: () => Record<string, unknown> };
+        }
+      ).__settingsStore.getState();
+      return { delay: s.delay, packPath: s.packPath, bogus: s.bogusKey };
+    });
+    expect(applied.delay).toBe(123);
+    // A pack preset must never redirect the active pack or strand unknown
+    // keys in the user's settings (the corruption-runtime invariant).
+    expect(applied.packPath).not.toBe("/nowhere");
+    expect(applied.bogus).toBeUndefined();
+
+    // And the autosaved config.json must carry the preset value but stay
+    // clean of the stray key.
+    const configFile = path.join(state!.dir, "data", "config.json");
+    await expect
+      .poll(() => {
+        try {
+          const cfg = JSON.parse(readFileSync(configFile, "utf-8")) as Record<string, unknown>;
+          return cfg.delay === 123 && cfg.bogusKey === undefined;
+        } catch {
+          return false;
+        }
+      }, { timeout: 10_000 })
+      .toBe(true);
     await window.locator("[data-testid='main-tabs']").getByRole("button", { name: "Status" }).click();
   });
 
@@ -254,9 +291,11 @@ test.describe("Pack moods, preset and script auto-run (AAP-shaped pack)", () => 
       .toBeGreaterThanOrEqual(1);
 
     // The script's corrupt() → injection → renderer applied level 1, whose
-    // active moods are mirrored back into the main process.
-    const picks = await randomImages(60);
-    expect(picks).toContain("locked.png");
+    // active moods are mirrored back into the main process. The mirror lands
+    // after the level broadcast, so poll rather than snapshot once.
+    await expect
+      .poll(async () => (await randomImages(60)).includes("locked.png"), { timeout: 15000 })
+      .toBe(true);
 
     await window.locator("[data-testid='start-stop-button']").click();
   });

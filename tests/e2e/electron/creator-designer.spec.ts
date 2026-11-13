@@ -217,13 +217,20 @@ test.describe("No-code corruption designer", () => {
 
     // The saved script runs immediately: level 1 corrupts within seconds.
     await expect.poll(level, { timeout: 30000 }).toBeGreaterThanOrEqual(1);
-    await window.evaluate(() =>
-      (window as unknown as { api: { scripting: { stop: () => Promise<boolean> } } }).api.scripting.stop()
-    );
+
+    // Stop through the real button: the test run must be user-stoppable and
+    // the session must not leak into the next test.
+    const startStop = window.locator("[data-testid='start-stop-button']");
+    await expect(startStop).toHaveText("Stop");
+    await startStop.click();
+    await expect(startStop).toHaveText("Start");
   });
 
   test("the design reopens losslessly in the visual editor", async () => {
     const { window } = running!;
+    // Real unmount: leave Creator, then come back and reload from disk.
+    await window.locator("[data-testid='main-tab-status']").click();
+    await expect(window.locator("[data-testid='creator-panel']")).toHaveCount(0);
     await window.locator("[data-testid='main-tab-creator']").click();
     await expect(window.locator("[data-testid='creator-panel']")).toBeVisible();
     await window.locator("[data-testid='creator-tab-script']").click();

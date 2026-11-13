@@ -32,16 +32,10 @@ export function addMood(index: RawIndexLike, name: string): RawIndexLike {
   return { ...index, moods: [...moods, { mood: clean, captions: [], web: [], webArgs: [], media: [] }] };
 }
 
-/** Remove a mood and drop its name from every other mood's media list. */
+/** Remove a mood; other moods' media lists are untouched. */
 export function removeMood(index: RawIndexLike, name: string): RawIndexLike {
   const moods = Array.isArray(index.moods) ? index.moods : [];
-  const kept = moods.filter((m) => moodNameOf(m) !== name);
-  const cleaned = kept.map((m) => {
-    const rec = asRecord(m);
-    if (!rec || !Array.isArray(rec.media)) return m;
-    return { ...rec, media: rec.media.filter((f) => f !== name) };
-  });
-  return { ...index, moods: cleaned };
+  return { ...index, moods: moods.filter((m) => moodNameOf(m) !== name) };
 }
 
 /**

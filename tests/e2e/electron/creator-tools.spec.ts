@@ -192,9 +192,8 @@ test.describe("Creator Tools authoring flow", () => {
       )
       .toBeGreaterThanOrEqual(1);
 
-    // The script's corrupt() activated the "starter" mood level? (level 1 has
-    // no adds in this pack) — instead verify the gallery reflects a session.
     await window.locator("[data-testid='start-stop-button']").click();
+    await expect(window.locator("[data-testid='start-stop-button']")).toHaveText("Start");
   });
 
   test("edits survive an app restart", async () => {

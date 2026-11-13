@@ -373,6 +373,18 @@ const NON_PERSISTED_KEYS = new Set([
 /** Store methods a hostile config key must never be able to shadow. */
 const STORE_METHOD_KEYS = new Set(["load", "save", "setRaw"]);
 
+const SETTINGS_KEYS = new Set(Object.keys(DEFAULT_SETTINGS));
+
+/** Keep only keys the settings schema knows: pack-authored payloads must
+ *  never strand unknown entries in config.json. */
+export function filterKnownSettings(values: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(values)) {
+    if (SETTINGS_KEYS.has(key)) out[key] = value;
+  }
+  return out;
+}
+
 export const useSettingsStore = create<SettingsStore>()(
   devtools(
     persist(

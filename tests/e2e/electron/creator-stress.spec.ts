@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import {
   cleanupTempState,
@@ -63,15 +63,12 @@ test("a 10k-level hostile marker is capped: the designer paints in seconds", asy
     EDGWARE_PANIC_SKIP_WALLPAPER: "1",
   });
   try {
-    const t0 = Date.now();
     await openDesigner(running.window);
     await expect(running.window.locator("[data-testid='designer-level-199']")).toBeVisible({
       timeout: 15_000,
     });
-    expect(Date.now() - t0).toBeLessThan(15_000);
     // Exactly the capped number of cards: level 200 (index 199) exists, 201 does not.
-    expect(await running.window.locator("[data-testid='designer-level-200']")).toHaveCount(0);
-    expect(await running.window.evaluate(() => 1 + 1)).toBe(2);
+    await expect(running.window.locator("[data-testid='designer-level-200']")).toHaveCount(0);
 
     // Saving the capped design produces valid, reopenable artifacts.
     await running.window.locator("[data-testid='designer-save']").click();
@@ -121,7 +118,17 @@ test("non-string action fields in a marker are dropped, and the design saves", a
     const lua = readFileSync(path.join(pack, "script.lua"), "utf-8");
     expect(lua).toContain("image(nil)");
     expect(lua).toContain("notification()");
-    expect(lua).not.toContain("replace");
+
+    // The saved marker must re-parse: one level card carrying exactly the two
+    // surviving actions after the reload from disk.
+    await running.window.locator("[data-testid='main-tab-status']").click();
+    await running.window.locator("[data-testid='main-tab-creator']").click();
+    await running.window.locator("[data-testid='creator-tab-script']").click();
+    await expect(running.window.locator("[data-testid='designer-level-0']")).toBeVisible();
+    await expect(running.window.locator("[data-testid='designer-level-1']")).toHaveCount(0);
+    await expect(running.window.locator("[data-testid='designer-action-0-0']")).toBeVisible();
+    await expect(running.window.locator("[data-testid='designer-action-0-1']")).toBeVisible();
+    await expect(running.window.locator("[data-testid='designer-action-0-2']")).toHaveCount(0);
   } finally {
     await quitApp(running);
     cleanupTempState(state);
@@ -563,6 +570,126 @@ test("converting a hand-written script yields editable levels and an honest repo
     await expect(running.window.getByRole("textbox", { name: "Action 1 file" })).toHaveValue("one.png");
     await expect(running.window.getByRole("textbox", { name: "Action 2 file" })).toHaveValue("a.mp3");
     await expect(running.window.getByRole("textbox", { name: "Action 3 text" })).toHaveValue("done");
+  } finally {
+    await quitApp(running);
+    cleanupTempState(state);
+  }
+});
+
+test("creator write channels refuse directories that are not packs", async () => {
+  const state = createTempState();
+  const bare = path.join(state.packsDir, "not-a-pack");
+  mkdirSync(bare, { recursive: true });
+  writeFileSync(path.join(bare, "victim.txt"), "do not touch");
+  seedConfig(state, { packPath: state.seedPath, showLoadingFlair: 0 });
+  const running = await launchApp(state, {
+    EDGWARE_STUB_BROWSER: "1",
+    EDGWARE_PANIC_SKIP_WALLPAPER: "1",
+  });
+  try {
+    const results = await running.window.evaluate(
+      async (p: string) => {
+        const api = (
+          window as unknown as {
+            api: {
+              scripting: {
+                readScript: (p: string) => Promise<unknown>;
+                writeScript: (p: string, c: string) => Promise<boolean>;
+                convertScript: (p: string) => Promise<unknown>;
+                writePackDesign: (p: string, lua: string, json: string) => Promise<boolean>;
+              };
+              pack: {
+                getEditableIndex: (p: string) => Promise<unknown>;
+                setFileTags: (p: string, f: string, t: string[]) => Promise<unknown>;
+              };
+            };
+          }
+        ).api;
+        return {
+          read: await api.scripting.readScript(p),
+          write: await api.scripting.writeScript(p, "x"),
+          convert: await api.scripting.convertScript(p),
+          design: await api.scripting.writePackDesign(p, "print(1)", "{}"),
+          index: await api.pack.getEditableIndex(p),
+          tags: await api.pack.setFileTags(p, "ghost.png", ["m"]),
+        };
+      },
+      bare
+    );
+    expect(results).toEqual({
+      read: null,
+      write: false,
+      convert: null,
+      design: false,
+      index: null,
+      tags: null,
+    });
+    // Nothing was created in or beside the bare directory.
+    expect(readdirSync(bare).sort()).toEqual(["victim.txt"]);
+  } finally {
+    await quitApp(running);
+    cleanupTempState(state);
+  }
+});
+
+test("a script beyond the 200 KB limit shows the banner and cannot be saved over", async () => {
+  const state = createTempState();
+  const dir = path.join(state.packsDir, "huge-script");
+  mkdirSync(path.join(dir, "img"), { recursive: true });
+  writeFileSync(
+    path.join(dir, "info.json"),
+    JSON.stringify({ name: "Huge Script", version: "1", creator: "e2e" })
+  );
+  writeFileSync(path.join(dir, "index.json"), JSON.stringify({ default: {}, moods: [] }));
+  const huge = `-- hand-written bulk\n${"-- filler\n".repeat(25000)}`;
+  writeFileSync(path.join(dir, "script.lua"), huge);
+  expect(huge.length).toBeGreaterThan(200_000);
+  seedConfig(state, { packPath: dir, showLoadingFlair: 0 });
+  const running = await launchApp(state, {
+    EDGWARE_STUB_BROWSER: "1",
+    EDGWARE_PANIC_SKIP_WALLPAPER: "1",
+  });
+  try {
+    await openDesigner(running.window);
+    await expect(running.window.locator("[data-testid='designer-toolarge-banner']")).toBeVisible();
+    await expect(running.window.locator("[data-testid='designer-save']")).toBeDisabled();
+    await expect(running.window.locator("[data-testid='designer-import-script']")).toBeDisabled();
+    // The oversized file is untouched — no truncation through the editor.
+    expect(readFileSync(path.join(dir, "script.lua"), "utf-8")).toBe(huge);
+  } finally {
+    await quitApp(running);
+    cleanupTempState(state);
+  }
+});
+
+test("converting refuses a malformed corruption.json and preserves every byte", async () => {
+  const state = createTempState();
+  const dir = path.join(state.packsDir, "broken-tables");
+  mkdirSync(path.join(dir, "img"), { recursive: true });
+  writeFileSync(
+    path.join(dir, "info.json"),
+    JSON.stringify({ name: "Broken Tables", version: "1", creator: "e2e" })
+  );
+  writeFileSync(path.join(dir, "index.json"), JSON.stringify({ default: {}, moods: [] }));
+  const lua = 'require("edgeware_v0")\nimage("one.png")\n';
+  const broken = "{oops";
+  writeFileSync(path.join(dir, "script.lua"), lua);
+  writeFileSync(path.join(dir, "corruption.json"), broken);
+  seedConfig(state, { packPath: dir, showLoadingFlair: 0 });
+  const running = await launchApp(state, {
+    EDGWARE_STUB_BROWSER: "1",
+    EDGWARE_PANIC_SKIP_WALLPAPER: "1",
+  });
+  try {
+    await openDesigner(running.window);
+    await running.window.locator("[data-testid='designer-import-script']").click();
+    await expect(running.window.locator("[data-testid='designer-status']")).toContainText(
+      "Could not save the design"
+    );
+    // Refusal means refusal: both files byte-identical, no backup churn.
+    expect(readFileSync(path.join(dir, "script.lua"), "utf-8")).toBe(lua);
+    expect(readFileSync(path.join(dir, "corruption.json"), "utf-8")).toBe(broken);
+    expect(existsSync(path.join(dir, "script.lua.bak"))).toBe(false);
   } finally {
     await quitApp(running);
     cleanupTempState(state);

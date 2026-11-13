@@ -23,7 +23,7 @@ describe("packEdit", () => {
     expect(listMoodNames(addMood(base(), "   "))).toEqual(["vanilla", "goon"]);
   });
 
-  it("removes a mood and untags it from other moods' media lists", () => {
+  it("removes a mood and leaves other moods' media lists untouched", () => {
     const withCross: RawIndexLike = {
       moods: [
         { mood: "a", media: ["x.png"] },
@@ -32,7 +32,9 @@ describe("packEdit", () => {
     };
     const next = removeMood(withCross, "a");
     expect(listMoodNames(next)).toEqual(["b"]);
-    expect((next.moods as RawIndexLike[])[0].media).toEqual(["x.png"]);
+    // Media entries are filenames, never mood names: a file that happens to
+    // share the removed mood's name must survive.
+    expect((next.moods as RawIndexLike[])[0].media).toEqual(["x.png", "a"]);
   });
 
   it("sets the exact tag set of a file across moods", () => {

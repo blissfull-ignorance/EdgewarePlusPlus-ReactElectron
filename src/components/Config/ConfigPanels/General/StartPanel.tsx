@@ -2,6 +2,7 @@ import { SimpleGrid, Stack, Text, Tooltip, Button, Group } from "@mantine/core";
 import { IconPlayerPlay, IconClock, IconWand } from "@tabler/icons-react";
 import { useEffect, useState } from "react";
 import { useSettingsStore } from "../../../../stores";
+import { filterKnownSettings } from "../../../../stores/settingsStore";
 import { ConfigDropdown, ConfigField, ConfigToggle } from "../../../Config";
 import { SectionCard } from "../../../SectionCard";
 import { normalizePackConfigValues } from "../../../../features/corruption/legacyConfig";
@@ -56,7 +57,7 @@ function PackPresetCard() {
           variant="light"
           data-testid="apply-pack-preset"
           onClick={() => {
-            setRaw(normalizePackConfigValues(preset));
+            setRaw(filterKnownSettings(normalizePackConfigValues(preset)));
             setApplied(true);
           }}
         >

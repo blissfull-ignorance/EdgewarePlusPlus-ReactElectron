@@ -90,17 +90,15 @@ test.describe("Multi-tag mood gating", () => {
 
   test("any one active tag makes a file eligible", async () => {
     await setMoods(["m2"]);
-    const seen = new Set(await picks(80));
-    expect(seen.has("dual.png")).toBe(true);
-    expect(seen.has("only1.png")).toBe(false);
-    expect(seen.has("free.png")).toBe(true);
-  });
+    const viaM2 = new Set(await picks(80));
+    expect(viaM2.has("dual.png")).toBe(true);
+    expect(viaM2.has("only1.png")).toBe(false);
+    expect(viaM2.has("free.png")).toBe(true);
 
-  test("the other tag unlocks the same file plus its siblings", async () => {
     await setMoods(["m1"]);
-    const seen = new Set(await picks(80));
-    expect(seen.has("dual.png")).toBe(true);
-    expect(seen.has("only1.png")).toBe(true);
+    const viaM1 = new Set(await picks(80));
+    expect(viaM1.has("dual.png")).toBe(true);
+    expect(viaM1.has("only1.png")).toBe(true);
   });
 
   test("with no active mood only untagged content plays, and dotfiles never do", async () => {
@@ -123,5 +121,14 @@ test.describe("Multi-tag mood gating", () => {
     const dual = gallery.entries.find((e) => e.file === "dual.png");
     expect(dual?.moods).toEqual(["m1", "m2"]);
     expect(gallery.entries.some((e) => e.file === ".hidden.png")).toBe(false);
+
+    // The grid itself: one card carrying both mood badges, no dotfile card.
+    const { window } = running!;
+    await window.locator("[data-testid='main-tab-gallery']").click();
+    const dualCard = window.locator("[data-testid='gallery-card-dual.png']");
+    await expect(dualCard).toBeVisible();
+    await expect(dualCard).toContainText("m1");
+    await expect(dualCard).toContainText("m2");
+    await expect(window.locator("[data-testid='gallery-card-.hidden.png']")).toHaveCount(0);
   });
 });

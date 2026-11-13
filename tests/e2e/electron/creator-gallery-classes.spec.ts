@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { copyFileSync, mkdirSync, writeFileSync } from "node:fs";
+import { copyFileSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import {
   cleanupTempState,
@@ -35,8 +35,16 @@ test.describe("Gallery media classes, paging and creator filters", () => {
   test.beforeAll(async () => {
     ensureElectronBuild();
     state = createTempState();
-    const dir = state.seedPath;
+    // A dedicated pack with an exactly-known file set: the copied seed pack
+    // differs between machines (a real library pack ships hypno/ and aud/).
+    const dir = path.join(state.packsDir, "classes-pack");
+    mkdirSync(path.join(dir, "img"), { recursive: true });
     mkdirSync(path.join(dir, "hypno"), { recursive: true });
+    writeFileSync(
+      path.join(dir, "info.json"),
+      JSON.stringify({ name: "Classes Pack", version: "1.0", creator: "e2e" })
+    );
+    writeFileSync(path.join(dir, "index.json"), JSON.stringify({ default: {}, moods: [] }));
     copyFileSync(path.join(IMG_DIR, "applelw.png"), path.join(dir, "img", "g1.png"));
     copyFileSync(path.join(IMG_DIR, "globelw.png"), path.join(dir, "img", "g2.png"));
     writeFileSync(path.join(dir, "hypno", "h1.gif"), GIF_BYTES);
@@ -101,23 +109,38 @@ test.describe("Gallery media classes, paging and creator filters", () => {
     await expect(window.locator("[data-testid='gallery-load-more']")).toHaveCount(0);
   });
 
-  test("tagging refuses hypno-only filenames over raw IPC", async () => {
+  test("tagging refuses hypno-only and nonexistent filenames over raw IPC", async () => {
     const { window } = running!;
+    const pack = path.join(state!.packsDir, "classes-pack");
+    const indexFile = path.join(pack, "index.json");
     const before = await window.evaluate((p) =>
       (window as unknown as { api: { pack: { getEditableIndex: (p: string) => Promise<unknown> } } })
         .api.pack.getEditableIndex(p)
-    , state!.seedPath);
-    const after = await window.evaluate(
-      async ([p, f]) =>
-        (
-          window as unknown as {
-            api: { pack: { setFileTags: (p: string, f: string, t: string[]) => Promise<unknown> } };
-          }
-        ).api.pack.setFileTags(p as string, f as string, ["phantom"]),
-      [state!.seedPath, "h1.gif"] as [string, string]
-    );
-    expect(JSON.stringify(after)).toBe(JSON.stringify(before));
-    expect(JSON.stringify(after)).not.toContain("h1.gif");
+    , pack);
+    const beforeBytes = readFileSync(indexFile, "utf-8");
+
+    const refuse = async (file: string) =>
+      window.evaluate(
+        async ([p, f]) =>
+          (
+            window as unknown as {
+              api: { pack: { setFileTags: (p: string, f: string, t: string[]) => Promise<unknown> } };
+            }
+          ).api.pack.setFileTags(p as string, f as string, ["phantom"]),
+        [pack, file] as [string, string]
+      );
+
+    // Hypno files are overlay-only and never taggable; a name with no file
+    // anywhere in the pack must not create a phantom media entry either.
+    const afterHypno = await refuse("h1.gif");
+    const afterGhost = await refuse("ghost.png");
+
+    expect(JSON.stringify(afterHypno)).toBe(JSON.stringify(before));
+    expect(JSON.stringify(afterHypno)).not.toContain("h1.gif");
+    expect(JSON.stringify(afterGhost)).toBe(JSON.stringify(before));
+    expect(JSON.stringify(afterGhost)).not.toContain("ghost.png");
+    // The regression was a disk write: the manifest must be byte-identical.
+    expect(readFileSync(indexFile, "utf-8")).toBe(beforeBytes);
   });
 
   test("the creator grid hides hypno and filters by type and favourites", async () => {
@@ -130,6 +153,16 @@ test.describe("Gallery media classes, paging and creator filters", () => {
 
     await window.locator("[data-testid='main-tab-creator']").click();
     await expect(window.locator("[data-testid='creator-tagging']")).toBeVisible();
+
+    // The creator grid pages too (the round-3 hang fix covers both grids):
+    // 157 taggable images, first page 150, the rest behind Load more.
+    const creatorCards = window.locator("[data-testid^='creator-card-']");
+    await expect(creatorCards).toHaveCount(150);
+    await expect(window.locator("[data-testid='creator-load-more']")).toContainText("7 hidden");
+    await window.locator("[data-testid='creator-load-more']").click();
+    await expect(creatorCards).toHaveCount(157);
+    await expect(window.locator("[data-testid='creator-load-more']")).toHaveCount(0);
+
     // Hypno spirals are never taggable.
     await expect(window.locator("[data-testid='creator-card-h1.gif']")).toHaveCount(0);
     await expect(window.locator("[data-testid='creator-card-g1.png']")).toBeVisible();

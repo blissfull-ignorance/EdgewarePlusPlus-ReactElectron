@@ -943,13 +943,12 @@ function registerHandlers(): void {
     async (_event, packPath: unknown, file: unknown, tags: unknown): Promise<RawIndexLike | null> => {
       const ctx = editableIndex(packPath);
       if (!ctx || typeof file !== "string" || !file || !Array.isArray(tags)) return null;
-      // Mood tags address img/vid/aud media by bare filename. A name that
-      // only exists under hypno/ would create a phantom tag (hypno files are
-      // overlay-only and never taggable).
+      // Mood tags address img/vid/aud media by bare filename. Hypno files
+      // are overlay-only and never taggable; a name with no file anywhere
+      // would strand a phantom media entry in the index.
       const inMediaDir = ["img", "vid", "aud"].some((d) => fs.existsSync(path.join(ctx.dir, d, file)));
-      const inHypno = fs.existsSync(path.join(ctx.dir, "hypno", file));
-      if (inHypno && !inMediaDir) {
-        logger.warn(`[Pack] Refused to tag hypno-only file: ${file}`);
+      if (!inMediaDir) {
+        logger.warn(`[Pack] Refused to tag non-media file: ${file}`);
         return ctx.index;
       }
       const clean = tags.filter((t): t is string => typeof t === "string");
