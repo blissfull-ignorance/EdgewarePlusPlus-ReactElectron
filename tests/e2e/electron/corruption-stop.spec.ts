@@ -96,6 +96,21 @@ test.describe("Stop severs the scripted audio chain", () => {
       )
       .toBeGreaterThanOrEqual(2);
 
+    // The chain really owns windows: without this presence proof, the
+    // post-Stop absence below could be asserting what was never there.
+    // Audio windows are transient (they close on file end), so track the
+    // maximum seen across polls rather than sampling one instant.
+    let sawWindow = 0;
+    await expect
+      .poll(
+        () => {
+          sawWindow = Math.max(sawWindow, audioWindows().length);
+          return sawWindow;
+        },
+        { timeout: 30000 }
+      )
+      .toBeGreaterThan(0);
+
     await window.locator("[data-testid='start-stop-button']").click();
 
     // Stop tears the session down: popups gone, level mirror reset, and no

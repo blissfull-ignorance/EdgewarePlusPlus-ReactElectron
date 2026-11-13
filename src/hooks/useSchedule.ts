@@ -39,7 +39,7 @@ export function useSchedule(running: boolean, onFire: () => void): void {
       const s = useSettingsStore.getState();
       if (!useAppStore.getState().isRunning) {
         onFire();
-        logger.info("[schedule] scheduled session started");
+        logger.info("[schedule] scheduled session trigger fired");
       }
       const interval = repeatIntervalMs(s.repeatSchedule, s.repeatTime, s.repeatType);
       if (interval) {

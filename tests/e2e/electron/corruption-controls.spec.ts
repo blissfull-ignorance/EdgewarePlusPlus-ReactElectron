@@ -131,4 +131,24 @@ test.describe("Corruption controls: max level, start level, skip", () => {
     await expect.poll(levelText, { timeout: 30_000 }).toContain("2 / 3");
     await window.locator("[data-testid='start-stop-button']").click();
   });
+
+  test("a start level above the pack maximum clamps to the last level", async () => {
+    const { window } = running!;
+    await window.locator("[data-testid='main-tab-config']").click();
+    await window.getByRole("tab", { name: "Corruption" }).click();
+    await window.locator("[data-testid='corruption-start-level']").fill("99");
+    await window.locator("[data-testid='main-tab-status']").click();
+
+    await window.locator("[data-testid='start-stop-button']").click();
+    await expect.poll(levelText, { timeout: 30_000 }).toContain("3 / 3");
+    // At the maximum there is nothing to skip to, and no error surfaced.
+    await expect(window.locator("[data-testid='corruption-skip']")).toHaveCount(0);
+    await expect(window.locator("[data-testid='corruption-error-banner']")).toHaveCount(0);
+
+    await window.locator("[data-testid='start-stop-button']").click();
+    await window.locator("[data-testid='main-tab-config']").click();
+    await window.getByRole("tab", { name: "Corruption" }).click();
+    await window.locator("[data-testid='corruption-start-level']").fill("0");
+    await window.locator("[data-testid='main-tab-status']").click();
+  });
 });

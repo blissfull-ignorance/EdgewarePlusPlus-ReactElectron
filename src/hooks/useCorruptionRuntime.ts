@@ -177,12 +177,21 @@ export function useCorruptionRuntime(active: boolean): void {
       switch (s.corruptionTrigger) {
         case "Timed": {
           applyUpTo(startLevel);
-          timers.push(
-            setInterval(() => {
-              const cur = useCorruptionStore.getState().currentLevel;
-              applyLevel(nextLevelFor(cur, maxLevel, purity));
-            }, Math.max(1000, s.corruptionTime))
-          );
+          // Re-arm from live settings after every transition: a level config
+          // that changes corruptionTime must change the real cadence, not
+          // just the displayed countdown (nextLevelTime reads live state).
+          const armTimed = () => {
+            const live = Number(useSettingsStore.getState().corruptionTime);
+            const timer = setTimeout(
+              () => {
+                applyLevel(nextLevelFor(useCorruptionStore.getState().currentLevel, maxLevel, purity));
+                if (!cancelled) armTimed();
+              },
+              Number.isFinite(live) ? Math.max(1000, live) : 1000
+            );
+            timers.push(timer);
+          };
+          armTimed();
           break;
         }
         case "Popup": {
