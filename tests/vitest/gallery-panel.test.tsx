@@ -40,7 +40,6 @@ describe("GalleryPanel", () => {
     expect(screen.getByTestId("gallery-card-voice.wav")).toBeInTheDocument();
     expect(screen.getByTestId("gallery-card-clip.mp4")).toBeInTheDocument();
 
-    expect(screen.getByTestId("gallery-chip-locked")).toHaveTextContent("locked");
     // Lock state badges: locked mood chip shows "locked", active one "active".
     expect(screen.getByTestId("gallery-chip-locked")).toHaveTextContent("locked");
     expect(screen.getByTestId("gallery-chip-voice")).toHaveTextContent("active");

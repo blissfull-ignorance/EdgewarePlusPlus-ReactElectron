@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
-import { render, fireEvent, cleanup } from "@testing-library/react";
+import { render, fireEvent, cleanup, waitFor } from "@testing-library/react";
 import { MantineProvider } from "@mantine/core";
 import { ConfigSlider } from "../../src/components/Config/ConfigSlider";
 import { ConfigToggle } from "../../src/components/Config/ConfigToggle";
@@ -19,30 +19,34 @@ beforeEach(() => {
 // ---------- ConfigSlider — behavioral tests ----------
 
 describe("ConfigSlider", () => {
-  it("calls onChange with clamped value when slider moves above max", () => {
+  it("clamps a typed value above max", () => {
     const handleChange = vi.fn();
-    const { container } = render(
-      <ConfigSlider label="Slider" value={50} onChange={handleChange} min={0} max={100} />,
+    const { getByLabelText } = render(
+      <ConfigSlider label="Spawn Delay" value={50} onChange={handleChange} min={0} max={100} />,
       { wrapper: MANTINE_WRAPPER }
     );
-    const sliders = container.querySelectorAll('input[type="range"]');
-    if (sliders.length > 0) {
-      fireEvent.change(sliders[0], { target: { value: "100" } });
-      expect(handleChange).toHaveBeenCalledWith(100);
-    }
+    fireEvent.change(getByLabelText("Spawn Delay"), { target: { value: "150" } });
+    expect(handleChange).toHaveBeenCalledWith(100);
   });
 
-  it("calls onChange with clamped value when slider moves below min", () => {
+  it("clamps a typed value below min", () => {
     const handleChange = vi.fn();
-    const { container } = render(
-      <ConfigSlider label="Slider" value={50} onChange={handleChange} min={0} max={100} />,
+    const { getByLabelText } = render(
+      <ConfigSlider label="Spawn Delay" value={50} onChange={handleChange} min={10} max={100} />,
       { wrapper: MANTINE_WRAPPER }
     );
-    const sliders = container.querySelectorAll('input[type="range"]');
-    if (sliders.length > 0) {
-      fireEvent.change(sliders[0], { target: { value: "0" } });
-      expect(handleChange).toHaveBeenCalledWith(0);
-    }
+    fireEvent.change(getByLabelText("Spawn Delay"), { target: { value: "5" } });
+    expect(handleChange).toHaveBeenCalledWith(10);
+  });
+
+  it("ignores non-numeric typed input", () => {
+    const handleChange = vi.fn();
+    const { getByLabelText } = render(
+      <ConfigSlider label="Spawn Delay" value={50} onChange={handleChange} min={0} max={100} />,
+      { wrapper: MANTINE_WRAPPER }
+    );
+    fireEvent.change(getByLabelText("Spawn Delay"), { target: { value: "abc" } });
+    expect(handleChange).not.toHaveBeenCalled();
   });
 
   it("renders label text", () => {
@@ -69,15 +73,12 @@ describe("ConfigSlider", () => {
     expect(container.textContent).not.toContain("A description");
   });
 
-  it("applies disabled state when disabled prop is true", () => {
-    const { container } = render(
+  it("disables the numeric input when disabled", () => {
+    const { getByLabelText } = render(
       <ConfigSlider label="Slider" value={50} onChange={() => {}} min={0} max={100} disabled />,
       { wrapper: MANTINE_WRAPPER }
     );
-    const sliders = container.querySelectorAll('input[type="range"]');
-    if (sliders.length > 0) {
-      expect(sliders[0].hasAttribute("disabled")).toBe(true);
-    }
+    expect(getByLabelText("Slider")).toBeDisabled();
   });
 });
 
@@ -124,19 +125,12 @@ describe("ConfigToggle", () => {
     expect(handleChange).toHaveBeenCalledWith(0);
   });
 
-  it("renders label text", () => {
+  it("renders label and description text", () => {
     const { container } = render(
-      <ConfigToggle label="Test Toggle" value={0} onChange={() => {}} />,
+      <ConfigToggle label="Test Toggle" value={0} onChange={() => {}} description="A description" />,
       { wrapper: MANTINE_WRAPPER }
     );
     expect(container.textContent).toContain("Test Toggle");
-  });
-
-  it("renders description when provided", () => {
-    const { container } = render(
-      <ConfigToggle label="Toggle" value={0} onChange={() => {}} description="A description" />,
-      { wrapper: MANTINE_WRAPPER }
-    );
     expect(container.textContent).toContain("A description");
   });
 
@@ -155,21 +149,6 @@ describe("ConfigToggle", () => {
       { wrapper: MANTINE_WRAPPER }
     );
     expect(container.textContent).not.toContain("DANGER");
-  });
-
-  it("applies red border via CSS variable when danger is true", () => {
-    const { container } = render(
-      <ConfigToggle label="Danger Toggle" value={0} onChange={() => {}} danger />,
-      { wrapper: MANTINE_WRAPPER }
-    );
-    // The red border style is applied to the Checkbox wrapper via styles.input prop
-    // In Mantine, this renders as inline styles on an inner element
-    const allText = container.textContent || "";
-    // If the danger prop works, the component renders DANGER text and the checkbox wrapper
-    // should contain the red border styling
-    expect(allText).toContain("DANGER");
-    // The Checkbox's styles.input prop applies red border — verify it renders without error
-    expect(container.querySelector('[class*="Checkbox-root"]')).toBeDefined();
   });
 
   it("applies disabled state when disabled prop is true", () => {
@@ -240,13 +219,9 @@ describe("PackImport", () => {
     warning: null,
   };
 
-  it("renders dropzone heading text", () => {
+  it("renders dropzone heading and zip hint", () => {
     const { container } = render(<PackImport {...baseProps} />, { wrapper: MANTINE_WRAPPER });
     expect(container.textContent).toContain("Drag and drop");
-  });
-
-  it("renders the zip file hint text", () => {
-    const { container } = render(<PackImport {...baseProps} />, { wrapper: MANTINE_WRAPPER });
     expect(container.textContent).toContain(".zip file here");
   });
 
@@ -304,18 +279,22 @@ describe("PackList", () => {
     expect(container.textContent).toContain("No Packs Found");
   });
 
-  it("onSelectPack is called with pack path when selection changes", async () => {
+  it("calls onSelectPack when an option is chosen", async () => {
     const handleSelect = vi.fn();
-    const { container } = render(
+    const { getByLabelText } = render(
       <PackList packs={mockPacks} currentPackPath={undefined} onSelectPack={handleSelect} />,
       { wrapper: MANTINE_WRAPPER }
     );
-    // Find the input in the Select component and simulate selection
-    const inputs = container.querySelectorAll('input[type="text"]');
-    if (inputs.length > 0) {
-      fireEvent.change(inputs[0], { target: { value: mockPacks[0].path } });
-      expect(handleSelect).toHaveBeenCalledWith(mockPacks[0].path);
-    }
+    fireEvent.mouseDown(getByLabelText("Available Packs", { selector: "input" }));
+    const option = await waitFor(() => {
+      const found = Array.from(document.querySelectorAll('[role="option"]')).find((o) =>
+        o.textContent?.includes("Pack A")
+      );
+      if (!found) throw new Error("option not open");
+      return found;
+    });
+    fireEvent.click(option);
+    expect(handleSelect).toHaveBeenCalledWith("/data/packs/pack-a");
   });
 
   it("shows current pack path when provided", () => {

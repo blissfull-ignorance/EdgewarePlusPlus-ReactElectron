@@ -25,9 +25,12 @@ export function mirroredLevel(): number {
   return mirror.level;
 }
 
+/** Hard ceiling: no real pack has a level anywhere near this. */
+const MAX_INJECT_LEVEL = 100_000;
+
 function injectLevel(level: number): boolean {
   const value = Number(level);
-  if (!Number.isFinite(value) || value < 1) {
+  if (!Number.isFinite(value) || value < 1 || value > MAX_INJECT_LEVEL) {
     logger.warn(`[Corruption] Rejected inject level ${JSON.stringify(level)}`);
     return false;
   }

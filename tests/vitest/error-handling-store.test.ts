@@ -55,15 +55,10 @@ describe("settingsStore — error handling", () => {
     const result = await useSettingsStore.getState().load();
     expect(result.themeType).toBe("Original");
     expect(result.popupMod).toBe(100);
-  });
 
-  it("load() returns defaults when loadSettings returns null", async () => {
     window.api.system.loadSettings = vi.fn().mockResolvedValue(null);
-    window.api.system.saveSettings = vi.fn().mockResolvedValue(undefined);
-
-    const { useSettingsStore } = await import("../../src/stores/settingsStore");
-    const result = await useSettingsStore.getState().load();
-    expect(result.themeType).toBe("Original");
+    const { useSettingsStore: again } = await import("../../src/stores/settingsStore");
+    expect((await again.getState().load()).themeType).toBe("Original");
   });
 
   it("save() excludes saveStatus and saveErrorMessage from serialized state", async () => {

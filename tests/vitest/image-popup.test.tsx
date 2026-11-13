@@ -30,15 +30,12 @@ describe("ImagePopup", () => {
     expect(caption!.textContent).toBe("Test caption");
   });
 
-  it("wraps content in PopupShell", () => {
+  it("hides the caption when showCaptions is disabled", () => {
+    useSettingsStore.setState({ showCaptions: 0 });
     const { container } = renderWithMantine(
-      <ImagePopup
-        imageUrl="test.png"
-        onClose={() => {}}
-      />
+      <ImagePopup imageUrl="test.png" caption="Test caption" onClose={() => {}} />
     );
-    const shell = container.querySelector('[data-testid="popup-shell"]');
-    expect(shell).not.toBeNull();
+    expect(container.querySelector('[data-testid="image-caption"]')).toBeNull();
   });
 
   it("calls onClose when close button is clicked", () => {

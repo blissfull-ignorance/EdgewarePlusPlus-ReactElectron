@@ -262,8 +262,12 @@ export class FengariVM {
 
     let returnValue: unknown;
     try {
-      returnValue = this.stackToJS(top + 1);
-      lua_settop(this.L, top);
+      // lua_pcall pops the chunk, so the first return value sits at `top`
+      // itself; clearing to top - 1 releases every result.
+      if (lua_gettop(this.L) >= top) {
+        returnValue = this.stackToJS(top);
+      }
+      lua_settop(this.L, top - 1);
     } catch (err) {
       this._initialized = false;
       return { success: false, error: `Result read crash: ${err instanceof Error ? err.message : String(err)}` };

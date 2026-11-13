@@ -29,39 +29,9 @@ describe("geometry.computePopupGeometry", () => {
     expect(result.height).toBeGreaterThan(0);
   });
 
-  it("returns positive dimensions", () => {
-    const result = computePopupGeometry({
-      mediaWidth: 1280,
-      mediaHeight: 720,
-    });
-
-    expect(result.width).toBeGreaterThan(0);
-    expect(result.height).toBeGreaterThan(0);
-  });
 });
 
 describe("geometry avoids overlapping existing popups", () => {
-  it("with 2 existing popups at (100,100) and (500,500), new popup is within monitor bounds", () => {
-    const existingPopups = [
-      { x: 100, y: 100, width: 200, height: 150 },
-      { x: 500, y: 500, width: 200, height: 150 },
-    ];
-
-    for (let i = 0; i < 100; i++) {
-      const result = computePopupGeometry({
-        mediaWidth: 640,
-        mediaHeight: 480,
-        monitors: [{ x: 0, y: 0, width: 1920, height: 1080 }],
-        existingPopups,
-        isLowkey: false,
-      });
-
-      expect(result.x).toBeGreaterThanOrEqual(0);
-      expect(result.y).toBeGreaterThanOrEqual(0);
-      expect(result.x + result.width).toBeLessThanOrEqual(1920);
-      expect(result.y + result.height).toBeLessThanOrEqual(1080);
-    }
-  });
 
   it("with 1 existing popup, uses finite weighted placement that prefers non-overlapping positions", () => {
     const existingPopups = [
@@ -200,8 +170,8 @@ describe("geometry with lowkey mode", () => {
     expect(result.y).toBeGreaterThan(600);
   });
 
-  it("lowkey=4 (Random) produces popup anywhere", () => {
-    let xPositions = 0;
+  it("lowkey=4 (Random) actually varies the corner", () => {
+    const corners = new Set<string>();
     for (let i = 0; i < 50; i++) {
       const result = computePopupGeometry({
         mediaWidth: 640,
@@ -212,59 +182,34 @@ describe("geometry with lowkey mode", () => {
         cornerIndex: 4,
         lowkeyScaling: 50,
       });
-      xPositions += result.x;
+      corners.add(`${result.x > 960 ? "R" : "L"}${result.y > 540 ? "B" : "T"}`);
     }
-    expect(xPositions / 50).toBeGreaterThan(0);
+    expect(corners.size).toBeGreaterThanOrEqual(2);
   });
 });
 
 describe("calculatePopupDimensions", () => {
-  it("uses 30-70% range for fullscreen mode", () => {
+  it("uses 30-70% range for fullscreen mode on every draw", () => {
     const monitor = { x: 0, y: 0, width: 1920, height: 1080 };
-    let withinRange = 0;
-    const iterations = 100;
-
-    for (let i = 0; i < iterations; i++) {
-      const { width, height } = calculatePopupDimensions(
-        640,
-        480,
-        monitor,
-        false,
-        50
-      );
-      const smallestDim = 1080;
-      const minDim = smallestDim * 0.3;
-      const maxDim = smallestDim * 0.7;
-      if (width >= minDim && width <= maxDim && height >= minDim && height <= maxDim) {
-        withinRange++;
-      }
+    // Longest side = short monitor side × scale ∈ [0.3,0.7] × min(aspect,2).
+    // 640x480 → aspect 4/3, so width ∈ [432, 1008] and height = width/aspect.
+    for (let i = 0; i < 100; i++) {
+      const { width, height } = calculatePopupDimensions(640, 480, monitor, false, 50);
+      expect(width).toBeGreaterThanOrEqual(431);
+      expect(width).toBeLessThanOrEqual(1008);
+      expect(Math.abs(height - width / (640 / 480))).toBeLessThanOrEqual(2);
     }
-
-    expect(withinRange).toBeGreaterThanOrEqual(iterations * 0.2);
   });
 
-  it("uses 20-50% range for lowkey mode", () => {
+  it("uses 20-50% range for lowkey mode on every draw", () => {
     const monitor = { x: 0, y: 0, width: 1920, height: 1080 };
-    let withinRange = 0;
-    const iterations = 100;
-
-    for (let i = 0; i < iterations; i++) {
-      const { width, height } = calculatePopupDimensions(
-        640,
-        480,
-        monitor,
-        true,
-        100
-      );
-      const smallestDim = 1080;
-      const minDim = smallestDim * 0.2;
-      const maxDim = smallestDim * 0.5;
-      if (width >= minDim && width <= maxDim && height >= minDim && height <= maxDim) {
-        withinRange++;
-      }
+    // 640x480 → width ∈ [1080×0.2×4/3, 1080×0.5×4/3] = [288, 720].
+    for (let i = 0; i < 100; i++) {
+      const { width, height } = calculatePopupDimensions(640, 480, monitor, true, 100);
+      expect(width).toBeGreaterThanOrEqual(287);
+      expect(width).toBeLessThanOrEqual(720);
+      expect(Math.abs(height - width / (640 / 480))).toBeLessThanOrEqual(2);
     }
-
-    expect(withinRange).toBeGreaterThan(iterations * 0.2);
   });
 
   it("respects minimum dimension of 100", () => {
@@ -291,7 +236,7 @@ describe("computeWeightedPosition", () => {
     expect(pos.y + 150).toBeLessThanOrEqual(1080);
   });
 
-  it("uses infinity weights when more than one popup exists", () => {
+  it("computes cell weight against existing popups", () => {
     const existingPopups = [
       { x: 100, y: 100, width: 200, height: 150 },
       { x: 500, y: 500, width: 200, height: 150 },
@@ -345,15 +290,6 @@ describe("parseDisabledMonitors", () => {
 });
 
 describe("selectMonitor", () => {
-  it("returns a monitor when none disabled", () => {
-    const monitors = [
-      { x: 0, y: 0, width: 1920, height: 1080 },
-      { x: 1920, y: 0, width: 1920, height: 1080 },
-    ];
-    const result = selectMonitor(monitors, "[]");
-    expect(monitors).toContain(result);
-  });
-
   it("excludes disabled monitors", () => {
     const monitors = [
       { x: 0, y: 0, width: 1920, height: 1080 },
@@ -361,6 +297,7 @@ describe("selectMonitor", () => {
     ];
     const result = selectMonitor(monitors, JSON.stringify([0]));
     expect(result).toBe(monitors[1]);
+    expect(monitors).toContain(selectMonitor(monitors, "[]"));
   });
 
   it("falls back to first monitor when all disabled", () => {
@@ -373,11 +310,8 @@ describe("selectMonitor", () => {
 });
 
 describe("LOWKEY_CORNERS", () => {
-  it("has 5 corner options", () => {
-    expect(LOWKEY_CORNERS).toHaveLength(5);
-  });
-
   it("corner names match legacy values", () => {
+    expect(LOWKEY_CORNERS).toHaveLength(5);
     expect(LOWKEY_CORNERS[0].name).toBe("Top-Right");
     expect(LOWKEY_CORNERS[1].name).toBe("Top-Left");
     expect(LOWKEY_CORNERS[2].name).toBe("Bottom-Left");

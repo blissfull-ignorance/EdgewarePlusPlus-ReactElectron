@@ -68,6 +68,32 @@ describe("useCorruptionStore", () => {
     expect(overrides).toEqual({ popupMod: 40, audioMod: 30 });
   });
 
+  it("chains three levels with cumulative moods and per-level overrides", () => {
+    useCorruptionStore.getState().loadCorruptionData({
+      moods: {
+        "1": { add: ["submissive", "beginner"], remove: [] },
+        "2": { add: ["dominant"], remove: ["submissive"] },
+        "3": { add: ["intense"], remove: ["beginner"] },
+      },
+      config: {
+        "1": { popupMod: 40 },
+        "2": { popupMod: 50, audioMod: 50 },
+        "3": { popupMod: 80 },
+      },
+    });
+
+    expect(useCorruptionStore.getState().transitionTo(1)).toEqual({ popupMod: 40 });
+    const o2 = useCorruptionStore.getState().transitionTo(2);
+    expect(o2).toEqual({ popupMod: 50, audioMod: 50 });
+    expect(useCorruptionStore.getState().activeMoods).toEqual(
+      expect.arrayContaining(["beginner", "dominant"])
+    );
+    expect(useCorruptionStore.getState().activeMoods).not.toContain("submissive");
+    expect(useCorruptionStore.getState().transitionTo(3)).toEqual({ popupMod: 80 });
+    expect(useCorruptionStore.getState().activeMoods).not.toContain("beginner");
+    expect(useCorruptionStore.getState().activeMoods).toContain("intense");
+  });
+
   it("transitionTo records transitions", () => {
     useCorruptionStore.getState().loadCorruptionData({
       moods: {
@@ -90,18 +116,10 @@ describe("useCorruptionStore", () => {
     expect(overrides).toEqual({});
   });
 
-  it("setDriverType updates driver", () => {
-    useCorruptionStore.getState().setDriverType("audio");
-    expect(useCorruptionStore.getState().driverType).toBe("audio");
-  });
-
-  it("setNextLevelTime updates next level time", () => {
-    const time = Date.now() + 60000;
-    useCorruptionStore.getState().setNextLevelTime(time);
-    expect(useCorruptionStore.getState().nextLevelTime).toBe(time);
-  });
-
   it("reset restores default state", () => {
+    useCorruptionStore.getState().loadCorruptionData({
+      moods: { "1": { add: ["test"], remove: [] } },
+    });
     useCorruptionStore.getState().setDriverType("script");
     useCorruptionStore.getState().setNextLevelTime(12345);
     useCorruptionStore.getState().transitionTo(1);
@@ -113,6 +131,15 @@ describe("useCorruptionStore", () => {
     expect(state.nextLevelTime).toBeNull();
     expect(state.driverType).toBe("timer");
     expect(state.transitions).toEqual([]);
+    expect(Object.keys(state.levels)).toHaveLength(0);
+  });
+
+  it("session state never persists to storage", () => {
+    // The store deliberately has no persist middleware: boot must never
+    // resurrect a previous run's moods or level (creator-round fix).
+    // A zustand persisted store exposes a .persist api; its absence pins
+    // the invariant regardless of the test environment's storage.
+    expect((useCorruptionStore as unknown as { persist?: unknown }).persist).toBeUndefined();
   });
 
   it("getNextCorruptionLevel returns the next level", () => {

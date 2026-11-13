@@ -8,25 +8,12 @@ const MANTINE_WRAPPER = ({ children }: { children: React.ReactNode }) => (
 );
 
 describe("DangerousPanel", () => {
-  it("renders the DANGEROUS header with red text", () => {
+  it("marks the danger tone on the card and its title", () => {
     const { container } = render(<DangerousPanel />, { wrapper: MANTINE_WRAPPER });
-    const textElements = container.querySelectorAll('[class*="Text-root"]');
-    const dangerousHeader = Array.from(textElements).find((h) => h.textContent?.includes("DANGEROUS SETTINGS"));
-    expect(dangerousHeader).toBeDefined();
-    if (dangerousHeader) {
-      expect(dangerousHeader.getAttribute("style") || "").toContain("red");
-    }
-  });
-
-  it("wraps content in a Paper with red border", () => {
-    const { container } = render(<DangerousPanel />, { wrapper: MANTINE_WRAPPER });
-    const papers = container.querySelectorAll('[class*="Paper"]');
-    const dangerousPaper = Array.from(papers).find((p) => p.textContent?.includes("DANGEROUS SETTINGS"));
-    expect(dangerousPaper).toBeDefined();
-    if (dangerousPaper) {
-      const paperStyle = dangerousPaper.getAttribute("style") || "";
-      expect(paperStyle).toContain("border-color: red");
-    }
+    const paper = container.querySelector('[data-danger="true"]');
+    expect(paper).not.toBeNull();
+    expect(paper!.textContent).toContain("DANGEROUS SETTINGS");
+    expect(container.querySelector('[data-danger-title="true"]')).not.toBeNull();
   });
 
   it("renders all 6 dangerous toggle item labels", () => {

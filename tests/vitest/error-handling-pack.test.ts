@@ -80,67 +80,43 @@ describe("pack:loadIndex — corrupt JSON handling", () => {
     expect(Array.isArray(res.moods)).toBe(true);
   });
 
-  it("handles corrupt info.json gracefully in loadInfo (returns fallback data)", async () => {
+  it("loadInfo falls back to the default index when the pack ships no manifests", async () => {
     mockReadFileSync.mockImplementation((p: string) => {
       if (p.includes("config.json")) {
         return JSON.stringify({ packPath: "/mock/pack" });
       }
       throw new Error("ENOENT: no such file");
     });
-    mockExistsSync.mockReturnValue(false);
+    // The pack directory exists; every manifest inside it does not.
+    mockExistsSync.mockImplementation((p: string) => p === "/mock/pack");
 
     const { registerHandlers } = await import("../../electron/ipc/pack");
     registerHandlers();
 
     const handler = handlers["pack:loadInfo"];
-    expect(handler).toBeDefined();
-
     const result = await (handler as () => Promise<Record<string, unknown> | null>)();
-    expect(result).toBeDefined();
+    // Contract: an existing pack without readable manifests yields the
+    // built-in default Index (non-null, moods array), never a throw.
+    expect(result).not.toBeNull();
+    expect(Array.isArray(result?.moods)).toBe(true);
   });
 
-  it("randomImage handles readdirSync errors gracefully", async () => {
-    mockReadFileSync.mockReturnValue(JSON.stringify({ packPath: "/mock/pack" }));
-    mockExistsSync.mockReturnValue(true);
-    mockReaddirSync.mockImplementation(() => {
-      throw new Error("EACCES: permission denied");
-    });
+  it.each(["pack:randomImage", "pack:randomAudio", "pack:randomVideo", "pack:randomPrompt", "pack:randomWeb"])(
+    "%s survives a readdir failure with null",
+    async (channel) => {
+      mockReadFileSync.mockReturnValue(JSON.stringify({ packPath: "/mock/pack" }));
+      mockExistsSync.mockReturnValue(true);
+      mockReaddirSync.mockImplementation(() => {
+        throw new Error("EACCES: permission denied");
+      });
 
-    const { registerHandlers } = await import("../../electron/ipc/pack");
-    registerHandlers();
+      const { registerHandlers } = await import("../../electron/ipc/pack");
+      registerHandlers();
 
-    const handler = handlers["pack:randomImage"];
-    const result = await (handler as () => Promise<string | null>)();
-    expect(result).toBeNull();
-  });
-
-  it("randomAudio handles readdirSync errors gracefully", async () => {
-    mockReadFileSync.mockReturnValue(JSON.stringify({ packPath: "/mock/pack" }));
-    mockExistsSync.mockReturnValue(true);
-    mockReaddirSync.mockImplementation(() => {
-      throw new Error("EACCES: permission denied");
-    });
-
-    const { registerHandlers } = await import("../../electron/ipc/pack");
-    registerHandlers();
-
-    const handler = handlers["pack:randomAudio"];
-    const result = await (handler as () => Promise<string | null>)();
-    expect(result).toBeNull();
-  });
-
-  it("randomVideo handles readdirSync errors gracefully", async () => {
-    mockReadFileSync.mockReturnValue(JSON.stringify({ packPath: "/mock/pack" }));
-    mockExistsSync.mockReturnValue(true);
-    mockReaddirSync.mockImplementation(() => {
-      throw new Error("EACCES: permission denied");
-    });
-
-    const { registerHandlers } = await import("../../electron/ipc/pack");
-    registerHandlers();
-
-    const handler = handlers["pack:randomVideo"];
-    const result = await (handler as () => Promise<string | null>)();
-    expect(result).toBeNull();
-  });
+      const handler = handlers[channel];
+      expect(handler).toBeDefined();
+      const result = await (handler as () => Promise<string | null>)();
+      expect(result).toBeNull();
+    }
+  );
 });

@@ -3,9 +3,8 @@ import { computeFadeInSteps, computeFadeOutSteps, computeSubliminalAlpha } from 
 
 describe("computeFadeInSteps", () => {
   it("returns correct number of steps at 60 ticks per second", () => {
-    const steps = computeFadeInSteps(600, 0.5);
-    const expectedSteps = Math.ceil(600 / (1000 / 60));
-    expect(steps.length).toBe(expectedSteps + 1);
+    // 600ms at 60 ticks/s = 36 intervals + the initial step.
+    expect(computeFadeInSteps(600, 0.5).length).toBe(37);
   });
 
   it("volume ramps from 0 to target volume", () => {
@@ -54,15 +53,8 @@ describe("computeSubliminalAlpha", () => {
     expect(computeSubliminalAlpha(0.5)).toBe(127);
   });
 
-  it("handles edge case: opacity 0.25 produces 191", () => {
+  it("maps quarter and three-quarter opacity", () => {
     expect(computeSubliminalAlpha(0.25)).toBe(191);
-  });
-
-  it("handles edge case: opacity 0.75 produces 63", () => {
     expect(computeSubliminalAlpha(0.75)).toBe(63);
-  });
-
-  it("higher opacity means more transparent", () => {
-    expect(computeSubliminalAlpha(0.1)).toBeGreaterThan(computeSubliminalAlpha(0.9));
   });
 });

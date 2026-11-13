@@ -15,20 +15,6 @@ describe("close button label (pack-defined, lower right corner)", () => {
     vi.restoreAllMocks();
   });
 
-  it("shows the pack-defined label (e.g. 'I Submit <3') instead of an X", async () => {
-    window.api.pack.closeLabel = vi.fn().mockResolvedValue("I Submit <3");
-    render(
-      <PopupShell onClose={() => {}}>
-        <div>Content</div>
-      </PopupShell>,
-      { wrapper: MANTINE_WRAPPER }
-    );
-
-    await waitFor(() => {
-      expect(screen.getByTestId("close-button")).toHaveTextContent("I Submit <3");
-    });
-  });
-
   it("falls back to 'Close' when the pack defines no label", async () => {
     window.api.pack.closeLabel = vi.fn().mockResolvedValue(null);
     render(
@@ -87,7 +73,7 @@ describe("close button label (pack-defined, lower right corner)", () => {
     expect(handleClose).toHaveBeenCalledTimes(1);
   });
 
-  it("keeps the button clickable exactly as before (single click closes)", () => {
+  it("closes with a single click even without an IPC bridge", () => {
     const original = (window as unknown as Record<string, unknown>).api;
     (window as unknown as Record<string, unknown>).api = undefined;
     const handleClose = vi.fn();

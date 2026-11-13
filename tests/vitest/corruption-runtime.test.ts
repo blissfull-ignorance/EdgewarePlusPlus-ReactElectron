@@ -52,6 +52,13 @@ describe("gateOverrides", () => {
     });
   });
 
+  it("normalizes legacy units while passing overrides", () => {
+    // Pack-authored corruptionTime arrives in seconds; the runtime applies ms.
+    expect(
+      gateOverrides({ corruptionTime: 30, delay: 500 }, { fullPerm: true, themeCycle: false })
+    ).toEqual({ corruptionTime: 30000, delay: 500 });
+  });
+
   it("gates themeType behind the theme cycle grant", () => {
     expect(gateOverrides({ themeType: "x" }, { fullPerm: true, themeCycle: false })).toEqual({});
     expect(gateOverrides({ themeType: "x" }, { fullPerm: true, themeCycle: true })).toEqual({

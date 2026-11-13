@@ -171,27 +171,13 @@ describe("computeActiveMoods", () => {
 // ── computeConfigOverrides ─────────────────────────────────────────────────────
 
 describe("computeConfigOverrides", () => {
-  it("returns the config from the level data", () => {
-    const level: ParsedCorruptionLevel = {
-      level: 1,
-      addMoods: new MoodSet(),
-      removeMoods: new MoodSet(),
-      wallpaper: null,
-      config: { popupMod: 50, delay: 2000 },
-    };
-    const result = computeConfigOverrides(level);
-    expect(result).toEqual({ popupMod: 50, delay: 2000 });
-  });
-
-  it("returns empty object for level with no config", () => {
-    const level: ParsedCorruptionLevel = {
-      level: 1,
-      addMoods: new MoodSet(),
-      removeMoods: new MoodSet(),
-      wallpaper: null,
-      config: {},
-    };
-    expect(computeConfigOverrides(level)).toEqual({});
+  it("passes the level config through, empty when absent", () => {
+    const base = { level: 1, addMoods: new MoodSet(), removeMoods: new MoodSet(), wallpaper: null };
+    expect(computeConfigOverrides({ ...base, config: { popupMod: 50, delay: 2000 } })).toEqual({
+      popupMod: 50,
+      delay: 2000,
+    });
+    expect(computeConfigOverrides({ ...base, config: {} })).toEqual({});
   });
 });
 
@@ -242,16 +228,13 @@ describe("getNextLevel", () => {
 // ── getAvailableLevels ─────────────────────────────────────────────────────────
 
 describe("getAvailableLevels", () => {
-  it("returns levels in ascending order", () => {
+  it("returns levels in ascending order; empty for none", () => {
     const levels = {
       3: {} as ParsedCorruptionLevel,
       1: {} as ParsedCorruptionLevel,
       2: {} as ParsedCorruptionLevel,
     };
     expect(getAvailableLevels(levels)).toEqual([1, 2, 3]);
-  });
-
-  it("returns empty array for no levels", () => {
     expect(getAvailableLevels({})).toEqual([]);
   });
 });

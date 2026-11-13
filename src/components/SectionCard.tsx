@@ -25,6 +25,7 @@ export function SectionCard({
       withBorder
       radius="lg"
       p="md"
+      data-danger={tone === "danger" ? "true" : undefined}
       style={tone === "danger" ? { borderColor: "red" } : undefined}
     >
       <Group justify="space-between" align="flex-start" gap="sm" mb={children ? "md" : 0}>
@@ -48,6 +49,7 @@ export function SectionCard({
             <Text
               size="md"
               fw={700}
+              data-danger-title={tone === "danger" ? "true" : undefined}
               style={tone === "danger" ? { color: "var(--mantine-color-red-5)" } : titleStyle}
             >
               {title}

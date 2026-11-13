@@ -192,7 +192,7 @@ describe("designerModel", () => {
     expect(parsed!.levels[0].wallpaper).toBeNull();
     expect(parsed!.levels[0].actions).toEqual([{ kind: "image", file: "a.png" }]);
     expect(parsed!.levels[0].advance).toEqual({ mode: "time", seconds: 10 });
-    expect(parsed!.levels[0].config).toEqual({ popupMod: undefined, delay: undefined });
+    expect(parsed!.levels[0].config).toStrictEqual({ popupMod: undefined, delay: undefined });
   });
 
   it("caps hostile marker dimensions", () => {
@@ -213,22 +213,15 @@ describe("designerModel", () => {
   });
 
   it("drops non-string action fields and unknown keys instead of throwing on save", () => {
-    const dirty = `-- [EDGWARE-DESIGNER]${JSON.stringify({
-      version: 1,
-      startDelaySeconds: 1,
-      levels: [
-        {
-          addMoods: [],
-          removeMoods: [],
-          actions: [
-            { kind: "image", file: 12345 },
-            { kind: "notification", text: { a: 1 } },
-            { kind: "prompt", text: ["x"], extra: "drop-me", __proto__: { polluted: 1 } },
-          ],
-          advance: { mode: "end" },
-        },
-      ],
-    })}`;
+    // Raw JSON text on purpose: an object literal's __proto__ key is dropped
+    // by JSON.stringify, so only a literal marker string tests the hostile
+    // prototype key reaching the parser.
+    const dirty =
+      "-- [EDGWARE-DESIGNER]" +
+      '{"version":1,"startDelaySeconds":1,"levels":[{"addMoods":[],"removeMoods":[],' +
+      '"actions":[{"kind":"image","file":12345},{"kind":"notification","text":{"a":1}},' +
+      '{"kind":"prompt","text":["x"],"extra":"drop-me","__proto__":{"polluted":1}}],' +
+      '"advance":{"mode":"end"}}]}';
     const parsed = parseDesignerScript(dirty);
     expect(parsed).not.toBeNull();
     expect(parsed!.levels[0].actions).toEqual([

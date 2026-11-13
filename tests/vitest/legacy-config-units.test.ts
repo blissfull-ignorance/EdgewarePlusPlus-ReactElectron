@@ -20,6 +20,7 @@ describe("normalizePackConfigValues", () => {
       delay: 500,
       corruptionMode: 1,
     });
+    expect(normalizePackConfigValues({})).toEqual({});
   });
 
   it("ignores non-numeric corruptionTime", () => {
@@ -28,7 +29,5 @@ describe("normalizePackConfigValues", () => {
     });
   });
 
-  it("passes an empty object through", () => {
-    expect(normalizePackConfigValues({})).toEqual({});
-  });
+
 });

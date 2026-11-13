@@ -5,15 +5,6 @@ describe("renderer logger", () => {
     vi.resetModules();
   });
 
-  it("exports logger with expected methods", async () => {
-    const { logger } = await import("../../src/utils/logger");
-    expect(typeof logger.error).toBe("function");
-    expect(typeof logger.warn).toBe("function");
-    expect(typeof logger.info).toBe("function");
-    expect(typeof logger.debug).toBe("function");
-    expect(typeof logger.setLevel).toBe("function");
-  });
-
   it("respects log level filtering", async () => {
     vi.spyOn(console, "error").mockImplementation(() => {});
     vi.spyOn(console, "warn").mockImplementation(() => {});

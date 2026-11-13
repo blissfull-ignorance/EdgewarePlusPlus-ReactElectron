@@ -3,7 +3,6 @@ import { screen, fireEvent, cleanup } from "@testing-library/react";
 import { renderWithMantine } from "./setup";
 import { ErrorBoundary } from "../../src/components/ErrorBoundary";
 import { ConfigSaveStatus } from "../../src/components/Config/ConfigSaveStatus";
-import type { SaveStatus } from "../../src/components/Config/ConfigSaveStatus";
 
 describe("ErrorBoundary", () => {
   beforeEach(() => {
@@ -104,22 +103,14 @@ describe("ConfigSaveStatus", () => {
     expect(badges.length).toBe(0);
   });
 
-  it("shows saving badge when status is saving", () => {
-    renderWithMantine(<ConfigSaveStatus status="saving" />);
-    expect(screen.getByTestId("save-status-saving")).toBeInTheDocument();
-    expect(screen.getByText("Saving...")).toBeInTheDocument();
-  });
-
-  it("shows saved badge when status is saved", () => {
-    renderWithMantine(<ConfigSaveStatus status="saved" />);
-    expect(screen.getByTestId("save-status-saved")).toBeInTheDocument();
-    expect(screen.getByText("Saved")).toBeInTheDocument();
-  });
-
-  it("shows error badge when status is error", () => {
-    renderWithMantine(<ConfigSaveStatus status="error" />);
-    expect(screen.getByTestId("save-status-error")).toBeInTheDocument();
-    expect(screen.getByText("Save Failed")).toBeInTheDocument();
+  it.each([
+    ["saving", "save-status-saving", "Saving..."],
+    ["saved", "save-status-saved", "Saved"],
+    ["error", "save-status-error", "Save Failed"],
+  ] as const)("shows the %s badge with its label", (status, testId, label) => {
+    renderWithMantine(<ConfigSaveStatus status={status} />);
+    expect(screen.getByTestId(testId)).toBeInTheDocument();
+    expect(screen.getByText(label)).toBeInTheDocument();
   });
 
   it("shows error message when provided", () => {
@@ -134,32 +125,4 @@ describe("ConfigSaveStatus", () => {
   });
 });
 
-describe("SaveStatus type", () => {
-  it("has all expected values", () => {
-    const statuses: SaveStatus[] = ["idle", "saving", "saved", "error"];
-    expect(statuses).toHaveLength(4);
-  });
-});
 
-describe("ConfigPage — ErrorBoundary per panel", () => {
-  it("wraps each panel in ErrorBoundary so one crashing panel does not break others", () => {
-    const BoomPanel = () => { throw new Error("Panel crash"); };
-
-    function TestConfigPage() {
-      return (
-        <div>
-          <ErrorBoundary fallbackTitle="Panel A Error" fallbackMessage="Panel A crashed.">
-            <BoomPanel />
-          </ErrorBoundary>
-          <ErrorBoundary fallbackTitle="Panel B Error" fallbackMessage="Panel B crashed.">
-            <div data-testid="panel-b-okay">Panel B works fine</div>
-          </ErrorBoundary>
-        </div>
-      );
-    }
-
-    renderWithMantine(<TestConfigPage />);
-    expect(screen.getByText("Panel A Error")).toBeInTheDocument();
-    expect(screen.getByTestId("panel-b-okay")).toBeInTheDocument();
-  });
-});
