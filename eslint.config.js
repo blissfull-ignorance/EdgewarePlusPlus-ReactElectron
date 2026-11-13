@@ -42,6 +42,7 @@ export default [
         navigator: "readonly",
         localStorage: "readonly",
         getComputedStyle: "readonly",
+        MutationObserver: "readonly",
         React: "readonly",
         File: "readonly",
         HTMLInputElement: "readonly",

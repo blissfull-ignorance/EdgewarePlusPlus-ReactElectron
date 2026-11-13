@@ -26,6 +26,13 @@ export function buildZip(
 export interface RawZipEntry {
   name: string;
   data: Buffer;
+  /**
+   * Store the entry as DEFLATE with bytes that are not a valid deflate stream.
+   * yauzl ignores data CRCs, so a corrupt-CRC STORED entry still extracts
+   * cleanly; an invalid deflate stream is what actually fails mid-read and
+   * drives extractPackZip's partial-cleanup path.
+   */
+  corruptDeflate?: boolean;
 }
 
 /**
@@ -41,12 +48,15 @@ export function buildRawZip(zipPath: string, entries: RawZipEntry[]): void {
   for (const entry of entries) {
     const nameBuf = Buffer.from(entry.name, "utf-8");
     const crc = crc32(entry.data) >>> 0;
+    // 0 = STORED; 8 = DEFLATE. A corrupt entry claims DEFLATE so the reader
+    // runs the bytes through zlib and fails on the first invalid block.
+    const method = entry.corruptDeflate ? 8 : 0;
 
     const local = Buffer.alloc(30);
     local.writeUInt32LE(0x04034b50, 0);
     local.writeUInt16LE(20, 4);
     local.writeUInt16LE(0, 6);
-    local.writeUInt16LE(0, 8);
+    local.writeUInt16LE(method, 8);
     local.writeUInt16LE(0, 10);
     local.writeUInt16LE(0, 12);
     local.writeUInt16LE(0, 14);
@@ -62,7 +72,7 @@ export function buildRawZip(zipPath: string, entries: RawZipEntry[]): void {
     cd.writeUInt16LE(20, 4);
     cd.writeUInt16LE(20, 6);
     cd.writeUInt16LE(0, 8);
-    cd.writeUInt16LE(0, 10);
+    cd.writeUInt16LE(method, 10);
     cd.writeUInt16LE(0, 12);
     cd.writeUInt16LE(0, 14);
     cd.writeUInt32LE(crc, 16);

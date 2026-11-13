@@ -1,5 +1,5 @@
 import { useCallback } from "react";
-import type { FileWithPath } from "@mantine/dropzone";
+import type { FileRejection, FileWithPath } from "@mantine/dropzone";
 import { Dropzone } from "@mantine/dropzone";
 import { Alert, Button, Group, Progress, Text } from "@mantine/core";
 import {
@@ -13,6 +13,7 @@ import { SectionCard } from "../SectionCard";
 
 interface PackImportProps {
   onDrop: (file: File | FileWithPath) => Promise<void>;
+  onReject: (rejections: FileRejection[]) => void;
   onImportFromDisk: () => void;
   onAddFolder: () => void;
   importing: boolean;
@@ -23,6 +24,7 @@ interface PackImportProps {
 
 const PackImport = ({
   onDrop,
+  onReject,
   onImportFromDisk,
   onAddFolder,
   importing,
@@ -46,6 +48,7 @@ const PackImport = ({
     >
       <Dropzone
         onDrop={handleDrop}
+        onReject={(files) => onReject(files)}
         maxSize={500 * 1024 * 1024}
         accept={["application/zip", ".zip"]}
         disabled={importing}

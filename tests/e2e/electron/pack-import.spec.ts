@@ -28,6 +28,8 @@ interface Fixtures {
   nestedZip: string;
   evilZip: string;
   garbageZip: string;
+  partialZip: string;
+  textFile: string;
   folderPack: string;
   flatDest: string;
   nestedDest: string;
@@ -118,6 +120,20 @@ test.beforeAll(async () => {
   const garbageZip = path.join(fix, "garbage.zip");
   writeFileSync(garbageZip, "this is not a zip archive at all");
 
+  // A plain non-zip file: exercises the dropzone's extension gate, which the
+  // corrupt-.zip fixture above never reaches.
+  const textFile = path.join(fix, "notes.txt");
+  writeFileSync(textFile, "definitely not a pack");
+
+  // A zip whose first entry is valid but whose second claims DEFLATE with
+  // bytes that are not a valid deflate stream: extraction writes the first
+  // file, fails mid-stream on the second, and must clean up.
+  const partialZip = path.join(fix, "partial-pack.zip");
+  buildRawZip(partialZip, [
+    { name: "info.json", data: Buffer.from(JSON.stringify({ name: "Partial Pack", version: "1" })) },
+    { name: "img/seed.png", data: Buffer.from([0x06, 0x06, 0x06, 0x06]), corruptDeflate: true },
+  ]);
+
   const folderPack = path.join(state!.dir, "elsewhere", "folder-pack");
   mkdirSync(folderPack, { recursive: true });
   writeFileSync(
@@ -130,6 +146,8 @@ test.beforeAll(async () => {
     nestedZip,
     evilZip,
     garbageZip,
+    partialZip,
+    textFile,
     folderPack,
     flatDest: path.join(state!.packsDir, "flat-pack"),
     nestedDest: path.join(state!.packsDir, "nested-pack"),
@@ -295,6 +313,53 @@ test("A20.5 a non-zip import shows a visible error, never a silent no-op", async
 
   const listed = await listPacksViaBridge(window);
   expect(listed!.some((p) => p.path.includes("garbage"))).toBe(false);
+  // The refusal is a disk fact, not just a listing fact.
+  expect(existsSync(path.join(state!.packsDir, "garbage"))).toBe(false);
+
+  await clearSeams();
+});
+
+test("a non-zip file dropped on the dropzone is refused by name, not extracted", async () => {
+  const { window } = running!;
+  await openPackManagement();
+
+  // The dropzone's accept filter is bypassed by a dialog-style file set, so
+  // the panel's own extension gate is what must refuse this file.
+  await window
+    .locator("[data-testid='pack-dropzone'] input[type='file']")
+    .setInputFiles(fixtures!.textFile);
+
+  const failureToast = window
+    .locator(".mantine-Notification-root")
+    .filter({ hasText: "Only .zip" });
+  await expect(failureToast.last()).toBeVisible({ timeout: 15000 });
+
+  await expect(window.locator("[data-testid='pack-import-error']")).toContainText(
+    "Only .zip files can be imported."
+  );
+  expect(existsSync(path.join(state!.packsDir, "notes"))).toBe(false);
+  const listed = await listPacksViaBridge(window);
+  expect(listed!.some((p) => p.path.includes("notes"))).toBe(false);
+});
+
+test("a mid-stream extraction failure leaves no partial pack behind", async () => {
+  const { window } = running!;
+  await setSeam("EDGWARE_IMPORT_TEST_PATH", fixtures!.partialZip);
+  await openPackManagement();
+
+  await window.locator("[data-testid='pack-import-zip-button']").click();
+
+  const failureToast = window
+    .locator(".mantine-Notification-root")
+    .filter({ hasText: "Zip extraction failed" });
+  await expect(failureToast.last()).toBeVisible({ timeout: 60000 });
+
+  // extractPackZip rm -rf's the destination on failure: the first entry
+  // extracted cleanly, so a leftover directory means the cleanup regressed.
+  const partialDest = path.join(state!.packsDir, "partial-pack");
+  await expect.poll(() => existsSync(partialDest), { timeout: 5000 }).toBe(false);
+  const listed = await listPacksViaBridge(window);
+  expect(listed!.some((p) => p.path.includes("partial-pack"))).toBe(false);
 
   await clearSeams();
 });

@@ -5,7 +5,7 @@ import { ipcMain } from "electron";
 import { logger } from "../utils/logger";
 import { pickSubliminalText, pickNotificationText } from "../utils/textPool";
 import { getActiveMoods, isMoodEligible, setActiveMoods } from "../utils/moodState";
-import { applyPackIcons, loadAppIconDataUrl } from "../utils/appIcon";
+import { applyPackIcons, loadAppIconDataUrl, logResolvedIcon } from "../utils/appIcon";
 import { parseDiscordDat } from "../utils/discordDat";
 import { resolveBlacklistSource, computeBlacklistTarget } from "../utils/blacklist";
 
@@ -877,7 +877,9 @@ function registerHandlers(): void {
 
   /** Re-apply the current pack's icon to dock and windows (pack switch). */
   ipcMain.handle("pack:refreshAppIcon", async (): Promise<void> => {
-    applyPackIcons(currentPackDir());
+    const packDir = currentPackDir();
+    applyPackIcons(packDir);
+    logResolvedIcon(packDir);
   });
 
   ipcMain.handle("pack:listFavourites", async (): Promise<string[]> => readFavouritesList());

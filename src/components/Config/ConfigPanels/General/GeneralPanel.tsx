@@ -1,5 +1,5 @@
 import { useCallback, useState } from "react";
-import type { FileWithPath } from "@mantine/dropzone";
+import type { FileRejection, FileWithPath } from "@mantine/dropzone";
 import { Stack, Tabs, Text } from "@mantine/core";
 import {
   IconAlertCircle,
@@ -138,8 +138,7 @@ export function GeneralPanel({ tab = "start", onTabChange }: GeneralPanelProps) 
           duration: 8000,
         });
         return;
-      }
-      const filePath = window.api.system.getPathForFile(file as File);
+      }      const filePath = window.api.system.getPathForFile(file as File);
       if (!filePath) {
         const message =
           "Could not resolve the file path for the dropped file. Use “Import from file…” to pick a zip from disk instead.";
@@ -157,6 +156,30 @@ export function GeneralPanel({ tab = "start", onTabChange }: GeneralPanelProps) 
       await runImport(filePath);
     },
     [runImport]
+  );
+
+  // The dropzone's accept filter routes non-zip drops to onReject, so the
+  // visible refusal must live here too — otherwise a bad drop is a silent
+  // no-op with only a momentary icon flicker.
+  const handleRejectedDrop = useCallback(
+    (rejections: FileRejection[]) => {
+      const first = rejections[0];
+      if (!first) return;
+      const tooLarge = first.errors.some((e) => e.code === "file-too-large");
+      const message = tooLarge
+        ? "Pack zips must be smaller than 500 MB."
+        : "Only .zip files can be imported.";
+      setImportError(message);
+      showToast({
+        id: "pack-import-error",
+        title: "Import failed",
+        description: message,
+        color: "red",
+        icon: <IconAlertCircle size={18} />,
+        duration: 8000,
+      });
+    },
+    []
   );
 
   const handleImportFromDisk = useCallback(async () => {
@@ -308,6 +331,7 @@ export function GeneralPanel({ tab = "start", onTabChange }: GeneralPanelProps) 
           <Stack gap="md">
             <PackImport
               onDrop={handleDroppedFile}
+              onReject={handleRejectedDrop}
               onImportFromDisk={() => void handleImportFromDisk()}
               onAddFolder={() => void handleAddFolder()}
               importing={importing}

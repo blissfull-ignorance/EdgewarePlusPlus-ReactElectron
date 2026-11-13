@@ -116,6 +116,11 @@ test.describe("Wallpaper memory and panic wallpaper override", () => {
     await quitApp(running!);
     running = null;
 
+    // Quitting itself must NOT restore — the documented mechanism is the
+    // dirty flag plus the next startup. If someone moves the restore to
+    // before-quit, this line fails and the semantics get a look-in.
+    expect(appliedLog().at(-1)).toMatch(/wp\.png$/);
+
     running = await launch();
     await expect
       .poll(() => appliedLog().at(-1), { timeout: 30_000 })
@@ -140,5 +145,29 @@ test.describe("Wallpaper memory and panic wallpaper override", () => {
     expect(readFileSync(staged).equals(payload)).toBe(true);
     expect(appliedLog().at(-1)).toBe(staged);
     running = null;
+  });
+
+  test("a panic hard-exit still restores the wallpaper on the next startup", async () => {
+    // The panic above ended in app.exit(0): before-quit never ran, so the
+    // dirty flag plus the startup restore is the only thing that can undo
+    // the panic wallpaper. Hard-exit leaks are this project's most-recurring
+    // incident class — pin the chain across the hard exit itself.
+    expect(appliedLog().at(-1)).toContain("panic_wallpaper.jpg");
+
+    running = await launch();
+    await expect
+      .poll(() => appliedLog().at(-1), { timeout: 30_000 })
+      .toBe(initialWallpaper);
+
+    const stateFile = path.join(state!.dir, "wallpaper_state.json");
+    await expect
+      .poll(() => {
+        try {
+          return (JSON.parse(readFileSync(stateFile, "utf-8")) as { dirty?: boolean }).dirty;
+        } catch {
+          return null;
+        }
+      }, { timeout: 15_000 })
+      .toBe(false);
   });
 });

@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { mkdirSync } from "node:fs";
+import { mkdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import {
   cleanupTempState,
@@ -36,7 +36,7 @@ function bodyColors(running: RunningApp): Promise<{ bg: string; fg: string }> {
 }
 
 test.describe("theme surfaces (legacy Tk palette parity)", () => {
-  let cleanup: Array<() => void> = [];
+  let cleanup: Array<() => Promise<void> | void> = [];
   let running: RunningApp | null = null;
   let state: TempState | null = null;
 
@@ -70,7 +70,7 @@ test.describe("theme surfaces (legacy Tk palette parity)", () => {
   });
 
   test.afterAll(async () => {
-    while (cleanup.length) cleanup.pop()!();
+    while (cleanup.length) await cleanup.pop()!();
   });
 
   for (const theme of THEMES) {
@@ -95,4 +95,29 @@ test.describe("theme surfaces (legacy Tk palette parity)", () => {
       await app.window.screenshot({ path: path.join(EVIDENCE_DIR, `${theme.name.toLowerCase()}.png`) });
     });
   }
+
+  test("the chosen themeType persists to config.json", async () => {
+    const app = running!;
+    await app.window.evaluate(() => {
+      const store = (
+        window as unknown as {
+          __settingsStore?: { getState: () => { setRaw: (v: Record<string, unknown>) => void } };
+        }
+      ).__settingsStore;
+      store?.getState().setRaw({ themeType: "The One" });
+    });
+
+    // The renderer paints the theme from store state; only the autosaved
+    // config proves the choice reaches disk (and so survives a restart).
+    const configFile = path.join(state!.dir, "data", "config.json");
+    await expect
+      .poll(() => {
+        try {
+          return (JSON.parse(readFileSync(configFile, "utf-8")) as { themeType?: string }).themeType;
+        } catch {
+          return null;
+        }
+      }, { timeout: 15000 })
+      .toBe("The One");
+  });
 });

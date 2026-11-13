@@ -46,7 +46,7 @@ function stubServer(): Promise<{ server: Server; url: string }> {
   });
 }
 
-function seed(): TempState {
+function seed(overrides: Record<string, unknown> = {}): TempState {
   const state = createTempState({ kind: "media" });
   seedConfig(state, {
     packPath: state.seedPath,
@@ -62,12 +62,13 @@ function seed(): TempState {
     delay: 1000,
     downloadEnabled: 1,
     tagList: "test>tags",
+    ...overrides,
   });
   return state;
 }
 
 test.describe("booru downloader (stubbed gelbooru, no real network)", () => {
-  let cleanup: Array<() => void> = [];
+  let cleanup: Array<() => Promise<void> | void> = [];
   let stub: { server: Server; url: string } | null = null;
 
   test.beforeAll(async () => {
@@ -76,8 +77,8 @@ test.describe("booru downloader (stubbed gelbooru, no real network)", () => {
     cleanup.push(() => stub?.server.close());
   });
 
-  afterEach(() => {
-    while (cleanup.length) cleanup.pop()!();
+  afterEach(async () => {
+    while (cleanup.length) await cleanup.pop()!();
   });
 
   test("forced roll swaps the pack image for the downloaded booru image", async () => {
@@ -139,6 +140,75 @@ test.describe("booru downloader (stubbed gelbooru, no real network)", () => {
       )
       .toBe(true);
 
+    expect(existsSync(path.join(state.dir, "data", "booru-cache"))).toBe(false);
+  });
+
+  test("a failing booru server falls back to pack media and never stalls the loop", async () => {
+    const state = seed();
+    cleanup.push(() => cleanupTempState(state));
+    // Forced roll against a closed port: every fetch fails at connect time.
+    // The downloader's contract is that each failure path returns null so
+    // the caller keeps the pack image — the popup loop must never stall on
+    // the network.
+    const running = await launchApp(state, {
+      EDGWARE_BOORU_BASE_URL: "http://127.0.0.1:9",
+      EDGWARE_BOORU_ROLL: "100",
+    });
+    cleanup.push(async () => {
+      try {
+        await quitApp(running);
+      } catch {
+        /* noop */
+      }
+    });
+
+    await running.window.locator("[data-testid='start-stop-button']").click();
+
+    const imagePopups = () =>
+      new Set(
+        running.app
+          .windows()
+          .filter((w) => w !== running.window && w.url().includes("/popup/image/"))
+          .map((w) => w.url())
+      );
+    // Two distinct popups prove the loop kept rolling after the failures.
+    await expect.poll(() => imagePopups().size, { timeout: 60000 }).toBeGreaterThanOrEqual(2);
+    expect(existsSync(path.join(state.dir, "data", "booru-cache"))).toBe(false);
+  });
+
+  test("downloadEnabled off skips the downloader even on a forced roll", async () => {
+    const state = seed({ downloadEnabled: 0 });
+    cleanup.push(() => cleanupTempState(state));
+    const running = await launchApp(state, {
+      EDGWARE_BOORU_BASE_URL: stub!.url,
+      EDGWARE_BOORU_ROLL: "100",
+    });
+    cleanup.push(async () => {
+      try {
+        await quitApp(running);
+      } catch {
+        /* noop */
+      }
+    });
+
+    await running.window.locator("[data-testid='start-stop-button']").click();
+
+    // The stub would serve a swap if the gate were ignored: popups must be
+    // pack media and the cache directory must never appear.
+    await expect
+      .poll(
+        async () =>
+          running.app
+            .windows()
+            .some((w) => w !== running.window && w.url().includes("/popup/image/")),
+        { timeout: 60000 }
+      )
+      .toBe(true);
+    expect(
+      running.app
+        .windows()
+        .some((w) => decodeURIComponent(w.url()).includes("packmedia://booru-cache/"))
+    ).toBe(false);
     expect(existsSync(path.join(state.dir, "data", "booru-cache"))).toBe(false);
   });
 });

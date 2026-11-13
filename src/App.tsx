@@ -33,10 +33,10 @@ function Workspace() {
 }
 
 /**
- * Legacy startup splash: a full-screen fade-in/hold/fade-out image shown once
- * per app start when the startup-splash setting is on. The pack may override
- * the image with loading_splash.{png,gif,jpg,jpeg,bmp} at its root or in
- * resource/.
+ * Legacy startup splash: a full-screen image opaque from the first frame,
+ * held briefly then faded out, shown once per app start when the
+ * startup-splash setting is on. The pack may override the image with
+ * loading_splash.{png,gif,jpg,jpeg,bmp} at its root or in resource/.
  */
 function MainSplash() {
   const loaded = useSettingsStore((s) => s.loaded);
