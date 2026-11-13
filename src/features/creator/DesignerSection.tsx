@@ -25,6 +25,7 @@ import {
 import { IconArrowDown, IconArrowUp, IconCopy, IconPlus, IconTrash } from "@tabler/icons-react";
 import type { GalleryEntry, GalleryResult } from "../../types/pack";
 import { useSettingsStore } from "../../stores/settingsStore";
+import { useAppStore } from "../../stores/appStore";
 import {
   emptyDesign,
   generateCorruptionJson,
@@ -571,7 +572,7 @@ export function DesignerSection({ packRevision = 0 }: { packRevision?: number })
         setDesign(effective);
         setDesignDirty(false);
         setCodeDirty(false);
-        if (andRun) void window.api?.scripting.runLua("script.lua").catch(() => undefined);
+        if (andRun) useAppStore.getState().requestStart();
         void reload().catch(() => undefined);
       })
       .catch(() => setStatus("failed"));

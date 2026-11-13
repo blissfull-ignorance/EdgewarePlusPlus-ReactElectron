@@ -10,6 +10,8 @@ export interface AppState {
   packPath: string | null;
   themeType: ThemeType;
   isRunning: boolean;
+  /** A Start request from outside the header button (designer test run). */
+  pendingStart: boolean;
   popupsCount: number;
   hibernateActive: boolean;
 
@@ -17,6 +19,8 @@ export interface AppState {
   setTheme: (theme: ThemeType) => void;
   start: () => void;
   stop: () => void;
+  requestStart: () => void;
+  clearPendingStart: () => void;
   incrementPopups: () => void;
   decrementPopups: () => void;
   setHibernateActive: (active: boolean) => void;
@@ -29,12 +33,15 @@ export const useAppStore = create<AppState>()(
         packPath: null,
         themeType: "Original",
         isRunning: false,
+        pendingStart: false,
         popupsCount: 0,
         hibernateActive: false,
 
         setPackPath: (packPath) => set({ packPath }),
         setTheme: (themeType) => set({ themeType }),
         start: () => set({ isRunning: true }),
+        requestStart: () => set({ pendingStart: true }),
+        clearPendingStart: () => set({ pendingStart: false }),
         stop: () => set({ isRunning: false, popupsCount: 0, hibernateActive: false }),
         incrementPopups: () => set((s) => ({ popupsCount: s.popupsCount + 1 })),
         decrementPopups: () =>

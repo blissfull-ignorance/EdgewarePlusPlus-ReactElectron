@@ -4,6 +4,7 @@ import path from "node:path";
 import { initLuaVM, getLuaVM, LuaExecResult, EdgewareHost } from "../scripting/fengariAdapter";
 import { resolveScriptPath } from "../scripting/scriptPath";
 import {
+  DESIGNER_MARKER,
   designFromScript,
   generateCorruptionJson,
   generateLua,
@@ -432,7 +433,24 @@ function registerHandlers(): void {
       const dir = path.resolve(packPath.replace(/^~/, process.env.HOME ?? packPath));
       if (!looksLikePack(dir)) return false;
       try {
-        writeAtomic(path.join(dir, "script.lua"), lua);
+        const script = path.join(dir, "script.lua");
+        // A designed script replacing a hand-written one must archive the
+        // original first — the designer's banner promises exactly that.
+        if (fs.existsSync(script) && lua.startsWith(DESIGNER_MARKER)) {
+          const existing = fs.readFileSync(script, "utf-8");
+          if (!existing.includes(DESIGNER_MARKER)) {
+            const candidates = [
+              "script.lua.bak",
+              ...Array.from({ length: 8 }, (_, i) => `script.lua.bak-${i + 2}`),
+              `script.lua.bak-${Date.now()}`,
+            ];
+            const target = candidates.find((name) => !fs.existsSync(path.join(dir, name)));
+            if (!target) return false;
+            fs.copyFileSync(script, path.join(dir, target));
+            logger.info(`[Scripting] Hand-written script archived as ${target} before a design save`);
+          }
+        }
+        writeAtomic(script, lua);
         if (parsed) {
           writeAtomic(path.join(dir, "corruption.json"), JSON.stringify(parsed, null, 2));
         }

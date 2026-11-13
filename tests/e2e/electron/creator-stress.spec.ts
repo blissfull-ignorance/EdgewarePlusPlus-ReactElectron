@@ -408,6 +408,90 @@ test("importing a hand-written script archives it and installs a designed one", 
   }
 });
 
+test("saving a design over a hand-written script archives the original first", async () => {
+  const state: TempState = createTempState();
+  const dir = path.join(state.packsDir, "CT-SaveOverwrite");
+  mkdirSync(path.join(dir, "img"), { recursive: true });
+  writeFileSync(path.join(dir, "img", "one.png"), "png");
+  writeFileSync(
+    path.join(dir, "info.json"),
+    JSON.stringify({ name: "CT-SaveOverwrite", id: "ctso", creator: "e2e", version: "1", description: "x" })
+  );
+  writeFileSync(path.join(dir, "index.json"), JSON.stringify({ default: {}, moods: [] }));
+  const handwritten = 'require("edgeware_v0")\n-- irreplaceable hand-written magic\nafter(1000, corrupt)\n';
+  writeFileSync(path.join(dir, "script.lua"), handwritten);
+  seedConfig(state, {
+    packPath: dir,
+    popupRenderMode: "electron",
+    popupMod: 0,
+    vidMod: 0,
+    showLoadingFlair: 0,
+    corruptionMode: 0,
+    corruptionTrigger: "Script",
+    delay: 60000,
+  });
+  const running = await launchApp(state, {
+    EDGWARE_STUB_BROWSER: "1",
+    EDGWARE_PANIC_SKIP_WALLPAPER: "1",
+  });
+  try {
+    await openDesigner(running.window);
+    await expect(running.window.locator("[data-testid='designer-handwritten-banner']")).toBeVisible();
+    // Save WITHOUT converting: the design replaces the script, so the
+    // hand-written original must be archived, not silently destroyed.
+    await running.window.locator("[data-testid='designer-save']").click();
+    await expect(running.window.locator("[data-testid='designer-status']")).toContainText("Saved");
+    expect(existsSync(path.join(dir, "script.lua.bak"))).toBe(true);
+    expect(readFileSync(path.join(dir, "script.lua.bak"), "utf-8")).toBe(handwritten);
+    expect(readFileSync(path.join(dir, "script.lua"), "utf-8")).toContain("EDGWARE-DESIGNER");
+  } finally {
+    await quitApp(running);
+    cleanupTempState(state);
+  }
+});
+
+test("Save & test run starts a session the Stop button controls", async () => {
+  const state: TempState = createTempState();
+  const dir = path.join(state.packsDir, "CT-TestRun");
+  mkdirSync(path.join(dir, "img"), { recursive: true });
+  writeFileSync(path.join(dir, "img", "one.png"), "png");
+  writeFileSync(
+    path.join(dir, "info.json"),
+    JSON.stringify({ name: "CT-TestRun", id: "cttr", creator: "e2e", version: "1", description: "x" })
+  );
+  writeFileSync(path.join(dir, "index.json"), JSON.stringify({ default: {}, moods: [] }));
+  seedConfig(state, {
+    packPath: dir,
+    popupRenderMode: "electron",
+    popupMod: 0,
+    vidMod: 0,
+    showLoadingFlair: 0,
+    corruptionMode: 0,
+    corruptionTrigger: "Script",
+    delay: 60000,
+  });
+  const running = await launchApp(state, {
+    EDGWARE_STUB_BROWSER: "1",
+    EDGWARE_PANIC_SKIP_WALLPAPER: "1",
+  });
+  try {
+    await openDesigner(running.window);
+    await running.window.locator("[data-testid='designer-add-level']").click();
+    await running.window.locator("[data-testid='designer-test-run']").click();
+    await expect(running.window.locator("[data-testid='designer-status']")).toContainText("Saved");
+    // The test run is a real session: the header button flips to Stop and
+    // ends it.
+    await expect(running.window.locator("[data-testid='start-stop-button']")).toHaveText("Stop", {
+      timeout: 15_000,
+    });
+    await running.window.locator("[data-testid='start-stop-button']").click();
+    await expect(running.window.locator("[data-testid='start-stop-button']")).toHaveText("Start");
+  } finally {
+    await quitApp(running);
+    cleanupTempState(state);
+  }
+});
+
 test("converting a hand-written script yields editable levels and an honest report", async () => {
   const state: TempState = createTempState();
   const dir = path.join(state.packsDir, "CT-Convert");

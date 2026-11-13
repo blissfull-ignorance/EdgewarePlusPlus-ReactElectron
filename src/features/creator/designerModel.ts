@@ -622,6 +622,7 @@ export function designFromScript(lua: string, corruption: unknown): ConversionRe
 
   const helperApi = new Map<string, DesignerActionKind>();
   const helperLiteral = new Map<string, string | null>();
+  const complexHelpers = new Set<string>();
   for (const name of definedFns) {
     if ((API_CALL_NAMES as readonly string[]).includes(name) || name === "corrupt") continue;
     // A wrapper is called WITH arguments somewhere. Functions used only as
@@ -637,12 +638,23 @@ export function designFromScript(lua: string, corruption: unknown): ConversionRe
       helperApi.set(name, API_KIND_BY_NAME[inner[0][1]]);
       helperLiteral.set(name, firstLiteral(body));
       definitionSpans.push(span);
+    } else if (kinds.size > 1 && span) {
+      // A parameterized wrapper around SEVERAL APIs (bulk spawners) has no
+      // design equivalent: its body is implementation, not usage, and its
+      // calls are reported as dropped.
+      definitionSpans.push(span);
+      complexHelpers.add(name);
     }
   }
   const insideDefinition = (pos: number): boolean =>
     definitionSpans.some((d) => pos >= d.start && pos < d.end);
 
   const calls: ScannedCall[] = [];
+  // Deeply nested calls make the balanced-paren scan quadratic; a hostile
+  // 200 KB script must not freeze the main process.
+  const SCAN_WORK_BUDGET = 4_000_000;
+  let scanWork = 0;
+  let scanBudgetHit = false;
   let droppedRandomWeb = 0;
   let droppedBulk = 0;
   let droppedHelpers = 0;
@@ -668,6 +680,11 @@ export function designFromScript(lua: string, corruption: unknown): ConversionRe
     }
     const scanned = scanCallArgs(code, openIdx);
     if (!scanned) continue;
+    scanWork += scanned.end - openIdx;
+    if (scanWork > SCAN_WORK_BUDGET) {
+      scanBudgetHit = true;
+      break;
+    }
     argsText = scanned.args;
     const parts = splitArgs(argsText);
     const first = (parts[0] ?? "").trim();
@@ -713,8 +730,15 @@ export function designFromScript(lua: string, corruption: unknown): ConversionRe
     calls.push({ kind, literal, chained, chance, pos: callm.index });
   }
 
-  const bulkRe = /\bmultiple_popups\s*\(/g;
-  droppedBulk = (code.match(bulkRe) ?? []).length;
+  // Call sites only: a script-local definition of the spawner is not a call.
+  const bulkCalls = (code.match(/\bmultiple_popups\s*\(/g) ?? []).length;
+  const bulkDefs = (code.match(/\bfunction\s+multiple_popups\s*\(/g) ?? []).length;
+  droppedBulk = Math.max(0, bulkCalls - bulkDefs);
+  for (const name of complexHelpers) {
+    const callRe = new RegExp(`\\b${name}\\s*\\(\\s*[^)\\s]`, "g");
+    const defRe = new RegExp(`\\bfunction\\s+${name}\\s*\\(\\s*[^)\\s]`, "g");
+    droppedHelpers += Math.max(0, (code.match(callRe) ?? []).length - (code.match(defRe) ?? []).length);
+  }
   const computedRollRe = /\broll\(\s*[^)\d\s]/g;
   computedRolls = (code.match(computedRollRe) ?? []).length;
 
@@ -818,6 +842,9 @@ export function designFromScript(lua: string, corruption: unknown): ConversionRe
   if (droppedRandomWeb > 0) notes.push(`${droppedRandomWeb} web(nil) random-URL call(s) dropped — set explicit URLs in the designer.`);
   if (droppedHelpers > 0) notes.push(`${droppedHelpers} helper call(s) with computed arguments dropped — the value was not a literal.`);
   if (computedRolls > 0) notes.push(`${computedRolls} roll() with a computed chance — those guards were not converted.`);
+  if (scanBudgetHit) {
+    notes.push("The script's nesting exceeded the conversion scan budget — later actions were not converted.");
+  }
   if (chainedCalls > 0) {
     notes.push("Callback chains were flattened into level order — check each level's Advance setting.");
   }

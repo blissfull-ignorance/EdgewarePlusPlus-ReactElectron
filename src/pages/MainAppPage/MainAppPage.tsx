@@ -335,6 +335,17 @@ export function MainAppPage() {
   // disclosure + pack script), not a bare store start.
   useSchedule(isRunning, handleStart);
 
+  // The designer's "Save & test run" asks for the same Start path as the
+  // header button (danger disclosure, spawn warning, script run), so the
+  // session is a real one the Stop button can end.
+  const pendingStart = useAppStore((st) => st.pendingStart);
+  useEffect(() => {
+    if (pendingStart && !useAppStore.getState().isRunning) {
+      useAppStore.getState().clearPendingStart();
+      handleStart();
+    }
+  }, [pendingStart, handleStart]);
+
   return (
     <>
     <AppFrame

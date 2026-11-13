@@ -158,6 +158,44 @@ describe("designFromScript", () => {
     expect(flatNotes.join(" ")).toContain("single level");
   });
 
+  it("drops parameterized multi-API wrappers instead of converting their bodies", () => {
+    const { design, notes } = designFromScript(
+      [
+        'require("edgeware_v0")',
+        "function multiple_popups(chance, number)",
+        "  while spawned < number do",
+        "    if roll(chance) then",
+        '      image("leak.png")',
+        "    else",
+        '      video("leak.mp4")',
+        "    end",
+        "    spawned = spawned + 1",
+        "  end",
+        "end",
+        "corrupt()",
+        "multiple_popups(95, 3)",
+        "multiple_popups(90, 2)",
+        "",
+      ].join("\n"),
+      {}
+    );
+    const json = JSON.stringify(design.levels);
+    expect(json).not.toContain("leak.png");
+    expect(json).not.toContain("leak.mp4");
+    const report = notes.join(" ");
+    expect(report).toContain("2 multiple_popups() call(s) dropped");
+    expect(report).toContain("2 helper call(s) with computed arguments dropped");
+  });
+
+  it("bounds conversion work on pathologically nested scripts", () => {
+    const depth = 20000;
+    const lua = "image(" .repeat(depth) + '"x.png"' + ")".repeat(depth);
+    const started = Date.now();
+    const { notes } = designFromScript(lua, {});
+    expect(Date.now() - started).toBeLessThan(2000);
+    expect(notes.join(" ")).toContain("scan budget");
+  });
+
   it("survives an empty script", () => {
     const { design: empty } = designFromScript("", {});
     expect(empty.levels).toHaveLength(1);
