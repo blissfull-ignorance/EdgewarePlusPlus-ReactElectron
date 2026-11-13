@@ -33,6 +33,7 @@ import { logger } from "../../utils/logger";
 export function MainAppPage() {
   const [view, setView] = useState<MainView>("status");
   const [configTab, setConfigTab] = useState("general");
+  const [annoyanceTab, setAnnoyanceTab] = useState("popupTypes");
   const [generalTab, setGeneralTab] = useState("start");
   const isRunning = useAppStore((s) => s.isRunning);
   const start = useAppStore((s) => s.start);
@@ -217,6 +218,7 @@ export function MainAppPage() {
   const openPopupSettings = useCallback(() => {
     setSpawnIssues(null);
     setConfigTab("annoyance");
+    setAnnoyanceTab("popupTweaks");
     setView("config");
   }, []);
 
@@ -382,6 +384,8 @@ export function MainAppPage() {
           <ConfigPage
             tab={configTab}
             onTabChange={setConfigTab}
+            annoyanceTab={annoyanceTab}
+            onAnnoyanceTabChange={setAnnoyanceTab}
             generalTab={generalTab}
             onGeneralTabChange={setGeneralTab}
           />

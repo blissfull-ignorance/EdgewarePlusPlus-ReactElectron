@@ -101,6 +101,25 @@ test.describe("Gallery media classes, paging and creator filters", () => {
     await expect(window.locator("[data-testid='gallery-load-more']")).toHaveCount(0);
   });
 
+  test("tagging refuses hypno-only filenames over raw IPC", async () => {
+    const { window } = running!;
+    const before = await window.evaluate((p) =>
+      (window as unknown as { api: { pack: { getEditableIndex: (p: string) => Promise<unknown> } } })
+        .api.pack.getEditableIndex(p)
+    , state!.seedPath);
+    const after = await window.evaluate(
+      async ([p, f]) =>
+        (
+          window as unknown as {
+            api: { pack: { setFileTags: (p: string, f: string, t: string[]) => Promise<unknown> } };
+          }
+        ).api.pack.setFileTags(p as string, f as string, ["phantom"]),
+      [state!.seedPath, "h1.gif"] as [string, string]
+    );
+    expect(JSON.stringify(after)).toBe(JSON.stringify(before));
+    expect(JSON.stringify(after)).not.toContain("h1.gif");
+  });
+
   test("the creator grid hides hypno and filters by type and favourites", async () => {
     const { window } = running!;
     // Star one file from the gallery first.

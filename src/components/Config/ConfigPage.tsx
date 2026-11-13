@@ -51,6 +51,8 @@ const CONFIG_TABS: { value: string; label: string; icon: Icon; description: stri
 export interface ConfigPageProps {
   tab?: string;
   onTabChange?: (tab: string) => void;
+  annoyanceTab?: string;
+  onAnnoyanceTabChange?: (tab: string) => void;
   generalTab?: string;
   onGeneralTabChange?: (tab: string) => void;
 }
@@ -58,6 +60,8 @@ export interface ConfigPageProps {
 export function ConfigPage({
   tab = "general",
   onTabChange,
+  annoyanceTab,
+  onAnnoyanceTabChange,
   generalTab = "start",
   onGeneralTabChange,
 }: ConfigPageProps) {
@@ -93,7 +97,7 @@ export function ConfigPage({
 
         <Tabs.Panel value="annoyance" pt={0}>
           <ErrorBoundary fallbackTitle="Annoyance Settings Error" fallbackMessage="Unable to load annoyance settings.">
-            <AnnoyancePanel />
+            <AnnoyancePanel tab={annoyanceTab} onTabChange={onAnnoyanceTabChange} />
           </ErrorBoundary>
         </Tabs.Panel>
 

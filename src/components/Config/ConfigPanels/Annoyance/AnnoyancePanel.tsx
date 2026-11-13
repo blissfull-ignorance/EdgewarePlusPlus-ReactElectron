@@ -24,14 +24,19 @@ const ANNOYANCE_TABS: { value: string; label: string; icon: Icon }[] = [
   { value: "dangerous", label: "Dangerous", icon: IconAlertTriangle },
 ];
 
-export function AnnoyancePanel() {
+export interface AnnoyancePanelProps {
+  tab?: string;
+  onTabChange?: (tab: string) => void;
+}
+
+export function AnnoyancePanel({ tab = "popupTypes", onTabChange }: AnnoyancePanelProps) {
   return (
     <Stack gap="md">
       <Text size="lg" fw={700}>
         Annoyance / Runtime Settings
       </Text>
 
-      <Tabs defaultValue="popupTypes">
+      <Tabs value={tab} onChange={(value) => onTabChange?.(value ?? tab)}>
         <Tabs.List mb="md">
           {ANNOYANCE_TABS.map(({ value, label, icon: TabIcon }) => (
             <Tabs.Tab key={value} value={value} leftSection={<TabIcon size={15} />}>

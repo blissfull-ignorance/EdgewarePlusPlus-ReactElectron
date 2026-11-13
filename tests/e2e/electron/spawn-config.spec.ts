@@ -125,6 +125,9 @@ test.describe("Session-scoped pack config + spawn warning", () => {
     await expect(window.locator("[data-testid='spawn-warning-modal']")).toBeVisible();
     await window.locator("[data-testid='spawn-warning-settings']").click();
     await expect(window.getByRole("tab", { name: "Popup Tweaks" })).toBeVisible();
+    // The deep link lands ON the tweaks panel: the slider is visible now,
+    // not one more click away.
+    await expect(window.locator("[data-testid='config-spawn-delay']")).toBeVisible();
 
     // A healthy setup starts without the modal.
     await window.locator("[data-testid='main-tab-status']").click();
