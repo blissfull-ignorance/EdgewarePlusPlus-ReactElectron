@@ -115,7 +115,9 @@
       "icon": "build/icon.png",
       "category": "Utility",
       "maintainer": "Edgeware++ contributors"
-    }
+    },
+    "compression": "maximum",
+    "afterPack": "build/afterPack.js"
   },
   "allowScripts": {
     "electron@33.4.11": true,

@@ -68,7 +68,13 @@ test.describe("wallpaper rotation (rotateWallpaper + wallpaperDat + timer/varian
     const state = createTempState({ kind: "media" });
     seed(state);
     cleanup.push(() => cleanupTempState(state));
-    const running = await launchApp(state);
+    const running = await launchApp(state, {
+      // The apply pipeline is exercised through the stub: the real desktop
+      // is never touched, and the stub log names the exact files rotation
+      // chose. (A test process cannot restore a real wallpaper anyway — its
+      // wallpaper-memory state dies with the temp userData directory.)
+      EDGWARE_WALLPAPER_STUB: path.join(state.seedPath, "img", readdirSync(path.join(state.seedPath, "img"))[0]),
+    });
     cleanup.push(async () => {
       try {
         await quitApp(running);
@@ -80,30 +86,16 @@ test.describe("wallpaper rotation (rotateWallpaper + wallpaperDat + timer/varian
     await running.window.locator("[data-testid='pack-info']").waitFor({ timeout: 30000 });
     await clickStart(running.window);
 
-    // Rotation must reach the OS apply step. The apply itself is gated by
-    // macOS Automation permission (osascript -1743 when denied) and may take
-    // up to the script timeouts, so poll for either outcome.
+    // Rotation drives the full pipeline: timer → pick → setWallpaper apply.
+    const appliedFile = path.join(state.dir, "wallpaper_applied.log");
+    const applied = () => (existsSync(appliedFile) ? readFileSync(appliedFile, "utf-8") : "");
     await expect
-      .poll(() => {
-        const log = wallpaperLog(state);
-        return (
-          log.includes("Applied via System Events") ||
-          log.includes("wallpaper set failed") ||
-          log.includes("Wallpaper fallback failed")
-        );
-      }, { timeout: 45000 })
+      .poll(() => /wallpapers\/wall-[ab]\.png/.test(applied()), { timeout: 45000 })
       .toBe(true);
     const log = wallpaperLog(state);
     expect(log).not.toContain("wallpaperRotation] wallpaper change failed");
     expect(log).not.toContain("rotation is on but no wallpapers are configured");
-    const applyFailures = log
-      .split("\n")
-      .filter((l) => l.includes("[Wallpaper]") && l.includes("failed"));
-    for (const line of applyFailures) {
-      // Any surfaced osascript failure is an OS-level gate (Automation
-      // permission or script timeout), never a pipeline defect.
-      expect(line).toMatch(/Command failed: osascript|-1743|Apple events|not authorized|ETIMEDOUT|timed out/i);
-    }
+    expect(applied()).not.toContain("Refused real wallpaper apply");
     expect(existsSync(path.join(state.seedPath, "wallpapers", "wall-a.png"))).toBe(true);
 
     // Config hygiene: rotation must not mark settings dirty forever or corrupt

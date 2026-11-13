@@ -125,9 +125,20 @@ export async function setWallpaper(filepath: string): Promise<void> {
   if (process.env.EDGWARE_WALLPAPER_STUB) {
     try {
       fs.appendFileSync(stubLogPath(), `${filepath}\n`, "utf-8");
+      logger.info(`[Wallpaper] Applied via stub: ${filepath}`);
     } catch (err) {
       logger.error("[Wallpaper] Stub apply failed:", err);
     }
+    return;
+  }
+  // Hard invariant: a process running against a test userData directory
+  // never touches the real desktop. Its wallpaper-memory state dies with
+  // the temp dir, so a real apply there could never be restored. Specs
+  // exercise the apply pipeline through EDGWARE_WALLPAPER_STUB instead.
+  if (process.env.EDGWARE_USER_DATA_DIR) {
+    logger.error(
+      `[Wallpaper] Refused real wallpaper apply under test userData (set EDGWARE_WALLPAPER_STUB to exercise this path): ${filepath}`
+    );
     return;
   }
   if (!fs.existsSync(filepath)) {

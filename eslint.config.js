@@ -16,6 +16,19 @@ export default [
   },
   js.configs.recommended,
   {
+    files: ["build/**/*.js"],
+    languageOptions: {
+      globals: {
+        require: "readonly",
+        module: "writable",
+        exports: "writable",
+        console: "readonly",
+        process: "readonly",
+        __dirname: "readonly",
+      },
+    },
+  },
+  {
     files: ["**/*.ts", "**/*.tsx"],
     languageOptions: {
       parser: tsParser,
