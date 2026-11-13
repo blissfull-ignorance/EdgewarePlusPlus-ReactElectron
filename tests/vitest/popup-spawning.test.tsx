@@ -126,6 +126,43 @@ describe("usePopupLifecycle spawning (Electron mode)", () => {
     expect(useAppStore.getState().popupsCount).toBe(0);
   });
 
+  it("Stop-driven mass close never launches web-on-close browsers", async () => {
+    renderHook(() => usePopupLifecycle());
+    useSettingsStore.setState({ webPopup: 1, webMod: -100 }); // roll((100-(-100))/2)=roll(100): always fires
+    window.api.pack.randomWeb = vi.fn().mockResolvedValue("https://x.example/");
+    window.api.system.openExternal = vi.fn().mockResolvedValue(undefined);
+
+    const onClosed = window as unknown as { __onPopupClosed?: (id: string) => void };
+    act(() => registerOpenPopup("popup-w", "image"));
+
+    // Stopped: the closed event must not open anything.
+    act(() => onClosed.__onPopupClosed!("popup-w"));
+    await waitFor(() => expect(useAppStore.getState().popupsCount).toBe(0));
+    expect(window.api.system.openExternal).not.toHaveBeenCalled();
+
+    // Running: the same event rolls and opens.
+    act(() => {
+      useAppStore.getState().start();
+      registerOpenPopup("popup-w2", "image");
+      onClosed.__onPopupClosed!("popup-w2");
+    });
+    await waitFor(() => expect(window.api.system.openExternal).toHaveBeenCalledWith("https://x.example/"));
+  });
+
+  it("a second close of the same id does not decrement twice", async () => {
+    const { result } = renderHook(() => usePopupLifecycle());
+    act(() => {
+      registerOpenPopup("popup-d", "image");
+      useAppStore.getState().incrementPopups();
+    });
+
+    await act(async () => {
+      await result.current.closePopup("popup-d");
+      await result.current.closePopup("popup-d");
+    });
+    expect(useAppStore.getState().popupsCount).toBe(0);
+  });
+
   it("spawnPopup returns null and does not increment when IPC resolves without an id", async () => {
     window.api.popup.create = vi.fn().mockResolvedValue({});
     const { result } = renderHook(() => usePopupLifecycle());

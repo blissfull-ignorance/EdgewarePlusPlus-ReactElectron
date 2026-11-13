@@ -2,9 +2,11 @@ import { describe, expect, it } from "vitest";
 import { roll } from "../../src/utils/roll";
 
 describe("roll", () => {
-  it("roll(0) always returns false", () => {
+  it("roll(0) always returns false (and always a boolean)", () => {
     for (let i = 0; i < 1000; i++) {
-      expect(roll(0)).toBe(false);
+      const r = roll(0);
+      expect(typeof r).toBe("boolean");
+      expect(r).toBe(false);
     }
   });
 
@@ -45,9 +47,5 @@ describe("roll", () => {
     const ratio = trueCount / iterations;
     expect(ratio).toBeGreaterThan(0.98);
     expect(ratio).toBeLessThan(0.997);
-  });
-
-  it("roll returns boolean values", () => {
-    expect(typeof roll(50)).toBe("boolean");
   });
 });

@@ -38,6 +38,17 @@ describe("PromptDialog", () => {
     expect(onClose).toHaveBeenCalledWith(true);
   });
 
+  it("accepts a differently-cased answer", () => {
+    const onClose = vi.fn();
+    const { container } = renderWithMantine(
+      <PromptDialog command="Type: hello" expectedAnswer="hello" onClose={onClose} />
+    );
+    const input = container.querySelector<HTMLInputElement>('[data-testid="prompt-input"]');
+    fireEvent.change(input!, { target: { value: "HELLO" } });
+    fireEvent.click(container.querySelector('[data-testid="prompt-submit"]')!);
+    expect(onClose).toHaveBeenCalledWith(true);
+  });
+
   it("accepts answer within max mistakes allowed", () => {
     const onClose = vi.fn();
     const { container } = renderWithMantine(

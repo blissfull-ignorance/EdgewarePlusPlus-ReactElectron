@@ -41,13 +41,14 @@ function buildRollTargets(settings: ReturnType<typeof useSettingsStore.getState>
  */
 export function duePopups(
   settings: ReturnType<typeof useSettingsStore.getState>,
-  rollFn: (chance: number) => boolean = roll
+  rollFn: (chance: number) => boolean = roll,
+  randomFn: () => number = Math.random
 ): PopupType[] {
   if (settings.singleMode) {
     const eligible = buildRollTargets(settings).filter((t) => t.chance > 0);
     if (!eligible.length) return [];
     const total = eligible.reduce((sum, t) => sum + t.chance, 0);
-    let pick = Math.random() * total;
+    let pick = randomFn() * total;
     for (const t of eligible) {
       pick -= t.chance;
       if (pick < 0) return [t.type];

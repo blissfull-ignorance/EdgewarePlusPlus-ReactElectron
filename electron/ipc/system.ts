@@ -544,6 +544,12 @@ ipcMain.handle("system:loadSettings", async (): Promise<Record<string, unknown> 
   });
 
   ipcMain.handle("system:saveSettings", async (_event, settings: Record<string, unknown>): Promise<void> => {
+    // config.json must stay a settings object: a string or array payload
+    // would land on disk and only limp along because readers are lenient.
+    if (!settings || typeof settings !== "object" || Array.isArray(settings)) {
+      logger.error("[System] saveSettings rejected a non-object payload");
+      return;
+    }
     try {
       const dir = dataDir();
       if (!fs.existsSync(dir)) {

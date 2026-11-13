@@ -219,7 +219,7 @@ export function MetadataPanel({ onOpenPackManager }: { onOpenPackManager?: () =>
         <Grid.Col span={{ base: 12, sm: 4 }}>
           <SectionCard icon={<IconMoonStars size={16} />} title="Hibernate">
             <Group gap="sm" align="center">
-              <Badge variant="light" color={hibernateColor} size="sm">
+              <Badge variant="light" color={hibernateColor} size="sm" data-testid="hibernate-state">
                 {hibernateState}
               </Badge>
               <Text size="sm" c="dimmed" data-testid="hibernate-countdown">

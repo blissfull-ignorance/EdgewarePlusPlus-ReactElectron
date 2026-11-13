@@ -1,117 +1,54 @@
-import { describe, expect, it, beforeEach, vi } from "vitest";
+import { describe, expect, it, beforeEach } from "vitest";
 import { renderHook } from "@testing-library/react";
 import { useCorruptionMode } from "../../src/hooks/useCorruptionMode";
 import { useCorruptionStore } from "../../src/stores/corruptionStore";
 import { useSettingsStore } from "../../src/stores/settingsStore";
 
-vi.mock("../../src/stores/corruptionStore", () => ({
-  useCorruptionStore: vi.fn(),
-  getNextCorruptionLevel: vi.fn(),
-}));
-
-vi.mock("../../src/stores/settingsStore", () => ({
-  useSettingsStore: vi.fn(),
-}));
-
-function mockCorruptionStore(state: Partial<ReturnType<typeof useCorruptionStore.getState>>) {
-  (useCorruptionStore as ReturnType<typeof vi.fn>).mockImplementation((fn: (s: unknown) => unknown) =>
-    fn(state)
-  );
-}
-
-function mockSettingsStore(state: Partial<ReturnType<typeof useSettingsStore.getState>>) {
-  (useSettingsStore as ReturnType<typeof vi.fn>).mockImplementation((fn: (s: unknown) => unknown) =>
-    fn(state)
-  );
-}
-
 describe("useCorruptionMode", () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    useCorruptionStore.getState().reset();
+    useSettingsStore.setState({ corruptionMode: 0 });
   });
 
-  it("returns correct level and moods list", () => {
-    mockCorruptionStore({
-      currentLevel: 2,
-      activeMoods: ["dominant", "submissive"],
-      nextLevelTime: Date.now() + 60000,
-      driverType: "timer",
-      transitionTo: vi.fn(),
-      setDriverType: vi.fn(),
-      setNextLevelTime: vi.fn(),
-      loadCorruptionData: vi.fn(),
-      reset: vi.fn(),
-    });
-    mockSettingsStore({ corruptionMode: 1 });
+  it("derives activeCorruption from the corruptionMode setting", () => {
+    const { result, rerender } = renderHook(() => useCorruptionMode());
+    expect(result.current.activeCorruption).toBe(false);
 
-    const { result } = renderHook(() => useCorruptionMode());
-
-    expect(result.current.level).toBe(2);
-    expect(result.current.activeMoods).toEqual(["dominant", "submissive"]);
-    expect(result.current.driverType).toBe("timer");
+    useSettingsStore.setState({ corruptionMode: 1 });
+    rerender(() => useCorruptionMode());
     expect(result.current.activeCorruption).toBe(true);
   });
 
-  it("activeCorruption is false when corruptionMode is 0", () => {
-    mockCorruptionStore({
-      currentLevel: 0,
-      activeMoods: [],
-      nextLevelTime: null,
-      driverType: "timer",
-      transitionTo: vi.fn(),
-      setDriverType: vi.fn(),
-      setNextLevelTime: vi.fn(),
-      loadCorruptionData: vi.fn(),
-      reset: vi.fn(),
+  it("exposes nextLevel only while corruption is active", () => {
+    useCorruptionStore.getState().loadCorruptionData({
+      moods: {
+        "1": { add: ["a"], remove: [] },
+        "2": { add: ["b"], remove: [] },
+      },
     });
-    mockSettingsStore({ corruptionMode: 0 });
+    useCorruptionStore.getState().transitionTo(1);
 
-    const { result } = renderHook(() => useCorruptionMode());
-    expect(result.current.activeCorruption).toBe(false);
+    // Inactive: no next level is advertised.
+    const off = renderHook(() => useCorruptionMode());
+    expect(off.result.current.nextLevel).toBeNull();
+
+    useSettingsStore.setState({ corruptionMode: 1 });
+    const on = renderHook(() => useCorruptionMode());
+    expect(on.result.current.nextLevel).toBe(2);
+    expect(on.result.current.level).toBe(1);
+    expect(on.result.current.activeMoods).toContain("a");
   });
 
-  it("exposes transitionTo function", () => {
-    const mockTransitionTo = vi.fn().mockReturnValue({ popupMod: 50 });
-    mockCorruptionStore({
-      currentLevel: 0,
-      activeMoods: [],
-      nextLevelTime: null,
-      driverType: "timer",
-      transitionTo: mockTransitionTo,
-      setDriverType: vi.fn(),
-      setNextLevelTime: vi.fn(),
-      loadCorruptionData: vi.fn(),
-      reset: vi.fn(),
+  it("transitionTo drives the real store and returns its overrides", () => {
+    useCorruptionStore.getState().loadCorruptionData({
+      moods: { "1": { add: ["a"], remove: [] } },
+      config: { "1": { popupMod: 50 } },
     });
-    mockSettingsStore({ corruptionMode: 1 });
+    useSettingsStore.setState({ corruptionMode: 1 });
 
     const { result } = renderHook(() => useCorruptionMode());
-    const overrides = result.current.transitionTo(1);
-    expect(mockTransitionTo).toHaveBeenCalledWith(1);
-    expect(overrides).toEqual({ popupMod: 50 });
-  });
-
-  it("exposes setDriverType and setNextLevelTime", () => {
-    const mockSetDriverType = vi.fn();
-    const mockSetNextLevelTime = vi.fn();
-    mockCorruptionStore({
-      currentLevel: 0,
-      activeMoods: [],
-      nextLevelTime: null,
-      driverType: "timer",
-      transitionTo: vi.fn(),
-      setDriverType: mockSetDriverType,
-      setNextLevelTime: mockSetNextLevelTime,
-      loadCorruptionData: vi.fn(),
-      reset: vi.fn(),
-    });
-    mockSettingsStore({ corruptionMode: 1 });
-
-    const { result } = renderHook(() => useCorruptionMode());
-    result.current.setDriverType("audio");
-    expect(mockSetDriverType).toHaveBeenCalledWith("audio");
-
-    result.current.setNextLevelTime(12345);
-    expect(mockSetNextLevelTime).toHaveBeenCalledWith(12345);
+    expect(result.current.transitionTo(1)).toEqual({ popupMod: 50 });
+    expect(useCorruptionStore.getState().currentLevel).toBe(1);
+    expect(useCorruptionStore.getState().activeMoods).toContain("a");
   });
 });

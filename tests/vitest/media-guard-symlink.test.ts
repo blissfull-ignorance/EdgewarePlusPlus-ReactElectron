@@ -23,12 +23,14 @@ describe("isPathConstrained (symlink confinement)", () => {
     expect(isPathConstrained(realpath, root, "img", path.join(sub, "real.png"))).toBe(true);
   });
 
-  it("rejects a symlink escaping the subdir", () => {
-    if (!fs.existsSync(link)) return;
+  it("rejects a symlink escaping the subdir", { skip: !fs.existsSync(link) }, () => {
     expect(isPathConstrained(realpath, root, "img", link)).toBe(false);
   });
 
   it("rejects lexical traversal before any filesystem access", () => {
+    // A lexically ugly path that resolves inside the pack must still be
+    // refused on the string check, before realpath is consulted.
+    expect(isPathConstrained(realpath, root, "img", path.join(sub, "..", "..", "secret.txt"))).toBe(false);
     expect(isPathConstrained(realpath, root, "img", path.join(root, "secret.txt"))).toBe(false);
   });
 

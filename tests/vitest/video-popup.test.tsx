@@ -18,6 +18,8 @@ describe("VideoPopup", () => {
     const video = container.querySelector<HTMLVideoElement>('[data-testid="video-popup-video"]');
     expect(video).not.toBeNull();
     expect(video!.src).toContain("test-video.mp4");
+    // Rendered inside the shared shell (close button, click handling).
+    expect(container.querySelector('[data-testid="popup-shell"]')).not.toBeNull();
   });
 
   it("video has autoplay and loop attributes", () => {
@@ -30,17 +32,6 @@ describe("VideoPopup", () => {
     const video = container.querySelector<HTMLVideoElement>('[data-testid="video-popup-video"]');
     expect(video!.hasAttribute("autoplay")).toBe(true);
     expect(video!.hasAttribute("loop")).toBe(true);
-  });
-
-  it("wraps content in PopupShell", () => {
-    const { container } = renderWithMantine(
-      <VideoPopup
-        videoUrl="test.mp4"
-        onClose={() => {}}
-      />
-    );
-    const shell = container.querySelector('[data-testid="popup-shell"]');
-    expect(shell).not.toBeNull();
   });
 
   it("loops natively when infinite looping is on", () => {

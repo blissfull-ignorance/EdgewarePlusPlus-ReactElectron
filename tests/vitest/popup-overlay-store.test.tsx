@@ -2,17 +2,13 @@ import { describe, expect, it, beforeEach } from "vitest";
 import { screen, waitFor, cleanup, fireEvent } from "@testing-library/react";
 import { usePopupOverlayStore } from "../../src/stores/popupOverlayStore";
 import { useAppStore } from "../../src/stores/appStore";
-import { registerOpenPopup } from "../../src/features/popup/openPopups";
+import { countOpenPops, registerOpenPopup } from "../../src/features/popup/openPopups";
 import { InAppPopupOverlay } from "../../src/components/InAppPopupOverlay";
 import { renderWithMantine } from "./setup";
 
 describe("popupOverlayStore", () => {
   beforeEach(() => {
     usePopupOverlayStore.setState({ popups: [] });
-  });
-
-  it("starts with no popups", () => {
-    expect(usePopupOverlayStore.getState().popups).toEqual([]);
   });
 
   it("addPopup adds an entry and returns its id", () => {
@@ -162,6 +158,7 @@ describe("InAppPopupOverlay", () => {
     await waitFor(() => {
       expect(screen.queryByTestId("in-app-popup")).toBeNull();
     });
-    expect(id).toBeTruthy();
+    // The openPopups registry must release the id too, or caps erode.
+    expect(countOpenPops("image")).toBe(0);
   });
 });

@@ -55,13 +55,4 @@ describe("maybeOpenWebOnClose (legacy try_web_open parity)", () => {
     expect(window.api.system.openExternal).not.toHaveBeenCalled();
   });
 
-  it("never fires more than once for a single close", () => {
-    useSettingsStore.setState({ webPopup: 1, webMod: 40 });
-    maybeOpenWebOnClose();
-    maybeOpenWebOnClose();
-    // Two explicit calls from two different close sites are distinct popup closes;
-    // the same close must only reach ONE site. Guarded structurally, verified here
-    // by ensuring each call is independent and resolves its own open attempt.
-    expect(rollMock).toHaveBeenCalledTimes(2);
-  });
 });

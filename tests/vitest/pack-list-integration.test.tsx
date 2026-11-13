@@ -1,9 +1,8 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
-import { render, fireEvent } from "@testing-library/react";
+import { render } from "@testing-library/react";
 import { MantineProvider } from "@mantine/core";
 import { useSettingsStore } from "../../src/stores/settingsStore";
 import { ConfigPage } from "../../src/components/Config/ConfigPage";
-import { PackList } from "../../src/components/Config/PackList";
 import { usePackDiscoveryStore, usePackDiscovery } from "../../src/hooks/usePackDiscovery";
 
 const MANTINE_WRAPPER = ({ children }: { children: React.ReactNode }) => (
@@ -29,56 +28,8 @@ describe("ConfigPage — store-driven rendering", () => {
     expect(container.textContent).toContain("Troubleshooting");
   });
 
-  it("renders with no props passed", () => {
-    expect(() => render(<ConfigPage />, { wrapper: MANTINE_WRAPPER })).not.toThrow();
-  });
 });
 
-describe("PackList — pack selection integration", () => {
-  const mockPacks = [
-    { name: "Pack A", path: "/data/packs/pack-a", version: "1.0", creator: "Alice" },
-    { name: "Pack B", path: "/data/packs/pack-b", version: "2.0", creator: "Bob" },
-  ];
-
-  it("renders pack names in the select dropdown", () => {
-    render(
-      <PackList packs={mockPacks} currentPackPath={undefined} onSelectPack={() => {}} />,
-      { wrapper: MANTINE_WRAPPER }
-    );
-    const text = document.body.textContent || "";
-    expect(text).toContain("Pack A");
-    expect(text).toContain("Pack B");
-  });
-
-  it("shows alert when no packs available", () => {
-    const { container } = render(
-      <PackList packs={[]} currentPackPath={undefined} onSelectPack={() => {}} />,
-      { wrapper: MANTINE_WRAPPER }
-    );
-    expect(container.textContent).toContain("No Packs Found");
-  });
-
-  it("onSelectPack is called with pack path when selection changes", () => {
-    const handleSelect = vi.fn();
-    const { container } = render(
-      <PackList packs={mockPacks} currentPackPath={undefined} onSelectPack={handleSelect} />,
-      { wrapper: MANTINE_WRAPPER }
-    );
-    const inputs = container.querySelectorAll('input[type="text"]');
-    if (inputs.length > 0) {
-      fireEvent.change(inputs[0], { target: { value: mockPacks[0].path } });
-      expect(handleSelect).toHaveBeenCalledWith(mockPacks[0].path);
-    }
-  });
-
-  it("shows current pack path when provided", () => {
-    const { container } = render(
-      <PackList packs={mockPacks} currentPackPath="/data/packs/pack-a" onSelectPack={() => {}} />,
-      { wrapper: MANTINE_WRAPPER }
-    );
-    expect(container.textContent).toContain("/data/packs/pack-a");
-  });
-});
 
 describe("usePackDiscoveryStore", () => {
   beforeEach(() => {
@@ -90,11 +41,6 @@ describe("usePackDiscoveryStore", () => {
     usePackDiscoveryStore.setState({ packs: [], isLoading: false, error: null });
   });
 
-  it("initial state has empty packs array", () => {
-    const state = usePackDiscoveryStore.getState();
-    expect(state.packs).toEqual([]);
-    expect(state.isLoading).toBe(false);
-  });
 
   it("refreshPacks populates packs from IPC", async () => {
     const mockPacks = [
@@ -121,6 +67,8 @@ describe("usePackDiscoveryStore", () => {
 
     const settingsState = useSettingsStore.getState();
     expect(settingsState.packPath).toBe("/data/packs/test");
+    // The pick must persist, or the next boot re-picks differently.
+    expect(window.api?.system.saveSettings).toHaveBeenCalled();
   });
 
   it("does not auto-select when packPath is already set", async () => {

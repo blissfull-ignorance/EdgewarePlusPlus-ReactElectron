@@ -21,6 +21,17 @@ describe("settings persistence (all keys)", () => {
 
   const keys = Object.keys(DEFAULT_SETTINGS);
 
+  it("load() with no file on disk resets stale in-memory state", async () => {
+    // Disk is the source of truth: a boot after a crash must not rehydrate
+    // the previous process's dirty values.
+    useSettingsStore.setState({ popupMod: 99, dirty: true });
+    api.system.loadSettings.mockResolvedValue(null);
+
+    const result = await useSettingsStore.getState().load();
+    expect(result.popupMod).toBe(DEFAULT_SETTINGS.popupMod);
+    expect(useSettingsStore.getState().dirty).toBe(false);
+  });
+
   it("covers the full legacy option registry", () => {
     expect(keys.length).toBeGreaterThanOrEqual(100);
   });

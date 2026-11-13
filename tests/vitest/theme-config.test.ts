@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { getTheme, THEME_PRIMARY_NAMES } from "../../src/theme/themeConfig";
+import { getTheme, isLightTheme, THEME_PRIMARY_NAMES } from "../../src/theme/themeConfig";
 
 describe("getTheme", () => {
   it("returns the ember primary for 'original'", () => {
@@ -102,5 +102,16 @@ describe("getTheme surfaces", () => {
     expect(getTheme("the-one").fontFamily).toContain("Consolas");
     expect(getTheme("goth").fontFamily).toContain("Georgia");
     expect(getTheme("bimbo").fontFamily).toContain("Constantia");
+  });
+});
+
+describe("isLightTheme", () => {
+  it("flags the light-scheme themes for chrome switching", () => {
+    expect(isLightTheme("Original")).toBe(true);
+    expect(isLightTheme("Bimbo")).toBe(true);
+    expect(isLightTheme("The One")).toBe(false);
+    expect(isLightTheme("Goth")).toBe(false);
+    // Unknown names keep the light default rather than a dark surprise.
+    expect(isLightTheme("bogus")).toBe(true);
   });
 });

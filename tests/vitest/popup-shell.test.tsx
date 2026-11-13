@@ -1,5 +1,5 @@
-import { describe, expect, it, vi, beforeEach } from "vitest";
-import { render, fireEvent, cleanup, screen } from "@testing-library/react";
+import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
+import { act, render, fireEvent, cleanup, screen } from "@testing-library/react";
 import { MantineProvider } from "@mantine/core";
 import { PopupShell } from "../../src/components/PopupShell/PopupShell";
 
@@ -23,6 +23,7 @@ describe("PopupShell", () => {
     const shell = container.querySelector('[data-testid="popup-shell"]');
     expect(shell).toBeTruthy();
     expect(shell?.style.borderStyle).toBe("none");
+    expect(shell?.style.backgroundColor).toBe("transparent");
   });
 
   it("renders with correct default opacity of 1", () => {
@@ -131,27 +132,74 @@ describe("PopupShell", () => {
     expect(handleClose).toHaveBeenCalledTimes(1);
   });
 
-  it("disables pointer events when clickthroughEnabled is true", () => {
-    const { container } = render(
+  it("toggles pointer events with clickthroughEnabled", () => {
+    const { container, unmount } = render(
       <PopupShell clickthroughEnabled>
         <div>Content</div>
       </PopupShell>,
       { wrapper: MANTINE_WRAPPER }
     );
+    expect(container.querySelector('[data-testid="popup-shell"]')).toHaveStyle("pointer-events: none");
+    unmount();
 
-    const shell = container.querySelector('[data-testid="popup-shell"]');
-    expect(shell).toHaveStyle("pointer-events: none");
-  });
-
-  it("enables pointer events when clickthroughEnabled is false", () => {
-    const { container } = render(
+    const { container: off } = render(
       <PopupShell clickthroughEnabled={false}>
         <div>Content</div>
       </PopupShell>,
       { wrapper: MANTINE_WRAPPER }
     );
+    expect(off.querySelector('[data-testid="popup-shell"]')).toHaveStyle("pointer-events: auto");
+  });
+});
 
-    const shell = container.querySelector('[data-testid="popup-shell"]');
-    expect(shell).toHaveStyle("pointer-events: auto");
+describe("PopupShell auto-close (timeoutMs)", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+    cleanup();
+  });
+
+  it("closes exactly once when the timeout elapses", () => {
+    const onClose = vi.fn();
+    render(
+      <PopupShell onClose={onClose} timeoutMs={1000}>
+        <div>Content</div>
+      </PopupShell>,
+      { wrapper: MANTINE_WRAPPER }
+    );
+
+    act(() => void vi.advanceTimersByTime(500));
+    expect(onClose).not.toHaveBeenCalled();
+    act(() => void vi.advanceTimersByTime(1200));
+    expect(onClose).toHaveBeenCalledTimes(1);
+    act(() => void vi.advanceTimersByTime(2000));
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it("never auto-closes with timeoutMs 0", () => {
+    const onClose = vi.fn();
+    render(
+      <PopupShell onClose={onClose} timeoutMs={0}>
+        <div>Content</div>
+      </PopupShell>,
+      { wrapper: MANTINE_WRAPPER }
+    );
+    act(() => void vi.advanceTimersByTime(10_000));
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it("does not close when unmounted before the deadline", () => {
+    const onClose = vi.fn();
+    const { unmount } = render(
+      <PopupShell onClose={onClose} timeoutMs={1000}>
+        <div>Content</div>
+      </PopupShell>,
+      { wrapper: MANTINE_WRAPPER }
+    );
+    unmount();
+    act(() => void vi.advanceTimersByTime(5000));
+    expect(onClose).not.toHaveBeenCalled();
   });
 });

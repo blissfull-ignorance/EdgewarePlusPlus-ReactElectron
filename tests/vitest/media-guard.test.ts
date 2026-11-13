@@ -84,9 +84,13 @@ describe("resolvePackMediaPath (media scope guard)", () => {
     expect(resolvePackMediaPath(PACK, "img", "a\u0000b.png")).toBeNull();
   });
 
-  it("returns a path strictly inside the media subdir even for weird segments", () => {
-    const r = resolvePackMediaPath(PACK, "aud", "think.wav");
-    expect(r).toBe(path.resolve(PACK, "aud", "think.wav"));
+  it("keeps weird segments inside the media subdir", () => {
+    for (const rel of ["a//b.png", " .. /x.png", "img/../../etc/passwd", "ünïcode/ok.png"]) {
+      const r = resolvePackMediaPath(PACK, "img", rel);
+      if (r !== null) {
+        expect(r.startsWith(path.resolve(PACK, "img") + path.sep)).toBe(true);
+      }
+    }
   });
 
   it("serves hypno overlay media from hypno/ and the legacy subliminals/ dir", () => {

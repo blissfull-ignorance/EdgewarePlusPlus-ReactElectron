@@ -49,7 +49,16 @@ export function PopupShell({
 
   closeHandlerRef.current = onClose;
 
+  // The auto-close fade re-runs its effect on every opacity step; the close
+  // itself must land exactly once.
+  const closedRef = useRef(false);
   const handleClose = useCallback(() => {
+    if (closedRef.current) return;
+    closedRef.current = true;
+    if (fadeIntervalRef.current) {
+      clearInterval(fadeIntervalRef.current);
+      fadeIntervalRef.current = null;
+    }
     closeHandlerRef.current?.();
   }, []);
 
@@ -81,17 +90,24 @@ export function PopupShell({
       const step = 16;
       const steps = fadeDuration / step;
       const delta = currentOpacity / steps;
+      if (fadeIntervalRef.current) clearInterval(fadeIntervalRef.current);
       fadeIntervalRef.current = setInterval(() => {
         setCurrentOpacity((prev) => {
           const next = Math.max(0, prev - delta);
           if (next <= 0) {
             clearInterval(fadeIntervalRef.current!);
+            fadeIntervalRef.current = null;
             handleClose();
           }
           return next;
         });
       }, step);
-      return;
+      return () => {
+        if (fadeIntervalRef.current) {
+          clearInterval(fadeIntervalRef.current);
+          fadeIntervalRef.current = null;
+        }
+      };
     }
 
     const fadeTimeout = setTimeout(() => {

@@ -2,12 +2,11 @@
  * @file usePopupLifecycle — Manages popup spawning and cleanup.
  *
  * Provides spawnPopup, closePopup, and closeAll for the renderer to
- * create/close BrowserWindow popups via IPC. When all popups are closed
- * while mitosisMode is active, fires onMitosisSpawn to restart sparring.
+ * create/close BrowserWindow popups via IPC. Mitosis triggering lives in
+ * the effect-based useMitosis hook, not here.
  */
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect } from "react";
 import { useAppStore } from "../stores/appStore";
-import { useSettingsStore } from "../stores/settingsStore";
 import { maybeOpenWebOnClose } from "../features/popup/webOnClose";
 import { registerOpenPopup, unregisterOpenPopup } from "../features/popup/openPopups";
 
@@ -17,21 +16,9 @@ export interface PopupInstance {
   mediaId: string;
 }
 
-export interface UsePopupLifecycleOptions {
-  // Invoked at render time, which is fragile — prefer the effect-based
-  // useMitosis trigger for new code.
-  /** Called when mitosis should spawn additional popups after all popups close */
-  onMitosisSpawn?: () => void;
-}
-
-export function usePopupLifecycle(options: UsePopupLifecycleOptions = {}) {
-  const { onMitosisSpawn } = options;
-  const prevCountRef = useRef(0);
-
+export function usePopupLifecycle() {
   const incrementPopups = useAppStore((s) => s.incrementPopups);
   const decrementPopups = useAppStore((s) => s.decrementPopups);
-  const popupsCount = useAppStore((s) => s.popupsCount);
-  const mitosisMode = useSettingsStore((s) => s.mitosisMode);
 
   const spawnPopup = useCallback(
       async (type: "image" | "video" | "audio" | "subliminal" | "prompt", mediaId: string, hypnoGif?: string): Promise<string | null> => {
@@ -93,11 +80,6 @@ export function usePopupLifecycle(options: UsePopupLifecycleOptions = {}) {
       console.error("[usePopupLifecycle] Failed to close all popups:", err);
     }
   }, []);
-
-  if (mitosisMode && prevCountRef.current > 0 && popupsCount === 0 && onMitosisSpawn) {
-    onMitosisSpawn();
-  }
-  prevCountRef.current = popupsCount;
 
   return {
     spawnPopup,

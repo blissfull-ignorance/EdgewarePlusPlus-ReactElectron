@@ -43,17 +43,6 @@ describe("MetadataPanel", () => {
     cleanup();
   });
 
-  it("renders the metadata panel container", () => {
-    mockStores(
-      { popupsCount: 0, isRunning: false, hibernateActive: false },
-      { levels: {}, currentLevel: 0, activeMoods: [], driverType: "timer", nextLevelTime: null },
-      { corruptionMode: 0, packPath: null, hibernateMode: 0 }
-    );
-
-    renderWithMantine(<MetadataPanel />);
-    expect(screen.getByTestId("metadata-panel")).toBeTruthy();
-  });
-
   it("displays corruption level and driver type", () => {
     mockStores(
       { popupsCount: 3, isRunning: true, hibernateActive: false },
@@ -67,10 +56,11 @@ describe("MetadataPanel", () => {
       { corruptionMode: 1, packPath: "/path/to/pack", hibernateMode: 0 }
     );
 
-    renderWithMantine(<MetadataPanel />);
-    expect(screen.getByTestId("corruption-level")).toBeTruthy();
-    expect(screen.getByTestId("driver-type")).toBeTruthy();
-    expect(screen.getByTestId("next-level-time")).toBeTruthy();
+    const { getByTestId } = renderWithMantine(<MetadataPanel />);
+    expect(getByTestId("metadata-panel")).toBeTruthy();
+    expect(getByTestId("corruption-level")).toHaveTextContent("Level: 2");
+    expect(getByTestId("driver-type")).toHaveTextContent("Driver: audio");
+    expect(getByTestId("next-level-time")).not.toHaveTextContent("Next transition: —");
   });
 
   it("displays active moods when corruption mode is active", () => {
@@ -144,54 +134,4 @@ describe("MetadataPanel", () => {
     expect(screen.getByText("Running")).toBeTruthy();
   });
 
-  it("shows hibernate disabled status", () => {
-    mockStores(
-      { popupsCount: 0, isRunning: false, hibernateActive: false },
-      {
-        levels: {},
-        currentLevel: 0,
-        activeMoods: [],
-        driverType: "timer",
-        nextLevelTime: null,
-      },
-      { corruptionMode: 0, packPath: null, hibernateMode: 0 }
-    );
-
-    renderWithMantine(<MetadataPanel />);
-    expect(screen.getByText("Disabled")).toBeTruthy();
-  });
-
-  it("shows hibernate enabled but idle status", () => {
-    mockStores(
-      { popupsCount: 0, isRunning: true, hibernateActive: false },
-      {
-        levels: {},
-        currentLevel: 0,
-        activeMoods: [],
-        driverType: "timer",
-        nextLevelTime: null,
-      },
-      { corruptionMode: 0, packPath: null, hibernateMode: 1 }
-    );
-
-    renderWithMantine(<MetadataPanel />);
-    expect(screen.getByText("Enabled, Idle")).toBeTruthy();
-  });
-
-  it("shows hibernate active status", () => {
-    mockStores(
-      { popupsCount: 0, isRunning: true, hibernateActive: true },
-      {
-        levels: {},
-        currentLevel: 0,
-        activeMoods: [],
-        driverType: "timer",
-        nextLevelTime: null,
-      },
-      { corruptionMode: 0, packPath: null, hibernateMode: 1 }
-    );
-
-    renderWithMantine(<MetadataPanel />);
-    expect(screen.getByText("Active")).toBeTruthy();
-  });
 });

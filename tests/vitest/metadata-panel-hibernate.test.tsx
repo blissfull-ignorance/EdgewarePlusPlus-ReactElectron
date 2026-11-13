@@ -31,8 +31,8 @@ describe("MetadataPanel hibernate and mitosis display", () => {
     useAppStore.setState({ hibernateActive: true });
 
     renderWithMantine(<MetadataPanel />);
-    const panel = screen.getByTestId("metadata-panel");
-    expect(panel.textContent).toContain("Active");
+    // Scoped: the Mitosis badge also contains the substring "Active".
+    expect(screen.getByTestId("hibernate-state")).toHaveTextContent("Active");
   });
 
   it("shows Hibernate: Enabled, Idle when enabled but not active", () => {
@@ -48,18 +48,14 @@ describe("MetadataPanel hibernate and mitosis display", () => {
     useSettingsStore.setState({ mitosisMode: 1, mitosisStrength: 3 });
 
     renderWithMantine(<MetadataPanel />);
-    const panel = screen.getByTestId("metadata-panel");
-    expect(panel.textContent).toContain("Mitosis");
-    expect(panel.textContent).toContain("Active");
+    expect(screen.getByTestId("mitosis-indicator")).toHaveTextContent("Active (strength: 3)");
   });
 
   it("shows Mitosis indicator as Inactive when mitosis is disabled", () => {
     useSettingsStore.setState({ mitosisMode: 0 });
 
     renderWithMantine(<MetadataPanel />);
-    const panel = screen.getByTestId("metadata-panel");
-    expect(panel.textContent).toContain("Mitosis");
-    expect(panel.textContent).toContain("Inactive");
+    expect(screen.getByTestId("mitosis-indicator")).toHaveTextContent("Inactive");
   });
 
   it("shows hibernate countdown when active", () => {

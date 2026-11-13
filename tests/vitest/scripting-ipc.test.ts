@@ -28,6 +28,10 @@ describe("resolveScriptPath", () => {
     expect(resolveScriptPath(packDir, "../testpack-evil/x.lua")).toBeNull();
   });
 
+  it("rejects an absolute script path outside the pack", () => {
+    expect(resolveScriptPath(packDir, "/etc/evil.lua")).toBeNull();
+  });
+
   it("appends .lua extension when not provided", () => {
     expect(resolveScriptPath(packDir, "voice7")).toBe(path.join(packDir, "voice7.lua"));
   });

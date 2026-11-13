@@ -290,4 +290,24 @@ describe("system IPC handlers (pack import / discovery / selection)", () => {
     const written = JSON.parse(readFileSync(configPath(), "utf-8"));
     expect(written).toEqual({ popupMod: 80, themeType: "Dark" });
   });
+
+  it("loadSettings resolves null for a corrupt config.json", async () => {
+    mkdirSync(path.join(tempRoot, "data"), { recursive: true });
+    writeFileSync(configPath(), "{oops");
+    expect(await handlers["system:loadSettings"]()).toBeNull();
+  });
+
+  it("saveSettings refuses payloads that are not settings objects", async () => {
+    mkdirSync(path.dirname(configPath()), { recursive: true });
+    rmSync(configPath(), { force: true });
+    await handlers["system:saveSettings"]({}, "garbage");
+    expect(existsSync(configPath())).toBe(false);
+    await handlers["system:saveSettings"]({}, [1, 2, 3]);
+    expect(existsSync(configPath())).toBe(false);
+
+    // An existing config must survive a rejected write unchanged.
+    writeFileSync(configPath(), JSON.stringify({ popupMod: 42 }));
+    await handlers["system:saveSettings"]({}, null);
+    expect(JSON.parse(readFileSync(configPath(), "utf-8"))).toEqual({ popupMod: 42 });
+  });
 });

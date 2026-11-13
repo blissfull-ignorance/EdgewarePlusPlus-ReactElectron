@@ -1,5 +1,15 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
 
+/**
+ * Mood state lives in the main-process module graph; vi.resetModules() gives
+ * every test a fresh pack.ts (fresh, empty mood set). Moods are therefore set
+ * through the registered pack:setActiveMoods handler — the same instance the
+ * resolvers read, and the same path the renderer takes in production.
+ */
+async function setActiveMoods(moods: string[]): Promise<void> {
+  await (handlers["pack:setActiveMoods"] as (e: unknown, m: unknown) => Promise<void>)({}, moods);
+}
+
 let handlers: Record<string, (...args: unknown[]) => unknown> = {};
 
 beforeEach(() => {
@@ -48,24 +58,6 @@ describe("pack IPC handlers", () => {
     handlers = {};
   });
 
-  it("should register randomImage handler", async () => {
-    const { registerHandlers } = await import("../../electron/ipc/pack");
-    registerHandlers();
-    expect(handlers["pack:randomImage"]).toBeDefined();
-  });
-
-  it("should register randomAudio handler", async () => {
-    const { registerHandlers } = await import("../../electron/ipc/pack");
-    registerHandlers();
-    expect(handlers["pack:randomAudio"]).toBeDefined();
-  });
-
-  it("should register randomVideo handler", async () => {
-    const { registerHandlers } = await import("../../electron/ipc/pack");
-    registerHandlers();
-    expect(handlers["pack:randomVideo"]).toBeDefined();
-  });
-
   it("randomImage returns null when img directory does not exist", async () => {
     mockReadFileSync.mockReturnValue(JSON.stringify({ packPath: "/mock/pack" }));
     mockExistsSync.mockImplementation((p: string) => {
@@ -103,35 +95,26 @@ describe("pack IPC handlers", () => {
     registerHandlers();
 
     const handler = handlers["pack:randomImage"];
-    const result = await (handler as () => Promise<string | null>)();
-    expect(["image1.png", "image2.jpg"]).toContain(result);
+    for (let i = 0; i < 20; i++) {
+      const result = await (handler as () => Promise<string | null>)();
+      expect(["image1.png", "image2.jpg"]).toContain(result);
+    }
   });
 
-  it("randomAudio uses packDir variable consistently with existsSync guard", async () => {
-    mockReadFileSync.mockReturnValue(JSON.stringify({ packPath: "/mock/pack" }));
-    mockExistsSync.mockReturnValue(false);
+  it.each(["pack:randomAudio", "pack:randomVideo"])(
+    "%s returns null when the pack directory does not exist",
+    async (channel) => {
+      mockReadFileSync.mockReturnValue(JSON.stringify({ packPath: "/mock/pack" }));
+      mockExistsSync.mockReturnValue(false);
 
-    const { registerHandlers } = await import("../../electron/ipc/pack");
-    registerHandlers();
+      const { registerHandlers } = await import("../../electron/ipc/pack");
+      registerHandlers();
 
-    const handler = handlers["pack:randomAudio"];
-    const result = await (handler as () => Promise<string | null>)();
-    expect(result).toBeNull();
-    expect(mockExistsSync).toHaveBeenCalled();
-  });
-
-  it("randomVideo uses packDir variable consistently with existsSync guard", async () => {
-    mockReadFileSync.mockReturnValue(JSON.stringify({ packPath: "/mock/pack" }));
-    mockExistsSync.mockReturnValue(false);
-
-    const { registerHandlers } = await import("../../electron/ipc/pack");
-    registerHandlers();
-
-    const handler = handlers["pack:randomVideo"];
-    const result = await (handler as () => Promise<string | null>)();
-    expect(result).toBeNull();
-    expect(mockExistsSync).toHaveBeenCalled();
-  });
+      const handler = handlers[channel];
+      const result = await (handler as () => Promise<string | null>)();
+      expect(result).toBeNull();
+    }
+  );
 
   it("closeLabel returns the modern index popupClose (pack-defined close text)", async () => {
     mockReadFileSync.mockImplementation((p: string) => {
@@ -192,7 +175,7 @@ describe("pack IPC handlers", () => {
     expect(result).toBeNull();
   });
 
-  it("randomPrompt picks from default + mood prompts (legacy prompt.json)", async () => {
+  it("randomPrompt reaches mood prompts only while the mood is active", async () => {
     mockReadFileSync.mockImplementation((p: string) => {
       if (p.includes("index.json")) throw new Error("ENOENT");
       if (p.includes("prompt.json")) {
@@ -206,10 +189,19 @@ describe("pack IPC handlers", () => {
     registerHandlers();
 
     const handler = handlers["pack:randomPrompt"];
-    for (let i = 0; i < 20; i++) {
-      const result = await (handler as () => Promise<string | null>)();
-      expect(["Do as I say", "Higher, slave"]).toContain(result);
+
+    // Locked: the mood prompt must never surface while inactive.
+    for (let i = 0; i < 30; i++) {
+      expect(await (handler as () => Promise<string | null>)()).toBe("Do as I say");
     }
+
+    await setActiveMoods(["high"]);
+    const seen = new Set<string>();
+    for (let i = 0; i < 30; i++) {
+      seen.add((await (handler as () => Promise<string | null>)())!);
+    }
+    expect(seen.has("Higher, slave")).toBe(true);
+    expect(seen.has("Do as I say")).toBe(true);
   });
 
   it("randomPrompt returns null when the pack defines no prompts", async () => {
@@ -281,10 +273,19 @@ describe("pack IPC handlers", () => {
     registerHandlers();
 
     const handler = handlers["pack:randomWeb"];
-    for (let i = 0; i < 20; i++) {
-      const result = await (handler as () => Promise<string | null>)();
-      expect(["https://a.example/page1", "https://b.example/"]).toContain(result);
+
+    // The "high"-tagged url stays unreachable while the mood is inactive.
+    for (let i = 0; i < 30; i++) {
+      expect(await (handler as () => Promise<string | null>)()).toBe("https://a.example/page1");
     }
+
+    await setActiveMoods(["high"]);
+    const seen = new Set<string>();
+    for (let i = 0; i < 30; i++) {
+      seen.add((await (handler as () => Promise<string | null>)())!);
+    }
+    expect(seen.has("https://b.example/")).toBe(true);
+    expect(seen.has("https://a.example/page1")).toBe(true);
   });
 
   it("randomWeb returns null when the pack defines no web urls", async () => {
