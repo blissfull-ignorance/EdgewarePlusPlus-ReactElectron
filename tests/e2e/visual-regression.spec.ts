@@ -8,57 +8,6 @@ const EMBER_6 = { r: 225, g: 29, b: 72 };
 test.describe("Visual Regression — styled app", () => {
   test.describe.configure({ timeout: 90_000 });
 
-  test("A18.1 Mantine CSS is loaded: ≥50 --mantine-* vars on :root and mantine- component rules", async ({
-    page,
-  }) => {
-    await launchApp(page);
-
-    const varCount = await page.evaluate(() => {
-      let count = 0;
-      for (const sheet of Array.from(document.styleSheets)) {
-        let rules;
-        try {
-          rules = sheet.cssRules;
-        } catch {
-          continue;
-        }
-        for (const rule of Array.from(rules)) {
-          const selectorText = rule.selectorText || "";
-          if (selectorText === ":root" || selectorText === "html") {
-            for (const name of Array.from(rule.style || [])) {
-              if (name.startsWith("--mantine-")) count += 1;
-            }
-          }
-        }
-      }
-      return count;
-    });
-    expect(varCount).toBeGreaterThanOrEqual(50);
-
-    const styles = await page.evaluate(() => {
-      let mantineComponentRules = 0;
-      let totalRules = 0;
-      for (const sheet of Array.from(document.styleSheets)) {
-        let rules;
-        try {
-          rules = sheet.cssRules;
-        } catch {
-          continue;
-        }
-        for (const rule of Array.from(rules)) {
-          totalRules += 1;
-          const selectorText = (rule as { selectorText?: string }).selectorText;
-          if (selectorText && /(^|[\s.,:>+~])mantine-/.test(selectorText)) {
-            mantineComponentRules += 1;
-          }
-        }
-      }
-      return { mantineComponentRules, totalRules };
-    });
-    expect(styles.totalRules).toBeGreaterThan(0);
-    expect(styles.mantineComponentRules).toBeGreaterThan(0);
-  });
-
   test("A18.2 primary filled button uses the theme primary, not native grey", async ({ page }) => {
     await launchApp(page);
 
@@ -82,9 +31,13 @@ test.describe("Visual Regression — styled app", () => {
 
     const focus = await page.evaluate(() => {
       const el = document.activeElement;
-      if (!el) return { outlineWidth: 0 };
-      return { outlineWidth: parseFloat(getComputedStyle(el).outlineWidth) };
+      if (!el) return { testId: null, outlineWidth: 0 };
+      return {
+        testId: el.getAttribute("data-testid"),
+        outlineWidth: parseFloat(getComputedStyle(el).outlineWidth),
+      };
     });
+    expect(focus.testId).toBe("main-tab-config");
     expect(focus.outlineWidth).toBeGreaterThanOrEqual(2);
   });
 

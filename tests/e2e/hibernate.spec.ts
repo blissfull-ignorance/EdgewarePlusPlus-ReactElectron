@@ -1,30 +1,20 @@
 import { test, expect } from "@playwright/test";
+import { launchApp } from "./helpers";
 
+// The hibernate scheduler is not yet mounted in the renderer (the badge and
+// countdown reflect the setting only), so this layer pins exactly that.
 test.describe("Hibernate Mode — Status Display", () => {
-  test.beforeEach(async ({ page }) => {
-    await page.goto("/");
-  });
+  test("the badge and countdown follow the hibernateMode setting", async ({ page }) => {
+    await launchApp(page, { settings: { hibernateMode: 0 } });
+    await expect(page.getByTestId("hibernate-state")).toHaveText("Disabled");
+    await expect(page.getByTestId("hibernate-countdown")).toHaveText("Countdown: —");
 
-  test("hibernate shows as disabled by default", async ({ page }) => {
-    await expect(page.locator("[data-testid='hibernate-countdown']")).toBeVisible();
-    await expect(page.locator("[data-testid='metadata-panel']").getByText("Disabled")).toBeVisible();
-  });
-
-  test("hibernate countdown shows placeholder when disabled", async ({ page }) => {
-    const hibernateCountdown = page.locator("[data-testid='hibernate-countdown']");
-    await expect(hibernateCountdown).toBeVisible();
-    await expect(hibernateCountdown).toContainText("Countdown:");
-  });
-
-  test("hibernate section is visible in metadata panel", async ({ page }) => {
-    await expect(page.locator("[data-testid='metadata-panel']").getByText("Hibernate")).toBeVisible();
-  });
-
-  test("hibernate state persists through start/stop interactions", async ({ page }) => {
-    const startStopButton = page.locator("[data-testid='start-stop-button']");
-    await startStopButton.click();
-    await expect(page.locator("[data-testid='metadata-panel']").getByText("Disabled")).toBeVisible();
-    await startStopButton.click();
-    await expect(page.locator("[data-testid='metadata-panel']").getByText("Disabled")).toBeVisible();
+    await page.evaluate(() => {
+      const store = (window as unknown as {
+        __settingsStore: { getState: () => { setRaw: (p: Record<string, unknown>) => void } };
+      }).__settingsStore;
+      store.getState().setRaw({ hibernateMode: 1 });
+    });
+    await expect(page.getByTestId("hibernate-state")).toHaveText("Enabled, Idle");
   });
 });

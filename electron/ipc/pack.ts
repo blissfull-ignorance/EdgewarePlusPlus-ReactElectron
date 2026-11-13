@@ -153,7 +153,18 @@ function loadIndexFallback(packDir: string): Index {
   const mediaMoods = loadMedia(packDir);
 
   const index: Index = {
-    default: { ...DEFAULT_INDEX.default },
+    // Own every list: the sections below push into these arrays, and a
+    // shallow spread would share DEFAULT_INDEX's — permanently growing the
+    // shipped defaults on every legacy-pack read.
+    default: {
+      ...DEFAULT_INDEX.default,
+      captions: [],
+      denial: [],
+      subliminals: [],
+      notifications: [],
+      prompts: [],
+      web: [],
+    },
     moods: [],
     mediaMoods,
   };

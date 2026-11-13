@@ -18,6 +18,7 @@ function NavItem({ active, label, icon, testId, onClick }: NavItemProps) {
   return (
     <UnstyledButton
       data-testid={testId}
+      data-active={active ? "true" : undefined}
       className={`ewpp-nav-item${active ? " ewpp-nav-item-active" : ""}`}
       onClick={onClick}
     >

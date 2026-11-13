@@ -1,5 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
-import { getPopupCount, TEST_IMAGE } from "./helpers";
+import { getPopupCount, TEST_IMAGE, TEST_VIDEO } from "./helpers";
 
 type SettingsStore = {
   getState: () => Record<string, unknown>;
@@ -33,6 +33,24 @@ async function setupPage(page: Page, overrides: Record<string, unknown> = {}) {
   );
 }
 
+async function recordCreateTypes(page: Page) {
+  await page.evaluate(() => {
+    const api = (window as unknown as { api: { popup: Record<string, unknown> } }).api;
+    (window as unknown as Record<string, unknown>).__createTypes = [] as string[];
+    const originalCreate = api.popup.create;
+    api.popup.create = async (...args: unknown[]) => {
+      (window as unknown as { __createTypes: string[] }).__createTypes.push(String(args[0]));
+      return (originalCreate as (...a: unknown[]) => Promise<unknown>)(...args);
+    };
+  });
+}
+
+async function createTypes(page: Page): Promise<string[]> {
+  return page.evaluate(
+    () => (window as unknown as { __createTypes?: string[] }).__createTypes ?? []
+  );
+}
+
 test.describe("Popup spawning — hybrid render modes", () => {
   test("the main app page keeps its opaque surface (transparency is popup-only)", async ({ page }) => {
     await page.goto("/");
@@ -40,14 +58,6 @@ test.describe("Popup spawning — hybrid render modes", () => {
     expect(flag).toBeNull();
   });
 
-  test("popupRenderMode defaults to electron", async ({ page }) => {
-    await page.goto("/");
-    const mode = await page.evaluate(() => {
-      const store = (window as unknown as { __settingsStore: SettingsStore }).__settingsStore;
-      return store.getState().popupRenderMode;
-    });
-    expect(mode).toBe("electron");
-  });
 
   test("electron popup route renders popup content and closes via IPC", async ({ page }) => {
     await page.goto("/#/popup/image/test.png/popup-abc");
@@ -83,11 +93,24 @@ test.describe("Popup spawning — hybrid render modes", () => {
     );
   });
 
-  test("config Modes panel shows the popup render mode dropdown", async ({ page }) => {
+  test("the Modes panel render-mode dropdown writes the store", async ({ page }) => {
     await page.goto("/");
     await page.locator("[data-testid='main-tabs']").getByRole("button", { name: "Config" }).click();
     await page.getByRole("tab", { name: "Modes" }).click();
-    await expect(page.getByText("Popup Render Mode")).toBeVisible();
+
+    const select = page.getByRole("textbox", { name: "Popup Render Mode" });
+    await expect(select).toHaveValue("Electron Windows (Topmost)");
+    await select.click();
+    await page.getByRole("option", { name: "In-App Overlay", exact: true }).click();
+
+    const mode = await page.evaluate(() =>
+      (
+        window as unknown as {
+          __settingsStore: { getState: () => { popupRenderMode: string } };
+        }
+      ).__settingsStore.getState().popupRenderMode
+    );
+    expect(mode).toBe("inapp");
   });
 
   test("electron mode: Start spawns via IPC, Stop closes all and resets count", async ({ page }) => {
@@ -159,6 +182,101 @@ test.describe("Popup spawning — hybrid render modes", () => {
 
     await expect(popupCount).toHaveText("Active: 0");
     await expect(inAppPopups).toHaveCount(0);
+  });
+
+  test("image and video at 100% both spawn — no type shadows another", async ({ page }) => {
+    await setupPage(page, { popupMod: 100, vidMod: 100 });
+    await page.evaluate(
+      (vid: string) => {
+        const api = (window as unknown as { api: { pack: Record<string, unknown> } }).api;
+        api.pack.randomVideo = async () => vid;
+      },
+      TEST_VIDEO
+    );
+    await recordCreateTypes(page);
+
+    await page.locator("[data-testid='start-stop-button']").click();
+    await expect
+      .poll(async () => new Set(await createTypes(page)), { timeout: 10_000 })
+      .toEqual(new Set(["image", "video"]));
+    await page.locator("[data-testid='start-stop-button']").click();
+  });
+
+  test("single mode spawns at most one popup per roll tick", async ({ page }) => {
+    await setupPage(page, { popupMod: 100, vidMod: 100, singleMode: 1 });
+    await page.evaluate(
+      (vid: string) => {
+        const api = (window as unknown as { api: { pack: Record<string, unknown> } }).api;
+        api.pack.randomVideo = async () => vid;
+      },
+      TEST_VIDEO
+    );
+    await recordCreateTypes(page);
+
+    await page.locator("[data-testid='start-stop-button']").click();
+    await page.waitForTimeout(2500);
+    await page.locator("[data-testid='start-stop-button']").click();
+
+    const calls = (await createTypes(page)).length;
+    // delay 200ms over a 2.5s window ≈ 12 ticks: single mode must stay near
+    // one create per tick; independent rolls (the regression) would double it.
+    expect(calls).toBeGreaterThanOrEqual(5);
+    expect(calls).toBeLessThanOrEqual(15);
+  });
+
+  test("the audio concurrency cap holds while running and releases after Stop", async ({ page }) => {
+    await setupPage(page, { popupMod: 0, audioMod: 100, maxAudio: 1, delay: 400 });
+    await page.evaluate(() => {
+      const api = (window as unknown as { api: { pack: Record<string, unknown> } }).api;
+      api.pack.randomAudio = async () => "aud/test.mp3";
+    });
+    await recordCreateTypes(page);
+
+    const startStop = page.locator("[data-testid='start-stop-button']");
+    await startStop.click();
+    await page.waitForTimeout(2000);
+    const audioWhileRunning = (await createTypes(page)).filter((t) => t === "audio").length;
+    expect(audioWhileRunning).toBe(1);
+
+    await startStop.click();
+    await startStop.click();
+    await expect
+      .poll(async () => (await createTypes(page)).filter((t) => t === "audio").length, {
+        timeout: 10_000,
+      })
+      .toBeGreaterThan(1);
+    await startStop.click();
+  });
+
+  test("mitosis refills the screen when the last popup closes", async ({ page }) => {
+    await setupPage(page, {
+      popupRenderMode: "inapp",
+      mitosisMode: 1,
+      mitosisStrength: 3,
+      delay: 4000,
+    });
+    await page.evaluate(
+      (vid: string) => {
+        const api = (window as unknown as { api: { pack: Record<string, unknown> } }).api;
+        api.pack.randomVideo = async () => vid;
+      },
+      TEST_VIDEO
+    );
+
+    const startStop = page.locator("[data-testid='start-stop-button']");
+    const inAppPopups = page.locator("[data-testid='in-app-popup']");
+    const popupCount = page.locator("[data-testid='popup-count']");
+
+    await startStop.click();
+    await expect(inAppPopups.first()).toBeVisible({ timeout: 8000 });
+    await expect(popupCount).toHaveText("Active: 1");
+
+    await inAppPopups.first().locator("[data-testid='close-button']").click();
+    await expect(inAppPopups).toHaveCount(3, { timeout: 2500 });
+    await expect(popupCount).toHaveText("Active: 3");
+
+    await startStop.click();
+    await expect(popupCount).toHaveText("Active: 0");
   });
 
   test("popup count increments with each spawned popup while running", async ({ page }) => {

@@ -28,10 +28,7 @@ test.describe("Dark Theme", () => {
     await launchApp(page);
 
     await page.locator("[data-testid='main-tabs']").getByRole("button", { name: "Config" }).click();
-    const startPanel = page
-      .locator("div.mantine-Paper-root")
-      .filter({ has: page.getByText("Start Settings", { exact: true }) });
-    const themeSelect = startPanel.locator("input.mantine-Select-input").first();
+    const themeSelect = page.getByRole("textbox", { name: "Theme" });
     await expect(themeSelect).toHaveValue("Original");
 
     await themeSelect.click();

@@ -38,20 +38,25 @@ test.describe("Corruption Mode", () => {
     await page.locator("[data-testid='main-tabs']").getByRole("button", { name: "Config" }).click();
     await page.getByRole("tab", { name: "Corruption" }).click();
 
-    const modeToggle = page.getByLabel("Enable Corruption Mode");
-    await expect(modeToggle).toBeEnabled();
-    await modeToggle.click();
+    const trigger = page.getByRole("textbox", { name: "Trigger Type" });
+    const startLevel = page.getByTestId("corruption-start-level");
+    await expect(trigger).toBeDisabled();
+    await expect(startLevel).toBeDisabled();
+
+    await page.getByLabel("Enable Corruption Mode").click();
     const after = await page.evaluate(
       () =>
         (
           window as unknown as {
-            __settingsStore: { getState: () => { corruptionMode: number; corruptionFullPerm: number } };
+            __settingsStore: { getState: () => { corruptionMode: number } };
           }
-        ).__settingsStore.getState()
+        ).__settingsStore.getState().corruptionMode
     );
-    expect(after.corruptionMode).toBe(1);
+    expect(after).toBe(1);
+    await expect(trigger).toBeEnabled();
+    await expect(startLevel).toBeEnabled();
 
-    await modeToggle.click();
+    await page.getByLabel("Enable Corruption Mode").click();
     const off = await page.evaluate(
       () =>
         (
@@ -61,11 +66,11 @@ test.describe("Corruption Mode", () => {
         ).__settingsStore.getState().corruptionMode
     );
     expect(off).toBe(0);
-
-    await expect(page.getByLabel("Full Permissions")).toBeEnabled();
+    await expect(trigger).toBeDisabled();
   });
 
-  test("corruption config tab exposes the mode controls", async ({ page }) => {    await launchApp(page, { packs });
+  test("corruption config tab exposes the mode controls", async ({ page }) => {
+    await launchApp(page, { packs });
 
     await page.locator("[data-testid='main-tabs']").getByRole("button", { name: "Config" }).click();
     await page.getByRole("tab", { name: "Corruption" }).click();
@@ -75,6 +80,7 @@ test.describe("Corruption Mode", () => {
     await expect(page.getByText("Trigger Type")).toBeVisible();
     await expect(page.getByText("Time Per Level")).toBeVisible();
     await expect(page.getByText("Popup Count Trigger")).toBeVisible();
+    await expect(page.getByRole("textbox", { name: "Trigger Type" })).toBeDisabled();
     await expect(page.getByTestId("corruption-error-banner")).not.toBeVisible();
   });
 
@@ -90,15 +96,11 @@ test.describe("Corruption Mode", () => {
     await expect(page.locator("[data-testid='next-level-time']")).toContainText("Next transition:");
   });
 
-  test("disabling corruption mode hides the driver details and mood badges again", async ({
-    page,
-  }) => {
+  test("disabling corruption mode hides the driver details again", async ({ page }) => {
     await launchApp(page, { packs });
     await setCorruptionMode(page, 1);
 
-    const panel = page.locator("[data-testid='metadata-panel']");
     await expect(corruptionBadge(page).getByText("Active", { exact: true })).toBeVisible();
-    await expect(panel.locator("[data-testid='active-mood']")).toHaveCount(0);
     await setCorruptionMode(page, 0);
 
     await expect(corruptionBadge(page).getByText("Inactive", { exact: true })).toBeVisible();

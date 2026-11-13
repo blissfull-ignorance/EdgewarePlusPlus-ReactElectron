@@ -28,6 +28,10 @@ export const PACKS_DIR = resolve(__dirname, "../../packs");
 /** Committed fallback fixtures used when the gitignored `packs/` directory is absent (clean checkout / CI). */
 export const FIXTURE_PACKS_DIR = resolve(__dirname, "fixtures");
 
+/** 0.5s black VP8 webm (64x64) — a cheap popup video the browser can actually load. */
+export const TEST_VIDEO = "data:video/webm;base64," +
+  "GkXfo59ChoEBQveBAULygQRC84EIQoKEd2VibUKHgQJChYECGFOAZwEAAAAAAAMcEU2bdLpNu4tTq4QVSalmU6yBoU27i1OrhBZUrmtTrIHWTbuMU6uEElTDZ1OsggEyTbuMU6uEHFO7a1OsggMG7AEAAAAAAABZAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAVSalmsCrXsYMPQkBNgIxMYXZmNjMuMS4xMDFXQYxMYXZmNjMuMS4xMDFEiYhAgEAAAAAAABZUrmvXrgEAAAAAAABO14EBc8WItwta8foE9RCcgQAitZyDdW5kiIEAhoVWX1ZQOIOBASPjg4QCYloA4JCwgUC6gUCagQJVsIRVuYEBVe6BAOwBAAAAAAAAAgAAElTDZ/pzc59jwIBnyJlFo4dFTkNPREVSRIeMTGF2ZjYzLjEuMTAxc3PVY8CLY8WItwta8foE9RBnyKBFo4dFTkNPREVSRIeTTGF2YzYzLjEuMTAxIGxpYnZweGfIoUWjiERVUkFUSU9ORIeTMDA6MDA6MDAuNTIwMDAwMDAwAB9DtnVBT+eBAKOqgQAAgPACAJ0BKkAAQAAARwiFhYiFhIgCAgAGcDxCYAqyIPcwAP7/q1CAo5aBACgA0QEAARAQABgAGFgv9AAIjoAAo5aBAFAA0QEAARAQABgAGFgv9AAIjoAAo5aBAHgA0QEAARAQABgAGFgv9AAIjoAAo5aBAKAA0QEAARAQABgAGFgv9AAIjoAAo5aBAMgA0QEAARAQABgAGFgv9AAIjoAAo5aBAPAA0QEAARAQABgAGFgv9AAIjoAAo5aBARgA0QEAARAQFGAAYWC/0AAiOgAAo5aBAUAA0QEAARAQABgAGFgv9AAIjoAAo5aBAWgA0QEAARAQABgAGFgv9AAIjoAAo5aBAZAA0QEAARAQABgAGFgv9AAIjoAAo5aBAbgA0QEAARAQABgAGFgv9AAIjoAAo5aBAeAA0QEAARAQABgAGFgv9AAIjoAAHFO7a5G7j7OBALeK94EB8YIBsfCBAw==";
+
 /** 10x10 red SVG data URI used as cheap popup media in E2E. */
 export const TEST_IMAGE =
   "data:image/svg+xml;utf8," +
@@ -49,6 +53,10 @@ export interface LaunchOptions {
   saveDelayMs?: number;
   /** Media returned by `pack:randomImage`; `null` disables image popups. */
   image?: string | null;
+  /** Corruption config returned by `pack:loadCorruption`. */
+  corruption?: Record<string, unknown>;
+  /** Make `corruption:getCurrentLevel` / `getNextLevelTime` reject. */
+  corruptionIpcFails?: boolean;
 }
 
 /** Read every pack directory under `dir` the same way `system:listPacks` does. */
@@ -114,17 +122,14 @@ export async function getPopupCount(page: Page): Promise<number> {
  * Resolves once the main window has rendered (metadata panel visible).
  */
 export async function launchApp(page: Page, options: LaunchOptions = {}): Promise<Page> {
-  if (
-    options.packs !== undefined ||
-    options.settings !== undefined ||
-    options.persistSettings ||
-    options.image !== undefined
-  ) {
+  if (Object.keys(options).length > 0) {
     await page.addInitScript((opts: LaunchOptions) => {
       const w = window as unknown as {
         api?: unknown;
         __e2eSaveCalls?: number;
         __e2eLastSaved?: Record<string, unknown> | null;
+        __e2eBaselines?: Record<string, unknown>[];
+        __e2eRevertCalls?: number;
       };
       w.api = {
         pack: {
@@ -147,7 +152,7 @@ export async function launchApp(page: Page, options: LaunchOptions = {}): Promis
           loadPackConfig: async () => null,
           hasScript: async () => false,
           setRuntimePack: async () => undefined,
-          listGallery: async () => ({ entries: [], moods: [], activeMoods: [] }),
+          listGallery: async () => ({ entries: [], moods: [], activeMoods: [], favourites: [] }),
           setFavourite: async () => [],
           refreshAppIcon: async () => undefined,
           getEditableIndex: async () => null,
@@ -156,17 +161,32 @@ export async function launchApp(page: Page, options: LaunchOptions = {}): Promis
           removeMood: async () => null,
           renameMood: async () => null,
           blacklist: async () => ({ ok: true }),
-          loadCorruption: async () => null,
+          loadCorruption: async () => opts.corruption ?? null,
           discord: async () => null,
         },
         booru: {
           fetchImage: async () => null,
         },
         corruption: {
-          getCurrentLevel: async () => 0,
-          getNextLevelTime: async () => null,
+          getCurrentLevel: async () => {
+            if (opts.corruptionIpcFails) throw new Error("IPC down");
+            return 0;
+          },
+          getNextLevelTime: async () => {
+            if (opts.corruptionIpcFails) throw new Error("IPC down");
+            return null;
+          },
           applyLevelChanges: async () => undefined,
           setLevel: async () => undefined,
+          persistBaseline: async (baseline: Record<string, unknown>) => {
+            w.__e2eBaselines = w.__e2eBaselines ?? [];
+            w.__e2eBaselines.push(baseline);
+            return true;
+          },
+          revertBaseline: async () => {
+            w.__e2eRevertCalls = (w.__e2eRevertCalls ?? 0) + 1;
+            return 0;
+          },
           onInject: () => () => {},
           onApplyChanges: () => () => {},
         },
@@ -233,8 +253,7 @@ export async function launchApp(page: Page, options: LaunchOptions = {}): Promis
             }
             // The startup splash is verified in the Electron layer; browser
             // specs start straight on the app UI.
-            if (opts.settings) return { showLoadingFlair: 0, ...opts.settings };
-            return null;
+            return { showLoadingFlair: 0, ...(opts.settings ?? {}) };
           },
           saveSettings: async (settings: Record<string, unknown>) => {
             w.__e2eSaveCalls = (w.__e2eSaveCalls ?? 0) + 1;
@@ -242,6 +261,13 @@ export async function launchApp(page: Page, options: LaunchOptions = {}): Promis
             if (opts.saveDelayMs) await new Promise((r) => setTimeout(r, opts.saveDelayMs));
             if (opts.persistSettings)
               localStorage.setItem("__e2e_settings_file__", JSON.stringify(settings));
+          },
+          flushSettings: (settings: Record<string, unknown>) => {
+            w.__e2eSaveCalls = (w.__e2eSaveCalls ?? 0) + 1;
+            w.__e2eLastSaved = settings;
+            if (opts.persistSettings)
+              localStorage.setItem("__e2e_settings_file__", JSON.stringify(settings));
+            return true;
           },
           sendNotification: async () => undefined,
         },

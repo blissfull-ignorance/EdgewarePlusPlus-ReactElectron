@@ -29,7 +29,7 @@ if (typeof window !== "undefined" && !(window as unknown as Record<string, unkno
       loadPackConfig: async () => null,
       hasScript: async () => false,
       setRuntimePack: async () => undefined,
-      listGallery: async () => ({ entries: [], moods: [], activeMoods: [] }),
+      listGallery: async () => ({ entries: [], moods: [], activeMoods: [], favourites: [] }),
       setFavourite: async () => [],
       refreshAppIcon: async () => undefined,
       getEditableIndex: async () => null,

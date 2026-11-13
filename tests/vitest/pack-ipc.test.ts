@@ -288,6 +288,29 @@ describe("pack IPC handlers", () => {
     expect(seen.has("https://a.example/page1")).toBe(true);
   });
 
+  it("repeated legacy reads never accumulate entries in the shipped default index", async () => {
+    mockReadFileSync.mockImplementation((p: string) => {
+      if (p.includes("index.json")) throw new Error("ENOENT");
+      if (p.includes("web.json")) {
+        return JSON.stringify({ urls: ["https://a.example/"], args: ["page1"], moods: [null] });
+      }
+      if (p.includes("config.json")) return JSON.stringify({ packPath: "/mock/pack" });
+      throw new Error("ENOENT");
+    });
+
+    const { registerHandlers } = await import("../../electron/ipc/pack");
+    registerHandlers();
+
+    const loadInfo = handlers["pack:loadInfo"] as () => Promise<Record<string, unknown>>;
+    for (let i = 0; i < 5; i++) {
+      const info = await loadInfo();
+      const web = (info?.default as { web?: unknown[] })?.web ?? [];
+      // A shallow copy of DEFAULT_INDEX made every read push a second entry
+      // into the shipped defaults — unbounded growth and mood dilution.
+      expect(web).toHaveLength(1);
+    }
+  });
+
   it("randomWeb returns null when the pack defines no web urls", async () => {
     mockReadFileSync.mockReturnValue(JSON.stringify({ packPath: "/mock/pack" }));
 
