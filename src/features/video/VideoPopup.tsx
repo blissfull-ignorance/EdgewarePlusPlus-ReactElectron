@@ -113,9 +113,9 @@ export function VideoPopup({
       <div style={{ width: "100%", height: "100%" }}>
         <Center
           // With a close button, clicks on the media do nothing (legacy);
-          // buttonless mode closes on any click, so let them bubble to the
-          // shell handler.
-          onClick={buttonless > 0 ? undefined : (e) => e.stopPropagation()}
+          // buttonless mode closes on any click and multi-click counts
+          // every click, so both let them bubble to the shell handler.
+          onClick={buttonless > 0 || clicksToClose > 0 ? undefined : (e) => e.stopPropagation()}
           style={{
             width: "100%",
             height: "100%",

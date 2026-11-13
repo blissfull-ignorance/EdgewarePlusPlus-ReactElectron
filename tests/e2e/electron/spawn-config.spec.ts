@@ -142,6 +142,93 @@ test.describe("Session-scoped pack config + spawn warning", () => {
     await expect(window.locator("[data-testid='spawn-warning-modal']")).toHaveCount(0);
     await window.locator("[data-testid='start-stop-button']").click();
   });
+
+  test("Start warns when every chance is zero on a scriptless pack", async () => {
+    const { window, app } = running!;
+    await window.evaluate(() => {
+      (
+        window as unknown as {
+          __settingsStore: { getState: () => { setRaw: (v: Record<string, unknown>) => void } };
+        }
+      ).__settingsStore.getState().setRaw({
+        corruptionMode: 0,
+        delay: 5000,
+        popupMod: 0,
+        vidMod: 0,
+        audioMod: 0,
+        promptMod: 0,
+        capPopChance: 0,
+        webMod: 0,
+        notificationChance: 0,
+      });
+    });
+    await window.locator("[data-testid='start-stop-button']").click();
+    await expect(window.locator("[data-testid='spawn-warning-modal']")).toBeVisible();
+    await expect(window.locator("[data-testid='spawn-warning-modal']")).toContainText(
+      "Every popup chance is 0%"
+    );
+    // The session does not start behind the modal — and nothing spawns.
+    await expect(window.locator("[data-testid='start-stop-button']")).toHaveText("Start");
+    await window.waitForTimeout(2500);
+    expect(app.windows().filter((w) => w.url().includes("/popup/")).length).toBe(0);
+
+    // "Start anyway" proceeds.
+    await window.locator("[data-testid='spawn-warning-start']").click();
+    await expect(window.locator("[data-testid='start-stop-button']")).toHaveText("Stop");
+    await window.locator("[data-testid='start-stop-button']").click();
+    await window.evaluate(() => {
+      (
+        window as unknown as {
+          __settingsStore: { getState: () => { setRaw: (v: Record<string, unknown>) => void } };
+        }
+      ).__settingsStore.getState().setRaw({ popupMod: 100 });
+    });
+  });
+
+  test("Start warns only below the 500 ms auto-close floor", async () => {
+    const { window } = running!;
+    await window.evaluate(() => {
+      (
+        window as unknown as {
+          __settingsStore: { getState: () => { setRaw: (v: Record<string, unknown>) => void } };
+        }
+      ).__settingsStore.getState().setRaw({
+        corruptionMode: 0,
+        delay: 5000,
+        popupMod: 100,
+        timeoutPopups: 1,
+        popupTimeout: 499,
+      });
+    });
+    await window.locator("[data-testid='start-stop-button']").click();
+    await expect(window.locator("[data-testid='spawn-warning-modal']")).toBeVisible();
+    await expect(window.locator("[data-testid='spawn-warning-modal']")).toContainText("auto-close");
+    // The modal offers only "Start anyway" / "Open settings": proceed, then
+    // Stop and reconfigure to the boundary value.
+    await window.locator("[data-testid='spawn-warning-start']").click();
+    const startStop = window.locator("[data-testid='start-stop-button']");
+    await expect(startStop).toHaveText("Stop");
+    await startStop.click();
+
+    await window.evaluate(() => {
+      (
+        window as unknown as {
+          __settingsStore: { getState: () => { setRaw: (v: Record<string, unknown>) => void } };
+        }
+      ).__settingsStore.getState().setRaw({ popupTimeout: 500 });
+    });
+    await startStop.click();
+    await expect(window.locator("[data-testid='spawn-warning-modal']")).toHaveCount(0);
+    await startStop.click();
+
+    await window.evaluate(() => {
+      (
+        window as unknown as {
+          __settingsStore: { getState: () => { setRaw: (v: Record<string, unknown>) => void } };
+        }
+      ).__settingsStore.getState().setRaw({ timeoutPopups: 0, popupMod: 100 });
+    });
+  });
 });
 
 test.describe("Pack config overrides survive a quit without Stop", () => {

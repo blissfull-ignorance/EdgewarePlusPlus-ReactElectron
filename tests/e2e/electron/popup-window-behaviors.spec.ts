@@ -132,11 +132,27 @@ test.describe("Popup window behaviors — sizing, movement, audio chip", () => {
       )
       .toBe(true);
 
-    // And it stays on-screen while moving.
-    const display = await app.evaluate(({ screen }) => screen.getPrimaryDisplay().bounds);
-    const b = await popupBounds(app, "#/popup/image");
-    expect(b!.x).toBeGreaterThanOrEqual(display.x - 1);
-    expect(b!.y).toBeGreaterThanOrEqual(display.y - 1);
+    // And every sampled position stays inside the work area the mover
+    // bounces in — a single end snapshot could catch a lucky instant.
+    const work = await app.evaluate(({ screen }) => screen.getPrimaryDisplay().workArea);
+    const samples: Array<{ x: number; y: number; width: number; height: number }> = [];
+    for (let i = 0; i < 12; i++) {
+      const b = await popupBounds(app, "#/popup/image");
+      if (b) samples.push(b);
+      await new Promise((r) => setTimeout(r, 180));
+    }
+    expect(samples.length).toBeGreaterThanOrEqual(6);
+    for (const b of samples) {
+      expect(b.x).toBeGreaterThanOrEqual(work.x - 1);
+      expect(b.y).toBeGreaterThanOrEqual(work.y - 1);
+      expect(b.x + b.width).toBeLessThanOrEqual(work.x + work.width + 1);
+      expect(b.y + b.height).toBeLessThanOrEqual(work.y + work.height + 1);
+    }
+    // The window travelled across the samples, it did not just jitter once.
+    const spread =
+      Math.max(...samples.map((b) => b.x)) - Math.min(...samples.map((b) => b.x)) +
+      (Math.max(...samples.map((b) => b.y)) - Math.min(...samples.map((b) => b.y)));
+    expect(spread).toBeGreaterThan(2);
 
     await closeAll(window);
   });
@@ -154,5 +170,101 @@ test.describe("Popup window behaviors — sizing, movement, audio chip", () => {
     expect(bounds!.height).toBeLessThanOrEqual(60);
 
     await closeAll(window);
+  });
+
+  test("the audio concurrency cap holds in electron mode and releases between pops", async () => {
+    const { window, app } = running!;
+    await window.evaluate((v: Record<string, unknown>) => {
+      (
+        window as unknown as {
+          __settingsStore: { getState: () => { setRaw: (x: Record<string, unknown>) => void } };
+        }
+      ).__settingsStore.getState().setRaw(v);
+    }, { audioMod: 100, maxAudio: 1, delay: 400 });
+    await expect
+      .poll(() =>
+        window.evaluate(
+          () =>
+            (
+              window as unknown as { __settingsStore: { getState: () => { dirty: boolean } } }
+            ).__settingsStore.getState().dirty
+        )
+      )
+      .toBe(false);
+
+    const audioWins = () =>
+      app.windows().filter((w) => w !== window && w.url().includes("/popup/audio"));
+    const seen = new Set<string>();
+    let maxConcurrent = 0;
+
+    const startStop = window.locator("[data-testid='start-stop-button']");
+    try {
+      await startStop.click();
+      for (let i = 0; i < 25; i++) {
+        const wins = audioWins();
+        maxConcurrent = Math.max(maxConcurrent, wins.length);
+        for (const w of wins) seen.add(w.url());
+        await new Promise((r) => setTimeout(r, 200));
+      }
+    } finally {
+      if ((await startStop.textContent()) === "Stop") await startStop.click();
+      await window.evaluate((v: Record<string, unknown>) => {
+        (
+          window as unknown as {
+            __settingsStore: { getState: () => { setRaw: (x: Record<string, unknown>) => void } };
+          }
+        ).__settingsStore.getState().setRaw(v);
+      }, { audioMod: 0, delay: 60000 });
+      await closeAll(window);
+    }
+
+    // Never two audio windows at once (the cap), yet more than one distinct
+    // pop across the run — the registry released after each 0.6s file ended.
+    expect(maxConcurrent).toBe(1);
+    expect(seen.size).toBeGreaterThanOrEqual(2);
+  });
+
+  test("clickthrough popups ignore the mouse in the real window", async () => {
+    const { window, app } = running!;
+    await window.evaluate((v: Record<string, unknown>) => {
+      (
+        window as unknown as {
+          __settingsStore: { getState: () => { setRaw: (x: Record<string, unknown>) => void } };
+        }
+      ).__settingsStore.getState().setRaw(v);
+    }, { clickthroughPopups: 1 });
+    await expect
+      .poll(() =>
+        window.evaluate(
+          () =>
+            (
+              window as unknown as { __settingsStore: { getState: () => { dirty: boolean } } }
+            ).__settingsStore.getState().dirty
+        )
+      )
+      .toBe(false);
+
+    try {
+      await createPopup(window, "image", "applelw.png");
+      const popup = await app.waitForEvent("window", {
+        predicate: (w) => w.url().includes("/popup/image"),
+        timeout: 15_000,
+      });
+      await popup.waitForSelector("[data-testid='popup-shell']", { timeout: 15_000 });
+      const pointerEvents = await popup
+        .locator("[data-testid='popup-shell']")
+        .first()
+        .evaluate((el) => getComputedStyle(el).pointerEvents);
+      expect(pointerEvents).toBe("none");
+    } finally {
+      await window.evaluate((v: Record<string, unknown>) => {
+        (
+          window as unknown as {
+            __settingsStore: { getState: () => { setRaw: (x: Record<string, unknown>) => void } };
+          }
+        ).__settingsStore.getState().setRaw(v);
+      }, { clickthroughPopups: 0 });
+      await closeAll(window);
+    }
   });
 });

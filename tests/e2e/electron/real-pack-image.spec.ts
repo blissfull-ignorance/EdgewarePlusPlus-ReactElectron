@@ -58,8 +58,10 @@ test.describe("A21.1 / A21.6 — Electron runtime with the real pack", () => {
 
   test.afterAll(async () => {
     try {
+      // Stop only when a session is actually running: an unconditional
+      // click would START one seconds before quitting.
       const btn = running?.window.locator("[data-testid='start-stop-button']");
-      if (btn && (await btn.isVisible())) await btn.click();
+      if (btn && (await btn.isVisible()) && (await btn.textContent()) === "Stop") await btn.click();
     } catch {
       /* noop */
     }
@@ -76,18 +78,15 @@ test.describe("A21.1 / A21.6 — Electron runtime with the real pack", () => {
 
     // A popup BrowserWindow appears AND its image is verified loaded from real pack media.
     await expect
-      .poll(async () => (await loadedImagePopups(running!)) || app.windows().length, { timeout: 30000 })
-      .toBeTruthy();
-    await expect
       .poll(async () => await loadedImagePopups(running!), { timeout: 30000 })
       .toBe(true);
 
     // Window count > 1 confirms a real second BrowserWindow exists.
     expect(app.windows().length).toBeGreaterThanOrEqual(2);
 
-    // Main-window metadata shows active popups.
+    // Main-window metadata counts the live popups — a non-zero number.
     const popupCount = await window.locator('[data-testid="popup-count"]').textContent();
-    expect(popupCount?.replace(/\s+/g, " ")).toMatch(/Active:\s*(\d+)/);
+    expect(popupCount?.replace(/\s+/g, " ")).toMatch(/Active:\s*[1-9]/);
 
     // Stop → back to exactly one window; 2× delay quiet period stays at one.
     await window.locator("[data-testid='start-stop-button']").click();
@@ -118,9 +117,25 @@ test.describe("A21.1 / A21.6 — Electron runtime with the real pack", () => {
       .poll(async () => await loadedImagePopups(running!), { timeout: 30000 })
       .toBe(true);
 
+    // Force the corrupt file: random selection only puts it in the pool, so
+    // spawn it directly — the erroring media must close its own window and
+    // the loop must keep serving good popups afterwards.
+    const spawned = await window.evaluate(async () => {
+      const api = (
+        window as unknown as {
+          api: { popup: { create: (t: string, m: string) => Promise<{ id: string } | null> } };
+        }
+      ).api;
+      return api.popup.create("image", "zz-corrupt.png");
+    });
+    expect(spawned?.id).toBeTruthy();
+    const corruptGone = () => !app.windows().some((w) => w.url().includes(`/${spawned!.id}`));
+    await expect.poll(corruptGone, { timeout: 15000 }).toBe(true);
+    await expect
+      .poll(async () => await loadedImagePopups(running!), { timeout: 30000 })
+      .toBe(true);
+
     // No crash — Stop still returns cleanly.
-    const popupCount = await window.locator('[data-testid="popup-count"]').textContent();
-    expect(popupCount).toBeTruthy();
     await window.locator("[data-testid='start-stop-button']").click();
     await expect.poll(async () => app.windows().length, { timeout: 30000 }).toBe(1);
   });
@@ -149,8 +164,9 @@ test.describe("A21.1 / A21.6 — Electron runtime with the real pack", () => {
     for (const k of ["traversal1", "traversal2", "foreignSubdir", "missing"] as const) {
       expect([res[k]]).not.toContain(200);
     }
-    // The real in-pack files ARE served successfully.
-    expect(res.controlGood0).toBeGreaterThan(0);
-    expect(res.controlGood1).toBeGreaterThan(0);
+    // The real in-pack files ARE served successfully — a 404 must not pass
+    // the positive control, or the guard could reject the whole pack.
+    expect(res.controlGood0).toBe(200);
+    expect(res.controlGood1).toBe(200);
   });
 });

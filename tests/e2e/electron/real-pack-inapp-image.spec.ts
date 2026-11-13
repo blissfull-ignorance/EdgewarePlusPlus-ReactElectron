@@ -53,8 +53,10 @@ test.describe("A21.2 — in-app popup overlay renders real pack media", () => {
 
   test.afterAll(async () => {
     try {
+      // Stop only when a session is actually running: an unconditional
+      // click would START one seconds before quitting.
       const btn = running?.window.locator("[data-testid='start-stop-button']");
-      if (btn && (await btn.isVisible())) await btn.click();
+      if (btn && (await btn.isVisible()) && (await btn.textContent()) === "Stop") await btn.click();
     } catch {
       /* noop */
     }

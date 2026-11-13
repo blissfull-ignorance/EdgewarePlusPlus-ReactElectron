@@ -121,6 +121,14 @@ test.describe("subliminal text popup (legacy SubliminalPopup, capPop* settings)"
     const popup = running.app
       .windows()
       .find((w) => w !== running.window && w.url().includes("/popup/subliminal/"))!;
+
+    // Lower bound: at 400 ms into a 1200 ms timer the popup must still be
+    // alive — a timer misread as 0 closes it instantly and would otherwise
+    // make the disappearance check below pass vacuously.
+    await popup.waitForTimeout(400);
+    expect(popup.isClosed()).toBe(false);
+    expect(await popup.locator("[data-testid='subliminal-overlay']").count()).toBe(1);
+
     await expect
       .poll(
         async () => {

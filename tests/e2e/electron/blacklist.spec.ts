@@ -115,6 +115,69 @@ test.describe("media blacklist (alt+click close moves the file out of the pack)"
     expect(remaining).not.toContain(mediaId);
   });
 
+  test("alt+clicking close blacklists a video the same way", async () => {
+    const state = seed();
+    seedConfig(state, {
+      packPath: state.seedPath,
+      popupRenderMode: "electron",
+      popupMod: 0,
+      vidMod: 100,
+      audioMod: 0,
+      promptMod: 0,
+      webMod: 0,
+      capPopChance: 0,
+      subliminalsChance: 0,
+      mitosisMode: 0,
+      delay: 1000,
+    });
+    cleanup.push(() => cleanupTempState(state));
+    const running = await launchApp(state);
+    cleanup.push(async () => {
+      try {
+        await quitApp(running);
+      } catch {
+        /* noop */
+      }
+    });
+
+    await running.window.locator("[data-testid='pack-info']").waitFor({ timeout: 30000 });
+    await running.window.locator("[data-testid='start-stop-button']").click();
+
+    await expect
+      .poll(
+        async () =>
+          running.app
+            .windows()
+            .filter((w) => w !== running.window && w.url().includes("/popup/video/")).length,
+        { timeout: 60000 }
+      )
+      .toBeGreaterThan(0);
+
+    const popup = running.app
+      .windows()
+      .find((w) => w !== running.window && w.url().includes("/popup/video/"))!;
+    const mediaId = decodeURIComponent(popup.url().split("/popup/video/")[1].split("/")[0]);
+    const srcFile = path.join(state.seedPath, "vid", mediaId);
+    expect(existsSync(srcFile)).toBe(true);
+
+    await popup.keyboard.down("Alt");
+    await popup.locator("[data-testid='close-button']").click();
+    await popup.keyboard.up("Alt").catch(() => undefined);
+
+    // resolveBlacklistSource finds it under vid/, and the flat blacklist
+    // destination receives the bytes.
+    const blacklistDir = path.join(
+      state.dir,
+      "data",
+      "blacklist",
+      packDisplayName(state).split(/\s+/).join("")
+    );
+    await expect
+      .poll(() => existsSync(path.join(blacklistDir, mediaId)), { timeout: 10000 })
+      .toBe(true);
+    expect(existsSync(srcFile)).toBe(false);
+  });
+
   test("plain click closes without blacklisting", async () => {
     const state = seed();
     cleanup.push(() => cleanupTempState(state));
@@ -147,6 +210,11 @@ test.describe("media blacklist (alt+click close moves the file out of the pack)"
 
     await popup.locator("[data-testid='close-button']").click();
 
+    // The click closed the window — without this, a dead close button would
+    // pass the file-still-exists check below trivially.
+    await expect
+      .poll(() => running.app.windows().some((w) => w.url().includes(popup.url())), { timeout: 10000 })
+      .toBe(false);
     await expect
       .poll(() => existsSync(path.join(state.seedPath, "img", mediaId)), { timeout: 10000 })
       .toBe(true);

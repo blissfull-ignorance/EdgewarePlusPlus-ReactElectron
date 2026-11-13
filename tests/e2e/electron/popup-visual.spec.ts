@@ -204,17 +204,19 @@ test.describe("popup visuals (no thick borders; overlays keep media clean)", () 
     await closeAllPopups(running!);
   });
 
-  test("subliminal text popup renders", async () => {
+  test("text popups render (screenshot evidence)", async () => {
+    // Real content is pinned in real-pack-subliminal/real-pack-prompt; this
+    // covers the visual surface of both text kinds in one pass.
     await setSettings(running!, { ...ALL_OFF, capPopChance: 100 });
-    const win = await waitForPopup(running!, "subliminal-text");
-    await win.screenshot({ path: path.join(EVIDENCE_DIR, "subliminal-text.png") });
+    const subliminal = await waitForPopup(running!, "subliminal-text");
+    await expect(subliminal.locator("[data-testid='subliminal-text']")).toBeVisible();
+    await subliminal.screenshot({ path: path.join(EVIDENCE_DIR, "subliminal-text.png") });
     await closeAllPopups(running!);
-  });
 
-  test("prompt popup renders", async () => {
     await setSettings(running!, { ...ALL_OFF, promptMod: 100 });
-    const win = await waitForPopup(running!, "prompt-dialog");
-    await win.screenshot({ path: path.join(EVIDENCE_DIR, "prompt.png") });
+    const prompt = await waitForPopup(running!, "prompt-dialog");
+    await expect(prompt.locator("[data-testid='prompt-dialog']")).toBeVisible();
+    await prompt.screenshot({ path: path.join(EVIDENCE_DIR, "prompt.png") });
     await closeAllPopups(running!);
   });
 
@@ -235,9 +237,18 @@ test.describe("popup visuals (no thick borders; overlays keep media clean)", () 
     await closeAllPopups(running!);
   });
 
-  test("denial keeps the media borderless", async () => {
+  test("denial blurs the media and keeps it borderless", async () => {
     await setSettings(running!, { ...ALL_OFF, popupMod: 100, denialChance: 100 });
     const win = await waitForPopup(running!, "image-popup-img");
+    // denialChance 100 makes the roll deterministic: the wrapper must blur.
+    await expect
+      .poll(() =>
+        win
+          .locator("[data-testid='image-popup-img']")
+          .first()
+          .evaluate((el) => getComputedStyle(el.parentElement!).filter)
+      )
+      .toContain("blur");
     await assertNoBorder(win, "[data-testid='image-popup-img']");
     await win.screenshot({ path: path.join(EVIDENCE_DIR, "denial.png") });
     await closeAllPopups(running!);

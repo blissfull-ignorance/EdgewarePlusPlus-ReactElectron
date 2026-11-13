@@ -36,8 +36,10 @@ test.describe("A21.3 — real pack video reaches playback in an Electron popup",
 
   test.afterAll(async () => {
     try {
+      // Stop only when a session is actually running: an unconditional
+      // click would START one seconds before quitting.
       const btn = running?.window.locator("[data-testid='start-stop-button']");
-      if (btn && (await btn.isVisible())) await btn.click();
+      if (btn && (await btn.isVisible()) && (await btn.textContent()) === "Stop") await btn.click();
     } catch {
       /* noop */
     }

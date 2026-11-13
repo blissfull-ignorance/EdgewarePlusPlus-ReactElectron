@@ -1,4 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
+import { rmSync } from "node:fs";
+import path from "node:path";
 import {
   cleanupTempState,
   createTempState,
@@ -91,8 +93,10 @@ test.describe("user-fix — hypno overlay + pack close label (electron render mo
 
   test.afterAll(async () => {
     try {
+      // Stop only when a session is actually running: an unconditional
+      // click would START one seconds before quitting.
       const btn = running?.window.locator("[data-testid='start-stop-button']");
-      if (btn && (await btn.isVisible())) await btn.click();
+      if (btn && (await btn.isVisible()) && (await btn.textContent()) === "Stop") await btn.click();
     } catch {
       /* noop */
     }
@@ -153,6 +157,11 @@ test.describe("user-fix — hypno overlay + pack close label (electron render mo
     // kind:"default" resolves to a pack without a hypno/ dir (V2 test pack or seed
     // fixture), so the overlay must fall back to the app's default_hypno.gif asset.
     const fallbackState = createTempState({ kind: "default" });
+    // kind:"default" may resolve to a local library pack that ships hypno
+    // media — remove both hypno locations so the fallback condition holds
+    // on every machine.
+    rmSync(path.join(fallbackState.seedPath, "hypno"), { recursive: true, force: true });
+    rmSync(path.join(fallbackState.seedPath, "subliminals"), { recursive: true, force: true });
     seedConfig(fallbackState, {
       packPath: fallbackState.seedPath,
       popupRenderMode: "electron",
@@ -236,8 +245,10 @@ test.describe("user-fix — hypno overlay + pack close label (in-app render mode
 
   test.afterAll(async () => {
     try {
+      // Stop only when a session is actually running: an unconditional
+      // click would START one seconds before quitting.
       const btn = running?.window.locator("[data-testid='start-stop-button']");
-      if (btn && (await btn.isVisible())) await btn.click();
+      if (btn && (await btn.isVisible()) && (await btn.textContent()) === "Stop") await btn.click();
     } catch {
       /* noop */
     }

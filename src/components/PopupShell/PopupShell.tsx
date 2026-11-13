@@ -79,58 +79,54 @@ export function PopupShell({
     setRemainingClicks(clicksToClose);
   }, [clicksToClose]);
 
+  // The auto-close chain arms exactly once per timeoutMs. It must not depend
+  // on the opacity it animates: re-running per fade step stacked timers.
+  const opacityRef = useRef(currentOpacity);
+  opacityRef.current = currentOpacity;
+
   useEffect(() => {
     if (timeoutMs <= 0) return;
 
     const fadeDuration = Math.min(1000, timeoutMs);
     const visibleDuration = timeoutMs - fadeDuration;
+    const step = 16;
+    const steps = Math.max(1, fadeDuration / step);
 
-    if (visibleDuration <= 0) {
+    let interval: ReturnType<typeof setInterval> | null = null;
+    let cancelled = false;
+
+    const beginFade = () => {
+      if (cancelled || interval) return;
       setIsFadingOut(true);
-      const step = 16;
-      const steps = fadeDuration / step;
-      const delta = currentOpacity / steps;
-      if (fadeIntervalRef.current) clearInterval(fadeIntervalRef.current);
-      fadeIntervalRef.current = setInterval(() => {
+      const delta = (opacityRef.current || 1) / steps;
+      interval = setInterval(() => {
         setCurrentOpacity((prev) => {
           const next = Math.max(0, prev - delta);
           if (next <= 0) {
-            clearInterval(fadeIntervalRef.current!);
-            fadeIntervalRef.current = null;
+            if (interval) {
+              clearInterval(interval);
+              interval = null;
+            }
             handleClose();
           }
           return next;
         });
       }, step);
-      return () => {
-        if (fadeIntervalRef.current) {
-          clearInterval(fadeIntervalRef.current);
-          fadeIntervalRef.current = null;
-        }
-      };
+    };
+
+    let timeout: ReturnType<typeof setTimeout> | null = null;
+    if (visibleDuration <= 0) {
+      beginFade();
+    } else {
+      timeout = setTimeout(beginFade, visibleDuration);
     }
 
-    const fadeTimeout = setTimeout(() => {
-      setIsFadingOut(true);
-      const step = 16;
-      const steps = fadeDuration / step;
-      const delta = currentOpacity / steps;
-      fadeIntervalRef.current = setInterval(() => {
-        setCurrentOpacity((prev) => {
-          const next = Math.max(0, prev - delta);
-          if (next <= 0) {
-            clearInterval(fadeIntervalRef.current!);
-            handleClose();
-          }
-          return next;
-        });
-      }, step);
-    }, visibleDuration);
-
     return () => {
-      clearTimeout(fadeTimeout);
+      cancelled = true;
+      if (timeout) clearTimeout(timeout);
+      if (interval) clearInterval(interval);
     };
-  }, [timeoutMs, currentOpacity, handleClose]);
+  }, [timeoutMs, handleClose]);
 
   useEffect(() => {
     return () => {
