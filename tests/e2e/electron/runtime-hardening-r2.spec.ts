@@ -8,11 +8,11 @@ import {
   launchApp,
   quitApp,
   seedConfig,
+  writeSilentWav,
   type TempState,
 } from "./launch";
 
 const REPO_ROOT = path.join(__dirname, "..", "..", "..");
-const AUD_DIR = path.join(REPO_ROOT, "tests", "e2e", "fixtures", "Real Test Pack", "aud");
 
 function baseSeed(state: TempState, packPath: string, extra: Record<string, unknown> = {}): string {
   return seedConfig(state, {
@@ -35,7 +35,11 @@ function baseSeed(state: TempState, packPath: string, extra: Record<string, unkn
 function audioSpamPack(packsDir: string): string {
   const packDir = path.join(packsDir, "Audio Spam Pack");
   mkdirSync(path.join(packDir, "aud"), { recursive: true });
-  copyFileSync(path.join(AUD_DIR, "think.wav"), path.join(packDir, "aud", "voice.wav"));
+  // A 6s tone, not the 0.6s fixture clip: the short one self-closes on end,
+  // so the popup count would read zero whether the cap held, was removed, or
+  // audio() was broken entirely. A long tone keeps the capped popup open for
+  // the count, turning `=== 1` into a real positive control.
+  writeSilentWav(path.join(packDir, "aud", "voice.wav"), 6);
   writeFileSync(
     path.join(packDir, "info.json"),
     JSON.stringify({ name: "Audio Spam Pack", id: "spam", creator: "e2e", version: "1.0", description: "spam" })
@@ -173,7 +177,9 @@ test("Lua audio() honors maxAudio", async () => {
     );
     await new Promise((r) => setTimeout(r, 1500));
     const chips = running.app.windows().filter((w) => w.url().includes("/popup/audio")).length;
-    expect(chips).toBeLessThanOrEqual(1);
+    // Exactly one: the cap holds the other 11 out, and the long tone proves
+    // the one that opened is real (0 would mean audio() never spawned).
+    expect(chips).toBe(1);
   } finally {
     await quitApp(running);
     cleanupTempState(state);

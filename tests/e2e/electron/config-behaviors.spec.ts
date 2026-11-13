@@ -44,14 +44,14 @@ async function setSettings(running: RunningApp, patch: Record<string, unknown>):
 }
 
 test.describe("config option behaviors", () => {
-  let cleanup: Array<() => void> = [];
+  let cleanup: Array<() => Promise<void> | void> = [];
 
   test.beforeAll(() => {
     ensureElectronBuild();
   });
 
-  afterEach(() => {
-    while (cleanup.length) cleanup.pop()!();
+  afterEach(async () => {
+    while (cleanup.length) await cleanup.pop()!();
   });
 
   test("themeNoConfig pins the app chrome to the Original theme", async () => {

@@ -36,14 +36,14 @@ function seed(overrides: Record<string, unknown> = {}): TempState {
 const PANIC_ENV = { EDGWARE_PANIC_SKIP_WALLPAPER: "1" };
 
 test.describe("panic runtime (hotkey path, panicDisabled, lockout + safeword)", () => {
-  let cleanup: Array<() => void> = [];
+  let cleanup: Array<() => Promise<void> | void> = [];
 
   test.beforeAll(() => {
     ensureElectronBuild();
   });
 
-  afterEach(() => {
-    while (cleanup.length) cleanup.pop()!();
+  afterEach(async () => {
+    while (cleanup.length) await cleanup.pop()!();
   });
 
   async function closedWithin(app: { once: (e: string, cb: () => void) => void }, ms: number) {
@@ -169,11 +169,14 @@ test.describe("panic runtime (hotkey path, panicDisabled, lockout + safeword)", 
       subliminalsChance: 0,
       mitosisMode: 0,
       delay: 1000,
-      globalPanicButton: "Key.esc",
+      // A second harmless combo, not bare Escape: refreshShortcut registers
+      // this system-wide for the test's duration, and the suite's own rule is
+      // never to hijack Escape. The "e"→Escape migration is pinned elsewhere.
+      globalPanicButton: "CommandOrControl+Alt+Shift+F22",
       panicDisabled: 0,
       timerMode: 0,
     });
     const refreshed = await running.window.evaluate(() => window.api?.panic.refreshShortcut());
-    expect(refreshed?.accelerator).toBe("Escape");
+    expect(refreshed?.accelerator).toBe("CommandOrControl+Alt+Shift+F22");
   });
 });

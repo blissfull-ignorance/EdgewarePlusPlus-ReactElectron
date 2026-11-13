@@ -152,13 +152,28 @@ test("a runaway script loop cannot freeze the app", async () => {
   try {
     await running.window.locator("[data-testid='start-stop-button']").click();
 
-    // The execution budget aborts the loop: the app answers again promptly.
+    // The Lua VM runs synchronously on the MAIN-process event loop, so a
+    // runaway loop freezes the whole app — the renderer answers 1+1 even when
+    // main is dead, so a renderer probe proves nothing. IPC is FIFO per
+    // window: this round-trip only resolves once the counted debug hook
+    // aborts the loop and main frees up. Remove the budget and this poll
+    // times out (the evaluate never resolves against a frozen main).
     await expect
       .poll(
-        () => running.window.evaluate(() => 1 + 1).catch(() => 0),
-        { timeout: 15000 }
+        () =>
+          running.window
+            .evaluate(() =>
+              Promise.race([
+                (
+                  window as unknown as { api: { panic: { status: () => Promise<unknown> } } }
+                ).api.panic.status().then(() => "alive"),
+                new Promise((r) => setTimeout(() => r("dead"), 9000)),
+              ])
+            )
+            .catch(() => "dead"),
+        { timeout: 20000 }
       )
-      .toBe(2);
+      .toBe("alive");
 
     await running.window.locator("[data-testid='start-stop-button']").click();
     await expect(running.window.locator("[data-testid='start-stop-button']")).toHaveText("Start", {

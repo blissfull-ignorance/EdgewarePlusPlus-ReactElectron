@@ -1,5 +1,4 @@
 import { expect, test } from "@playwright/test";
-import { writeFileSync } from "node:fs";
 import path from "node:path";
 import {
   cleanupTempState,
@@ -7,28 +6,9 @@ import {
   ensureElectronBuild,
   launchApp,
   seedConfig,
+  writeSilentWav,
   type TempState,
 } from "./launch";
-
-/** Mono 16-bit PCM silence — long enough to still be playing when quit fires. */
-function writeSilentWav(file: string, seconds = 6, rate = 8000): void {
-  const data = Buffer.alloc(seconds * rate * 2);
-  const header = Buffer.alloc(44);
-  header.write("RIFF", 0);
-  header.writeUInt32LE(36 + data.length, 4);
-  header.write("WAVE", 8);
-  header.write("fmt ", 12);
-  header.writeUInt32LE(16, 16);
-  header.writeUInt16LE(1, 20);
-  header.writeUInt16LE(1, 22);
-  header.writeUInt32LE(rate, 24);
-  header.writeUInt32LE(rate * 2, 28);
-  header.writeUInt16LE(2, 32);
-  header.writeUInt16LE(16, 34);
-  header.write("data", 36);
-  header.writeUInt32LE(data.length, 40);
-  writeFileSync(file, Buffer.concat([header, data]));
-}
 
 function seedMediaState(): TempState {
   const state = createTempState({ kind: "media" });

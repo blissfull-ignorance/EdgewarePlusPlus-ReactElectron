@@ -245,9 +245,42 @@ export async function listPacksViaBridge(window: Page): Promise<PackListing[] | 
 export async function clickStart(window: import("@playwright/test").Page): Promise<void> {
   await window.locator("[data-testid='start-stop-button']").click();
   const proceed = window.locator("[data-testid='spawn-warning-start']");
-  const shown = await proceed
-    .waitFor({ state: "visible", timeout: 1500 })
-    .then(() => true)
-    .catch(() => false);
-  if (shown) await proceed.click();
+  const startStop = window.locator("[data-testid='start-stop-button']");
+  // The click resolves either way: a spawn-blocker modal (proceed button) or
+  // a direct start (button flips to Stop). The hasScript IPC can lag under
+  // load, so wait for whichever wins instead of a fixed window that can miss
+  // a late modal and leave the session un-started.
+  await expect
+    .poll(
+      async () =>
+        (await proceed.isVisible().catch(() => false)) ||
+        (await startStop.textContent()) === "Stop",
+      { timeout: 10000 }
+    )
+    .toBe(true);
+  if (await proceed.isVisible().catch(() => false)) await proceed.click();
+}
+
+/**
+ * Mono 16-bit PCM silence of the given length. Long enough that the popup is
+ * still playing when a test counts open popups — a short clip self-closes on
+ * end and would make a concurrency-cap assertion pass at zero.
+ */
+export function writeSilentWav(file: string, seconds = 6, rate = 8000): void {
+  const data = Buffer.alloc(seconds * rate * 2);
+  const header = Buffer.alloc(44);
+  header.write("RIFF", 0);
+  header.writeUInt32LE(36 + data.length, 4);
+  header.write("WAVE", 8);
+  header.write("fmt ", 12);
+  header.writeUInt32LE(16, 16);
+  header.writeUInt16LE(1, 20);
+  header.writeUInt16LE(1, 22);
+  header.writeUInt32LE(rate, 24);
+  header.writeUInt32LE(rate * 2, 28);
+  header.writeUInt16LE(2, 32);
+  header.writeUInt16LE(16, 34);
+  header.write("data", 36);
+  header.writeUInt32LE(data.length, 40);
+  writeFileSync(file, Buffer.concat([header, data]));
 }

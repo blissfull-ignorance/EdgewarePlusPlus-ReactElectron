@@ -82,15 +82,6 @@ test.describe("Session-scoped pack config + spawn warning", () => {
     await expect.poll(configDelay, { timeout: 15_000 }).toBe(60000);
   });
 
-  test("the delay slider is reachable in Popup Tweaks", async () => {
-    const { window } = running!;
-    await window.locator("[data-testid='main-tab-config']").click();
-    await window.getByRole("tab", { name: "Annoyance / Runtime" }).click();
-    await window.getByRole("tab", { name: "Popup Tweaks" }).click();
-    await expect(window.locator("[data-testid='config-spawn-delay']")).toBeVisible();
-    await window.locator("[data-testid='main-tab-status']").click();
-  });
-
   test("Start warns when leftover settings would block all popups", async () => {
     const { window } = running!;
     // Corruption off + a leftover 30s spawn delay with a live chance:
@@ -127,6 +118,13 @@ test.describe("Session-scoped pack config + spawn warning", () => {
     await expect(window.getByRole("tab", { name: "Popup Tweaks" })).toBeVisible();
     // The deep link lands ON the tweaks panel: the slider is visible now,
     // not one more click away.
+    await expect(window.locator("[data-testid='config-spawn-delay']")).toBeVisible();
+
+    // The slider is also reachable by hand (not only via the deep link):
+    // Config → Annoyance/Runtime → Popup Tweaks.
+    await window.locator("[data-testid='main-tab-config']").click();
+    await window.getByRole("tab", { name: "Annoyance / Runtime" }).click();
+    await window.getByRole("tab", { name: "Popup Tweaks" }).click();
     await expect(window.locator("[data-testid='config-spawn-delay']")).toBeVisible();
 
     // A healthy setup starts without the modal.
@@ -275,6 +273,74 @@ test.describe("Pack config overrides survive a quit without Stop", () => {
       await expect.poll(configDelay, { timeout: 30_000 }).toBe(2500);
       // Quit WITHOUT Stop: the mutation is on disk and the baseline is pending.
       await quitApp(app);
+
+      app = await launchApp(state, env);
+      await expect.poll(configDelay, { timeout: 15_000 }).toBe(60000);
+      const storeDelay = await app.window.evaluate(
+        () =>
+          (
+            window as unknown as { __settingsStore: { getState: () => { delay: number } } }
+          ).__settingsStore.getState().delay
+      );
+      expect(storeDelay).toBe(60000);
+    } finally {
+      await quitApp(app);
+      cleanupTempState(state);
+    }
+  });
+
+  test("a panic hard-exit mid-session still reverts config.json on the next startup", async () => {
+    ensureElectronBuild();
+    const state = createTempState({ kind: "media" });
+    writeFileSync(
+      path.join(state.seedPath, "corruption.json"),
+      JSON.stringify({
+        moods: { "1": { add: [], remove: [] } },
+        wallpapers: {},
+        config: { "1": { delay: 2500 } },
+      })
+    );
+    seedConfig(state, {
+      packPath: state.seedPath,
+      popupRenderMode: "electron",
+      popupMod: 0,
+      vidMod: 0,
+      audioMod: 0,
+      promptMod: 0,
+      webMod: 0,
+      capPopChance: 0,
+      subliminalsChance: 0,
+      mitosisMode: 0,
+      showLoadingFlair: 0,
+      corruptionMode: 1,
+      corruptionFullPerm: 1,
+      corruptionTrigger: "Script",
+      delay: 60000,
+    });
+    const env = { EDGWARE_STUB_BROWSER: "1", EDGWARE_PANIC_SKIP_WALLPAPER: "1" };
+    const configDelay = () =>
+      JSON.parse(readFileSync(path.join(state.dir, "data", "config.json"), "utf-8")).delay as number;
+
+    let app = await launchApp(state, env);
+    try {
+      await app.window.locator("[data-testid='start-stop-button']").click();
+      await expect(app.window.locator("[data-testid='start-stop-button']")).toHaveText("Stop");
+      await app.window.evaluate(() =>
+        (window as unknown as { api: { scripting: { advanceLevel: () => Promise<number> } } })
+          .api.scripting.advanceLevel()
+      );
+      await expect.poll(configDelay, { timeout: 30_000 }).toBe(2500);
+
+      // Panic ends in app.exit(0): before-quit AND the pagehide flush are both
+      // skipped — the one exit path neither the graceful-quit nor the
+      // crash-equivalent pin exercises. The baseline was persisted to disk on
+      // the first override, so only the startup revert can undo the mutation.
+      const closed = new Promise<void>((resolve) => {
+        app.app.once("close", () => resolve());
+        setTimeout(() => resolve(), 8000);
+      });
+      await app.window.evaluate(() => window.api?.panic.trigger()).catch(() => undefined);
+      await closed;
 
       app = await launchApp(state, env);
       await expect.poll(configDelay, { timeout: 15_000 }).toBe(60000);

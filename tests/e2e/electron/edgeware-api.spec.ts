@@ -48,14 +48,14 @@ function seed(): ReturnType<typeof createTempState> {
 }
 
 test.describe("edgeware_v0 Lua API (Addict Acceptance Program surface)", () => {
-  let cleanup: Array<() => void> = [];
+  let cleanup: Array<() => Promise<void> | void> = [];
 
   test.beforeAll(() => {
     ensureElectronBuild();
   });
 
-  afterEach(() => {
-    while (cleanup.length) cleanup.pop()!();
+  afterEach(async () => {
+    while (cleanup.length) await cleanup.pop()!();
   });
 
   test("every scripted-corruption API function runs end to end", async () => {

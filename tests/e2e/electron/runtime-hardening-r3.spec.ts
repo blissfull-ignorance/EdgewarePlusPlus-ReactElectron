@@ -44,7 +44,10 @@ test("packmedia refuses symlinked escapes out of the pack", async () => {
   try {
     symlinkSync(secret, path.join(state.seedPath, "img", "zz-sym.png"));
   } catch {
-    return; /* symlinks unavailable on this volume */
+    // A silent return here would report a pass on volumes without symlinks
+    // while testing nothing — make the skip visible in the report.
+    test.skip(true, "symlinks unavailable on this volume");
+    return;
   }
   baseSeed(state, state.seedPath);
   const running = await launchApp(state);
@@ -144,12 +147,19 @@ test("the running session keeps its pack; switching applies on next start", asyn
     await clickStart(running.window);
 
     // Mid-run pack switch: the session still draws from the pinned pack.
+    // Save to disk too, so the on-disk config says B — then a mid-run "alpha"
+    // can only come from the runtime pin, not from a resolver that just reads
+    // a not-yet-autosaved disk.
     await running.window.evaluate((b) => {
-      (
+      const store = (
         window as unknown as {
-          __settingsStore: { getState: () => { setRaw: (v: Record<string, unknown>) => void } };
+          __settingsStore: {
+            getState: () => { setRaw: (v: Record<string, unknown>) => void; save: () => Promise<void> };
+          };
         }
-      ).__settingsStore.getState().setRaw({ packPath: b });
+      ).__settingsStore;
+      store.getState().setRaw({ packPath: b });
+      return store.getState().save();
     }, packB);
     const midRun = await running.window.evaluate(() =>
       Promise.all(
@@ -203,7 +213,9 @@ test("Lua video() honors maxVideos", async () => {
     );
     await new Promise((r) => setTimeout(r, 1500));
     const windows = running.app.windows().filter((w) => w.url().includes("/popup/video")).length;
-    expect(windows).toBeLessThanOrEqual(1);
+    // Exactly one: video popups loop by default so the capped-open window is
+    // still present at count time; 0 would mean video() never spawned.
+    expect(windows).toBe(1);
   } finally {
     await quitApp(running);
     cleanupTempState(state);

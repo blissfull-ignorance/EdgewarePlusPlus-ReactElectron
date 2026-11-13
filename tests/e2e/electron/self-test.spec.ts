@@ -74,10 +74,20 @@ test.describe("Bundled Lua API self-test (user-runnable)", () => {
       .toContain("API-TEST corrupt");
   });
 
-  test("the self-test button is present in Troubleshooting", async () => {
+  test("the self-test button runs the bundled script", async () => {
     const { window } = running!;
     await window.locator("[data-testid='main-tabs']").getByRole("button", { name: "Config" }).click();
     await window.getByRole("tab", { name: "Troubleshooting" }).click();
-    await expect(window.locator("[data-testid='run-lua-self-test']")).toBeVisible({ timeout: 10000 });
+    const button = window.locator("[data-testid='run-lua-self-test']");
+    await expect(button).toBeVisible({ timeout: 10000 });
+
+    // Presence alone passes against a dead onClick — click it and prove the
+    // button reaches the runSelfTest IPC (the handler logs on start).
+    await button.click();
+    await expect
+      .poll(() => mainLog(state!).includes("[Scripting] Self-test script started"), {
+        timeout: 15000,
+      })
+      .toBe(true);
   });
 });
