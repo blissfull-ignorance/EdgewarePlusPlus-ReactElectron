@@ -89,7 +89,7 @@ describe("useHibernateScheduler", () => {
       useHibernateScheduler({ active: true, onBurstTick, onPumpScare, rand: () => 0 })
     );
 
-    vi.advanceTimersByTime(5000);
+    act(() => vi.advanceTimersByTime(5000));
     expect(onPumpScare).toHaveBeenCalledTimes(1);
     expect(onBurstTick).not.toHaveBeenCalled();
   });
@@ -100,7 +100,7 @@ describe("useHibernateScheduler", () => {
       useHibernateScheduler({ active: true, onBurstTick, rand: () => 0 })
     );
     act(() => result.current.stop());
-    vi.advanceTimersByTime(60_000);
+    act(() => vi.advanceTimersByTime(60_000));
     expect(onBurstTick).not.toHaveBeenCalled();
     expect(useAppStore.getState().hibernateNextBurst).toBeNull();
     expect(useAppStore.getState().hibernateActive).toBe(false);
@@ -112,13 +112,27 @@ describe("useHibernateScheduler", () => {
       useHibernateScheduler({ active: true, onBurstTick, rand: () => 0 })
     );
     unmount();
-    vi.advanceTimersByTime(60_000);
+    act(() => vi.advanceTimersByTime(60_000));
     expect(onBurstTick).not.toHaveBeenCalled();
+  });
+
+  it("the burst disposes the countdown interval it replaces", () => {
+    // A sleep delay that is not a multiple of the 250ms countdown tick means
+    // the interval is still alive when fireBurst runs: it must be disposed
+    // there, or it leaks past the burst and kills the NEXT cycle's interval.
+    seedSettings({ hibernateMin: 1100, hibernateMax: 1100 });
+    renderHook(() => useHibernateScheduler({ active: true, rand: () => 0 }));
+    expect(vi.getTimerCount()).toBe(2); // countdown interval + sleep timer
+
+    act(() => vi.advanceTimersByTime(1101)); // burst fires and re-arms
+    expect(vi.getTimerCount()).toBe(2); // no orphaned interval
   });
 
   it("tray skip fires the pending burst now and re-arms (legacy skip_hibernate)", () => {
     let skip: (() => void) | null = null;
-    (window as unknown as { api: unknown }).api = {
+    const w = window as unknown as { api?: unknown };
+    const prevApi = w.api;
+    w.api = {
       hibernate: {
         onSkip: (cb: () => void) => {
           skip = cb;
@@ -132,13 +146,15 @@ describe("useHibernateScheduler", () => {
 
       act(() => skip!());
       act(() => vi.advanceTimersByTime(1));
-      // The burst fires immediately and the cancelled sleep never double-fires.
+      // The burst fires immediately...
       expect(onBurstTick).toHaveBeenCalledTimes(1);
       expect(useAppStore.getState().hibernateNextBurst).not.toBeNull();
-      act(() => vi.advanceTimersByTime(4000));
-      expect(onBurstTick).toHaveBeenCalledTimes(1);
+      // ...and the cancelled sleep must never double-fire: past the original
+      // 5000ms deadline only the skip-re-armed cycle (one burst) may exist.
+      act(() => vi.advanceTimersByTime(6000));
+      expect(onBurstTick).toHaveBeenCalledTimes(2); // exactly the re-armed burst
     } finally {
-      delete (window as unknown as { api?: unknown }).api;
+      w.api = prevApi;
     }
   });
 });

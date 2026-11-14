@@ -1,4 +1,6 @@
 import { expect, test } from "@playwright/test";
+import { readFileSync } from "node:fs";
+import path from "node:path";
 import {
   cleanupTempState,
   createTempState,
@@ -35,11 +37,18 @@ test("an unsaved lowkey change positions the very next popup", async () => {
 
     // Flip lowkey on WITHOUT saving: nothing has hit config.json yet.
     await window.evaluate(() => {
-      const store = (
-        window as unknown as { __settingsStore?: { setState: (p: object) => void } }
-      ).__settingsStore;
-      store?.setState({ lkToggle: 1, lkCorner: 0 });
+      const store = (window as unknown as { __settingsStore?: { setState: (p: object) => void } })
+        .__settingsStore;
+      if (!store) throw new Error("__settingsStore missing: push path cannot be proven");
+      store.setState({ lkToggle: 1, lkCorner: 0 });
     });
+
+    // The disk still holds the pre-change config: only the push cache can
+    // make the next popup honour the unsaved value.
+    const disk = JSON.parse(
+      readFileSync(path.join(state.dir, "data", "config.json"), "utf-8")
+    ) as Record<string, unknown>;
+    expect(disk.lkToggle ?? 0).toBe(0);
 
     const id: string = await window.evaluate(async () => {
       const api = (

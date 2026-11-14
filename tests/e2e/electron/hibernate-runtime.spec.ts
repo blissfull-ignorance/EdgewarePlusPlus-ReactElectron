@@ -116,12 +116,10 @@ test("pump-scare popups force-close ~2.5s after opening without popup timeouts",
     // Stand the scheduler down so no second burst pollutes the close check;
     // the already-open pump-scare windows must still close on their own.
     await window.evaluate(() => {
-      const store = (
-        window as unknown as {
-          __settingsStore?: { setState: (p: object) => void };
-        }
-      ).__settingsStore;
-      store?.setState({ hibernateMode: 0 });
+      const store = (window as unknown as { __settingsStore?: { setState: (p: object) => void } })
+        .__settingsStore;
+      if (!store) throw new Error("__settingsStore missing: cannot stand the scheduler down");
+      store.setState({ hibernateMode: 0 });
     });
 
     await expect

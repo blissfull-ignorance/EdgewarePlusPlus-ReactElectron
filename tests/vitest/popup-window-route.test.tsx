@@ -59,6 +59,21 @@ describe("parsePopupRoute", () => {
     });
   });
 
+  it("parses the pump-scare force-close flag (?ps=1), alone and beside hypno", () => {
+    expect(parsePopupRoute("#/popup/image/foo.png/popup-1?ps=1")).toMatchObject({
+      pumpScare: true,
+    });
+    expect(parsePopupRoute("#/popup/image/foo.png/popup-1?h=a.gif&ps=1")).toMatchObject({
+      hypnoGif: "a.gif",
+      pumpScare: true,
+    });
+    expect(parsePopupRoute("#/popup/image/foo.png/popup-1?h=a.gif")).toMatchObject({
+      hypnoGif: "a.gif",
+    });
+    expect(parsePopupRoute("#/popup/image/foo.png/popup-1?h=a.gif")?.pumpScare).toBeUndefined();
+    expect(parsePopupRoute("#/popup/image/foo.png/popup-1?ps=0")?.pumpScare).toBeUndefined();
+  });
+
   it("parses the built-in default spiral as the overlay", () => {
     expect(parsePopupRoute("#/popup/video/bar.mp4/popup-2?h=default_hypno.gif")).toEqual({
       type: "video",

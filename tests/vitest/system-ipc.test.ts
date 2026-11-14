@@ -49,6 +49,12 @@ vi.mock("electron", () => ({
   Notification: class Notification {},
 }));
 
+// The real logger opens a write stream under the temp userData; rmSync of
+// that tree mid-run surfaces an unhandled ENOENT from the pending write.
+vi.mock("../../electron/utils/logger", () => ({
+  logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn(), setLevel: vi.fn() },
+}));
+
 describe("system IPC handlers (pack import / discovery / selection)", () => {
   let tempRoot: string;
 
@@ -346,6 +352,9 @@ describe("settings live cache (push-through)", () => {
   });
 
   it("saveSettings refreshes the cache as part of persisting", async () => {
+    // Prime the cache with a sentinel: without the save-path refresh, the
+    // stale sentinel (not the disk) is what loadSettings would keep serving.
+    handlers["system:pushSettings"]({}, { sentinel: true });
     await handlers["system:saveSettings"]({}, { lkCorner: 2 });
     expect(await handlers["system:loadSettings"]()).toEqual({ lkCorner: 2 });
     expect(JSON.parse(readFileSync(configPath(), "utf-8"))).toEqual({ lkCorner: 2 });

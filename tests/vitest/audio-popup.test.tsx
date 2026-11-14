@@ -3,7 +3,10 @@ import { act, cleanup, fireEvent, render, screen } from "@testing-library/react"
 import { AudioPopup } from "../../src/features/audio/AudioPopup";
 import { useSettingsStore } from "../../src/stores/settingsStore";
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  vi.useRealTimers();
+});
 
 beforeEach(() => {
   useSettingsStore.setState({ audioVolume: 100, fadeInDuration: 0, fadeOutDuration: 0 });
@@ -70,7 +73,6 @@ describe("AudioPopup volume and fades", () => {
     expect(el.volume).toBe(0);
     act(() => vi.advanceTimersByTime(320));
     expect(el.volume).toBeCloseTo(0.4, 5);
-    vi.useRealTimers();
   });
 
   it("fade-out reaches zero exactly at end-of-stream", () => {
@@ -82,6 +84,5 @@ describe("AudioPopup volume and fades", () => {
     expect(el.volume).toBe(1); // not started yet
     act(() => vi.advanceTimersByTime(2100));
     expect(el.volume).toBe(0);
-    vi.useRealTimers();
   });
 });

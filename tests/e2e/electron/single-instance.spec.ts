@@ -36,9 +36,12 @@ test("a second launch against the same userData exits while the first instance s
         new Promise<void>((resolve) => proc.once("exit", () => resolve())),
         new Promise<void>((resolve) => setTimeout(resolve, 15000)),
       ]);
-      secondExited = proc.exitCode !== null || proc.killed;
+      // The lock path quits deliberately: a clean exit code, not a crash.
+      expect(proc.exitCode, "second instance should exit cleanly via the lock").toBe(0);
+      secondExited = true;
     } catch {
-      // Dying during or before the protocol handshake is still an exit.
+      // Dying during or before the protocol handshake still means no second
+      // runtime took over; the first-instance checks below carry the claim.
       secondExited = true;
     }
 

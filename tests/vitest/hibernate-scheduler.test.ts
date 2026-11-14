@@ -127,7 +127,7 @@ describe("planBurst — Spaced (delay-driven inside the length window)", () => {
 });
 
 describe("planBurst — Glitch (legacy choice-set gaps, window-capped)", () => {
-  it("produces activity ticks whose gaps come from [0, base, base/m, base*m]", () => {
+  it("rand 0 pins the legacy choice set: modifier 2, gap choice 0 (clustering)", () => {
     const plan = planBurst({
       type: "Glitch",
       wakeupActivity: 4,
@@ -135,13 +135,25 @@ describe("planBurst — Glitch (legacy choice-set gaps, window-capped)", () => {
       popupDelayMs: 5000,
       rand: seq([0, 0, 0, 0, 0, 0, 0]),
     });
-    expect(plan.intervalsMs).toHaveLength(4);
-    expect(plan.intervalsMs[0]).toBe(0);
-    // base = 12000/4 = 3000; with rand 0: modifier=2, choice index 0 → gap 0.
-    expect(plan.intervalsMs.slice(1).every((g) => [0, 3000, 1500, 750, 6000, 12000].includes(g))).toBe(
-      true
-    );
+    // base = 3000; every draw: modifier=2, choice index 0 → gap 0.
+    expect(plan.intervalsMs).toEqual([0, 0, 0, 0]);
     expect(plan.durationMs).toBe(12000);
+  });
+
+  it("each legacy choice index is reachable: [0, base, base/m, base*m]", () => {
+    // activity 4, length 40000 → base 10000; modifier pinned to 2 by rand 0.
+    const gapFor = (choiceRand: number) =>
+      planBurst({
+        type: "Glitch",
+        wakeupActivity: 4,
+        hibernateLengthMs: 40_000,
+        popupDelayMs: 5000,
+        rand: seq([0, choiceRand]),
+      }).intervalsMs[1];
+    expect(gapFor(0)).toBe(0);
+    expect(gapFor(0.25)).toBe(10_000); // base
+    expect(gapFor(0.5)).toBe(5_000); // base / modifier
+    expect(gapFor(0.75)).toBe(20_000); // base * modifier
   });
 
   it("stops ticking when the length window closes", () => {
@@ -200,6 +212,22 @@ describe("planBurst — Ramp (accelerating, locked ticks counted)", () => {
     expect(plan.intervalsMs).toHaveLength(0);
   });
 
+  it("only locked-phase ticks count toward activity (legacy ramp)", () => {
+    // length 400 → divisor starts at 100: one accelerating tick (uncounted),
+    // then two locked ticks at delay*0.9 = 90ms each.
+    const plan = planBurst({
+      type: "Ramp",
+      wakeupActivity: 2,
+      hibernateLengthMs: 400,
+      popupDelayMs: 100,
+      rand: () => 0,
+    });
+    // t=0 (accelerate: modifier 100→90.9, gap 100+90=190), t=190 (locked 1,
+    // gap 90), t=280 (locked 2 → budget spent).
+    expect(times(plan.intervalsMs)).toEqual([0, 190, 280]);
+    expect(plan.durationMs).toBe(400);
+  });
+
   it("a zero-length window locks immediately and counts one tick", () => {
     // length 0 → divisor starts under the 100ms lock → the locked branch
     // (the only one that counts toward activity) fires once.
@@ -211,6 +239,19 @@ describe("planBurst — Ramp (accelerating, locked ticks counted)", () => {
       rand: () => 0,
     });
     expect(plan.intervalsMs).toEqual([0]);
+  });
+});
+
+describe("planBurst — roll-delay floor", () => {
+  it("a zero popup delay still spaces Spaced ticks at the 100ms floor", () => {
+    const plan = planBurst({
+      type: "Spaced",
+      wakeupActivity: 20,
+      hibernateLengthMs: 250,
+      popupDelayMs: 0,
+      rand: () => 0,
+    });
+    expect(times(plan.intervalsMs)).toEqual([0, 100, 200]);
   });
 });
 

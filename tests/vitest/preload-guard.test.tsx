@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { bootstrapDecision, isElectronRenderer } from "../../src/features/preloadGuard";
+import { render } from "@testing-library/react";
+import {
+  bootstrapDecision,
+  isElectronRenderer,
+  PreloadFailureScreen,
+} from "../../src/features/preloadGuard";
 
 describe("isElectronRenderer", () => {
   it("recognizes the Electron UA token", () => {
@@ -27,5 +32,14 @@ describe("bootstrapDecision", () => {
 
   it("installs the stub only in real browsers", () => {
     expect(bootstrapDecision(false, false)).toBe("stub");
+  });
+});
+
+describe("PreloadFailureScreen", () => {
+  it("renders the visible failure surface the boot decision promises", () => {
+    const { container } = render(<PreloadFailureScreen />);
+    const screen = container.querySelector('[data-testid="preload-failure"]');
+    expect(screen).not.toBeNull();
+    expect(screen?.textContent).toContain("failed to start");
   });
 });
