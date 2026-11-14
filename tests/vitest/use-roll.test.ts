@@ -19,10 +19,19 @@ describe("duePopups (independent per-type rolls)", () => {
       capPopChance: 0,
       webMod: 0,
       notificationChance: 0,
+      mitosisMode: 0,
     });
   });
 
   const settings = () => useSettingsStore.getState();
+
+  it("mitosis mode zeroes image and video chances (legacy targets)", () => {
+    useSettingsStore.setState({ popupMod: 100, vidMod: 100, audioMod: 100, mitosisMode: 1 });
+    const due = duePopups(settings(), (chance) => chance >= 100);
+    expect(due).not.toContain("image");
+    expect(due).not.toContain("video");
+    expect(due).toContain("audio");
+  });
 
   it("never schedules subliminal as a standalone spawn (it is an overlay now)", () => {
     useSettingsStore.setState({

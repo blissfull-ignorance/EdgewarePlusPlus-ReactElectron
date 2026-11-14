@@ -21,14 +21,9 @@ const TICK_MS = 16;
 export interface AudioPopupProps {
   audioUrl: string;
   onClose?: () => void;
-  /**
-   * Pump-scare parity: close this window this many ms after mount regardless
-   * of playback or timeout settings (legacy `try_pump_scare` = 2500).
-   */
-  forcedCloseMs?: number;
 }
 
-export function AudioPopup({ audioUrl, onClose, forcedCloseMs }: AudioPopupProps) {
+export function AudioPopup({ audioUrl, onClose }: AudioPopupProps) {
   const audioVolume = useSettingsStore((s) => s.audioVolume);
   const fadeInDuration = useSettingsStore((s) => s.fadeInDuration);
   const fadeOutDuration = useSettingsStore((s) => s.fadeOutDuration);
@@ -73,12 +68,6 @@ export function AudioPopup({ audioUrl, onClose, forcedCloseMs }: AudioPopupProps
       if (fadeOutTimerRef.current) clearTimeout(fadeOutTimerRef.current);
     };
   }, []);
-
-  useEffect(() => {
-    if (forcedCloseMs === undefined) return;
-    const t = setTimeout(close, forcedCloseMs);
-    return () => clearTimeout(t);
-  }, [forcedCloseMs, close]);
 
   const handleLoadedMetadata = useCallback(
     (el: HTMLAudioElement) => {

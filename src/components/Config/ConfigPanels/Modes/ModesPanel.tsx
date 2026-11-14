@@ -128,14 +128,14 @@ export function ModesPanel() {
         />
 
         <ConfigSlider
-          label="Wake Activity Duration"
+          label="Wake Activity"
           value={wakeupActivity}
           onChange={(val) => setRaw({ wakeupActivity: val })}
           min={0}
-          max={300000}
-          step={1000}
+          max={1000}
+          step={1}
           disabled={!hibernateMode}
-          description="Duration of active burst (ms)"
+          description="Popups per burst (Original spawns half to this many instantly)"
         />
 
         <ConfigSlider
@@ -146,7 +146,7 @@ export function ModesPanel() {
           max={300000}
           step={1000}
           disabled={!hibernateMode}
-          description="Total hibernation duration (ms)"
+          description="Active burst window in ms (Spaced/Glitch/Ramp stop when it closes)"
         />
 
         <ConfigToggle

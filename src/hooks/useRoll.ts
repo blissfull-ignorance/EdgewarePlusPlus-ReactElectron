@@ -20,9 +20,12 @@ export interface RollTarget {
  * spirals actually sit over other media instead of competing for a spawn slot.
  */
 function buildRollTargets(settings: ReturnType<typeof useSettingsStore.getState>): RollTarget[] {
+  // Legacy: mitosis mode replaces the regular image and video pops — the
+  // mitosis spawns own those slots (main_edgeware targets).
+  const mitosis = settings.mitosisMode === 1;
   return [
-    { type: "image", chance: settings.popupMod },
-    { type: "video", chance: settings.vidMod },
+    { type: "image", chance: mitosis ? 0 : settings.popupMod },
+    { type: "video", chance: mitosis ? 0 : settings.vidMod },
     { type: "audio", chance: settings.audioMod },
     { type: "prompt", chance: settings.promptMod },
     { type: "caption", chance: settings.capPopChance },

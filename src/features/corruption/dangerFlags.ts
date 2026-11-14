@@ -32,7 +32,7 @@ const DANGER_TRIGGERS: Record<string, (s: Record<string, unknown>) => boolean> =
   delay: (s) => typeof s.delay === "number" && s.delay <= 1999,
   hibernateMin: (s) => hibernate(s) && num(s.hibernateMin) > 0 && num(s.hibernateMin) < 30_000,
   hibernateMax: (s) => hibernate(s) && num(s.hibernateMax) > 0 && num(s.hibernateMax) < 30_000,
-  wakeupActivity: (s) => hibernate(s) && num(s.wakeupActivity) >= 36_000,
+  wakeupActivity: (s) => hibernate(s) && num(s.wakeupActivity) >= 36,
 };
 
 /** Danger warnings for the given settings, keyed and worded like the legacy app. */

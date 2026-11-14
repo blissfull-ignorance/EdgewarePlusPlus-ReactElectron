@@ -73,9 +73,12 @@ describe("useHibernateScheduler", () => {
 
     act(() => vi.advanceTimersByTime(2000));
     expect(onBurstTick).toHaveBeenCalledTimes(2);
+    // The window is still open: no re-arm yet even though ticks are done.
+    expect(useAppStore.getState().hibernateActive).toBe(true);
 
-    act(() => vi.advanceTimersByTime(10_000));
+    act(() => vi.advanceTimersByTime(2000)); // window closes at burst+4000
     expect(useAppStore.getState().hibernateActive).toBe(false);
+    expect(useAppStore.getState().hibernateNextBurst).not.toBeNull();
   });
 
   it("pump-scare bursts call onPumpScare instead of rolling ticks", () => {
@@ -111,5 +114,31 @@ describe("useHibernateScheduler", () => {
     unmount();
     vi.advanceTimersByTime(60_000);
     expect(onBurstTick).not.toHaveBeenCalled();
+  });
+
+  it("tray skip fires the pending burst now and re-arms (legacy skip_hibernate)", () => {
+    let skip: (() => void) | null = null;
+    (window as unknown as { api: unknown }).api = {
+      hibernate: {
+        onSkip: (cb: () => void) => {
+          skip = cb;
+          return () => undefined;
+        },
+      },
+    };
+    try {
+      const onBurstTick = vi.fn();
+      renderHook(() => useHibernateScheduler({ active: true, onBurstTick, rand: () => 0 }));
+
+      act(() => skip!());
+      act(() => vi.advanceTimersByTime(1));
+      // The burst fires immediately and the cancelled sleep never double-fires.
+      expect(onBurstTick).toHaveBeenCalledTimes(1);
+      expect(useAppStore.getState().hibernateNextBurst).not.toBeNull();
+      act(() => vi.advanceTimersByTime(4000));
+      expect(onBurstTick).toHaveBeenCalledTimes(1);
+    } finally {
+      delete (window as unknown as { api?: unknown }).api;
+    }
   });
 });

@@ -84,15 +84,4 @@ describe("AudioPopup volume and fades", () => {
     expect(el.volume).toBe(0);
     vi.useRealTimers();
   });
-
-  it("forcedCloseMs closes the popup regardless of playback", () => {
-    vi.useFakeTimers();
-    const onClose = vi.fn();
-    render(<AudioPopup audioUrl="packmedia://aud/x.wav" onClose={onClose} forcedCloseMs={2500} />);
-    act(() => vi.advanceTimersByTime(2499));
-    expect(onClose).not.toHaveBeenCalled();
-    act(() => vi.advanceTimersByTime(2));
-    expect(onClose).toHaveBeenCalledTimes(1);
-    vi.useRealTimers();
-  });
 });

@@ -264,7 +264,7 @@ export const CONFIG_ITEMS: Record<string, z.ZodType> = {
     .describe("Hibernate burst type"),
   hibernateMin: ZodNonNegative.describe("Hibernate min delay (ms)"),
   hibernateMax: ZodNonNegative.describe("Hibernate max delay (ms)"),
-  wakeupActivity: ZodNonNegative.describe("Wake activity duration (ms)"),
+  wakeupActivity: ZodNonNegative.describe("Popups spawned per hibernate burst"),
   hibernateLength: ZodNonNegative.describe("Hibernation burst length (ms)"),
   fixWallpaper: ZodBoolean.describe("Fix wallpaper after hibernate"),
 

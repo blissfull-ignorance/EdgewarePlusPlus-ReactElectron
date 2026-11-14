@@ -46,12 +46,14 @@ export function useHibernateScheduler(options: UseHibernateSchedulerOptions) {
   const burstTimersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
   const tickRef = useRef(onBurstTick);
   const pumpRef = useRef(onPumpScare);
+  const activeRef = useRef(active);
   // Held in a ref so an inline `rand` from the caller never re-triggers the
   // scheduling effect on every render.
   const randRef = useRef(options.rand ?? Math.random);
   randRef.current = options.rand ?? Math.random;
   tickRef.current = onBurstTick;
   pumpRef.current = onPumpScare;
+  activeRef.current = active;
 
   const clearTimers = useCallback(() => {
     if (sleepTimerRef.current) clearTimeout(sleepTimerRef.current);
@@ -91,7 +93,10 @@ export function useHibernateScheduler(options: UseHibernateSchedulerOptions) {
   armRef.current = arm;
 
   const fireBurst = useCallback(() => {
-    countdownRef.current = null;
+    if (countdownRef.current) {
+      clearInterval(countdownRef.current);
+      countdownRef.current = null;
+    }
     const s = useSettingsStore.getState();
     const plan = planBurst({
       type: s.hibernateType as Parameters<typeof planBurst>[0]["type"],
@@ -125,7 +130,9 @@ export function useHibernateScheduler(options: UseHibernateSchedulerOptions) {
       const t = setTimeout(() => tickRef.current?.(), at);
       burstTimersRef.current.push(t);
     }
-    const endT = setTimeout(finish, at);
+    // The activity-loop window closes the burst (legacy re-arms the sleep at
+    // hibernateLength), even when the last tick fired earlier.
+    const endT = setTimeout(finish, Math.max(at, plan.durationMs));
     burstTimersRef.current.push(endT);
   }, [setHibernateActive, setHibernateNextBurst]);
   fireBurstRef.current = fireBurst;
@@ -146,11 +153,17 @@ export function useHibernateScheduler(options: UseHibernateSchedulerOptions) {
     return clearTimers;
   }, [active, hibernateMode, arm, stop, clearTimers]);
 
-  // Tray "Skip Hibernate": stand down until the next Start (legacy parity —
-  // skipping does not re-arm the cycle).
+  // Tray "Skip Hibernate": fire the pending burst now and let the cycle
+  // continue (legacy skip_hibernate cancels the sleep and runs the burst —
+  // it never skips a mid-burst, and never acts with the mode off).
   useEffect(() => {
-    return window.api?.hibernate?.onSkip?.(() => stop());
-  }, [stop]);
+    return window.api?.hibernate?.onSkip?.(() => {
+      if (useSettingsStore.getState().hibernateMode !== 1 || !activeRef.current) return;
+      if (useAppStore.getState().hibernateActive) return;
+      clearTimers();
+      fireBurstRef.current();
+    });
+  }, [clearTimers]);
 
   return { ...state, stop };
 }

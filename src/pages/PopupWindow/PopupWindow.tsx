@@ -177,11 +177,7 @@ export function PopupWindow({ route }: { route: PopupRoute }) {
             Audio
           </Text>
         </div>
-        <AudioPopup
-          audioUrl={mediaUrl}
-          onClose={handleClose}
-          forcedCloseMs={route.pumpScare ? PUMP_SCARE_CLOSE_MS : undefined}
-        />
+        <AudioPopup audioUrl={mediaUrl} onClose={handleClose} />
       </PopupShell>
     );
   }

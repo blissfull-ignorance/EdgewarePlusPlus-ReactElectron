@@ -12,6 +12,12 @@ function seq(values: number[]): () => number {
   return () => values[i++ % values.length];
 }
 
+/** Absolute tick times reconstructed from consecutive delays. */
+function times(intervals: number[]): number[] {
+  let t = 0;
+  return intervals.map((d) => (t += d));
+}
+
 describe("computeNextHibernateDelay (legacy randint(min, max))", () => {
   it("is inclusive on both ends", () => {
     expect(computeNextHibernateDelay(1000, 2000, () => 0)).toBe(1000);
@@ -58,6 +64,7 @@ describe("planBurst — Original (instant barrage)", () => {
     });
     expect(plan.intervalsMs).toHaveLength(10); // randint(10, 20) with rand 0 → 10
     expect(plan.intervalsMs.every((i) => i === 0)).toBe(true);
+    expect(plan.durationMs).toBe(0);
   });
 
   it("upper end of the range with rand near 1", () => {
@@ -70,10 +77,21 @@ describe("planBurst — Original (instant barrage)", () => {
     });
     expect(plan.intervalsMs).toHaveLength(20);
   });
+
+  it("zero activity is a silent burst (legacy randint(0, 0))", () => {
+    const plan = planBurst({
+      type: "Original",
+      wakeupActivity: 0,
+      hibernateLengthMs: 15000,
+      popupDelayMs: 5000,
+      rand: () => 0.5,
+    });
+    expect(plan.intervalsMs).toHaveLength(0);
+  });
 });
 
-describe("planBurst — Spaced (delay-driven, legacy)", () => {
-  it("ticks every popup delay for the burst length, not by wakeupActivity", () => {
+describe("planBurst — Spaced (delay-driven inside the length window)", () => {
+  it("ticks every popup delay while the window is open, ignoring wakeupActivity", () => {
     const plan = planBurst({
       type: "Spaced",
       wakeupActivity: 999, // must be ignored
@@ -81,14 +99,26 @@ describe("planBurst — Spaced (delay-driven, legacy)", () => {
       popupDelayMs: 2000,
       rand: () => 0,
     });
-    expect(plan.intervalsMs).toEqual([0, 2000, 2000, 2000, 2000]); // floor(10000/2000) ticks
+    expect(times(plan.intervalsMs)).toEqual([0, 2000, 4000, 6000, 8000]);
+    expect(plan.durationMs).toBe(10000); // re-arm at the window close
   });
 
-  it("always ticks at least once", () => {
+  it("keeps the tick whose time lands inside a non-multiple window (legacy ceil)", () => {
     const plan = planBurst({
       type: "Spaced",
       wakeupActivity: 5,
-      hibernateLengthMs: 100,
+      hibernateLengthMs: 12000,
+      popupDelayMs: 5000,
+      rand: () => 0,
+    });
+    expect(times(plan.intervalsMs)).toEqual([0, 5000, 10000]);
+  });
+
+  it("always ticks at least once, even with a zero-length window", () => {
+    const plan = planBurst({
+      type: "Spaced",
+      wakeupActivity: 5,
+      hibernateLengthMs: 0,
       popupDelayMs: 5000,
       rand: () => 0,
     });
@@ -96,7 +126,7 @@ describe("planBurst — Spaced (delay-driven, legacy)", () => {
   });
 });
 
-describe("planBurst — Glitch (legacy choice-set gaps)", () => {
+describe("planBurst — Glitch (legacy choice-set gaps, window-capped)", () => {
   it("produces activity ticks whose gaps come from [0, base, base/m, base*m]", () => {
     const plan = planBurst({
       type: "Glitch",
@@ -111,23 +141,39 @@ describe("planBurst — Glitch (legacy choice-set gaps)", () => {
     expect(plan.intervalsMs.slice(1).every((g) => [0, 3000, 1500, 750, 6000, 12000].includes(g))).toBe(
       true
     );
+    expect(plan.durationMs).toBe(12000);
   });
 
-  it("sums to a plausible burst window", () => {
+  it("stops ticking when the length window closes", () => {
+    // rand 0.99: modifier 4, choice index 3 → gap = base*4 = 400 per tick.
     const plan = planBurst({
       type: "Glitch",
       wakeupActivity: 10,
-      hibernateLengthMs: 10000,
+      hibernateLengthMs: 1000,
       popupDelayMs: 5000,
-      rand: seq([0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5]),
+      rand: seq([0.99, 0.99, 0.99, 0.99, 0.99, 0.99, 0.99, 0.99, 0.99, 0.99]),
     });
-    const total = plan.intervalsMs.reduce((a, b) => a + b, 0);
-    expect(total).toBeLessThanOrEqual(10 * (10000 / 10) * 4);
+    const t = times(plan.intervalsMs);
+    expect(t.length).toBeLessThan(10); // window cut it short
+    expect(t.every((x) => x < 1000)).toBe(true);
+    expect(t[t.length - 1]).toBeGreaterThanOrEqual(800);
+  });
+
+  it("zero activity is a silent burst", () => {
+    const plan = planBurst({
+      type: "Glitch",
+      wakeupActivity: 0,
+      hibernateLengthMs: 5000,
+      popupDelayMs: 1000,
+      rand: () => 0,
+    });
+    expect(plan.intervalsMs).toHaveLength(0);
+    expect(plan.durationMs).toBe(5000);
   });
 });
 
-describe("planBurst — Ramp (accelerating)", () => {
-  it("gaps shrink over the burst and lock to delay*0.9 below the floor", () => {
+describe("planBurst — Ramp (accelerating, locked ticks counted)", () => {
+  it("gaps shrink over the burst and the window caps it", () => {
     const plan = planBurst({
       type: "Ramp",
       wakeupActivity: 30,
@@ -135,15 +181,36 @@ describe("planBurst — Ramp (accelerating)", () => {
       popupDelayMs: 1000,
       rand: () => 0,
     });
-    expect(plan.intervalsMs[0]).toBe(0);
+    const t = times(plan.intervalsMs);
+    expect(t[0]).toBe(0);
+    expect(t.every((x) => x < 20000)).toBe(true);
     const gaps = plan.intervalsMs.slice(1);
-    // Early gaps are large (length/4 territory), later gaps hit the 0.9*delay floor.
     expect(gaps[0]).toBeGreaterThan(gaps[gaps.length - 1]);
-    expect(gaps[gaps.length - 1]).toBe(900);
-    // Monotonic non-increasing overall trend: first half average > second half.
-    const half = Math.floor(gaps.length / 2);
-    const avg = (a: number[]) => a.reduce((x, y) => x + y, 0) / a.length;
-    expect(avg(gaps.slice(0, half))).toBeGreaterThan(avg(gaps.slice(half)));
+    expect(plan.durationMs).toBe(20000);
+  });
+
+  it("zero activity is a silent burst", () => {
+    const plan = planBurst({
+      type: "Ramp",
+      wakeupActivity: 0,
+      hibernateLengthMs: 5000,
+      popupDelayMs: 1000,
+      rand: () => 0,
+    });
+    expect(plan.intervalsMs).toHaveLength(0);
+  });
+
+  it("a zero-length window locks immediately and counts one tick", () => {
+    // length 0 → divisor starts under the 100ms lock → the locked branch
+    // (the only one that counts toward activity) fires once.
+    const plan = planBurst({
+      type: "Ramp",
+      wakeupActivity: 1,
+      hibernateLengthMs: 0,
+      popupDelayMs: 100,
+      rand: () => 0,
+    });
+    expect(plan.intervalsMs).toEqual([0]);
   });
 });
 
@@ -158,6 +225,7 @@ describe("planBurst — Pump-Scare", () => {
     });
     expect(plan.isPumpScare).toBe(true);
     expect(plan.intervalsMs).toEqual([0]);
+    expect(plan.durationMs).toBe(0);
   });
 });
 
@@ -172,6 +240,18 @@ describe("planBurst — hostile settings clamps", () => {
     });
     expect(plan.intervalsMs.length).toBeLessThanOrEqual(MAX_BURST_POPUPS);
     expect(plan.intervalsMs.length).toBeGreaterThan(0);
+  });
+
+  it("caps a runaway burst length for windowed types", () => {
+    const plan = planBurst({
+      type: "Spaced",
+      wakeupActivity: 20,
+      hibernateLengthMs: 1e12,
+      popupDelayMs: 100,
+      rand: () => 0,
+    });
+    expect(plan.durationMs).toBeLessThanOrEqual(3_600_000);
+    expect(plan.intervalsMs.length).toBeLessThanOrEqual(36_001);
   });
 
   it("survives NaN settings with sane defaults", () => {

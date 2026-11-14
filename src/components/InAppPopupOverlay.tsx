@@ -69,11 +69,7 @@ export function InAppPopupOverlay() {
         if (popup.type === "audio") {
           return (
             <div key={popup.id} data-testid="in-app-popup" data-popup-id={popup.id}>
-              <AudioPopup
-                audioUrl={mediaUrl}
-                onClose={() => handleClose(popup.id)}
-                forcedCloseMs={popup.pumpScare ? 2500 : undefined}
-              />
+              <AudioPopup audioUrl={mediaUrl} onClose={() => handleClose(popup.id)} />
             </div>
           );
         }
