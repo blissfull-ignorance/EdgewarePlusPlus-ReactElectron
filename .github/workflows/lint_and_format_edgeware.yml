@@ -1,5 +1,7 @@
 name: Lint & Format Edgeware
-on: [push]
+on:
+  push:
+    branches: [macos-python]
 jobs:
   lint:
     runs-on: ubuntu-22.04
