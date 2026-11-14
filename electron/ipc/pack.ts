@@ -1032,7 +1032,7 @@ function registerHandlers(): void {
           description: "A new empty pack.",
         });
         writePackJson(path.join(dir, "index.json"), { default: {}, moods: [] });
-        for (const sub of ["img", "vid", "aud"]) {
+        for (const sub of ["img", "vid", "aud", "hypno"]) {
           fs.mkdirSync(path.join(dir, sub), { recursive: true });
         }
       } catch (err) {
