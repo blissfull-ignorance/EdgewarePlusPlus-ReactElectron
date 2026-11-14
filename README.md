@@ -1,52 +1,30 @@
 # Edgeware++
 
-A cross-platform desktop app for running immersive media packs: timed image,
-video, audio and text popups, hypno overlays, corruption and hibernate modes,
-and Lua-driven scripting — built with React, Vite and Electron for
-macOS, Windows and Linux.
+Edgeware++ is a fetish-designed program (so 18+ only!!!) that essentially spawns popups over your screen in many different ways. These popups can include images, videos, audio, prompts, etc. It's also highly customizable, with the ability to download "packs" people have made and use them yourself. It can be ended at any time and also scheduled in ways to be used more passively.
 
-## From Python to a cross-platform desktop app
+**Edgeware++ is not a virus, nor does it install itself onto your computer**. Edgeware **can** potentially modify files on your computer or be configured to start delayed. The most dangerous settings (deleting or replacing files) have not been included in this fork.
 
-Edgeware++ began as a Python/Tkinter application for Windows with community
-shims for Linux and macOS. The GUI toolkit, the mpv/ANGLE video pipeline and
-the packaging story each needed per-platform surgery, and every new platform
-multiplied the maintenance surface.
+## What Is This Fork?
 
-This repository is the rewrite of that application on a single rendering
-stack: an Electron shell around a React renderer. One codebase now covers all
-three platforms, including the parts that were hardest to port natively —
-transparent always-on-top popup windows, global panic hotkeys, wallpaper
-control, system tray and an embedded Lua VM. Media plays through Chromium's
-own pipeline, so hypno overlays and video popups behave identically
-everywhere. The original Python implementation is kept in
-[`legacy-python/`](legacy-python/) as a behavioral reference.
+Stumbling over a great Edgeware++ community pack, I was disheartened to see the software was not macOS compatible. So I made it compatible! And in doing so, I got increasingly invested making it a React-Electron cross-platform implementation instead of just a macOS port. I have no idea how much time I spent on this at this point.
 
-## Features
+## Confirmed OS Compatibility
 
-- **Popups** — images, videos, audio and prompt popups spawn on configurable
-  timers, with movement, scaling, overlap avoidance, auto-close, per-type
-  limits and pack-defined close labels.
-- **Subliminal text pops** — short pack phrases flashed centered on screen
-  with configurable chance, duration and opacity.
-- **Hypno overlays** — animated GIF spirals composited over image and video
-  pops, clipped to the media frame.
-- **Corruption mode** — escalating level progression (timed, popup-count,
-  launch-count or script driven) with mood cycling, per-level config
-  overrides behind explicit permission gates, and a start-up warning listing
-  every dangerous setting the pack can flip.
-- **Hibernate mode** — scheduled activity loops with several pacing styles.
-- **Panic** — a global hotkey (Escape by default) and a tray entry tear
-  everything down instantly, set the panic wallpaper and exit; an optional
-  timed lockout gates panic behind your safeword.
-- **Media blacklist** — Alt+click a popup's close control to move that file
-  into the blacklist so it never spawns again.
-- **Scripting** — packs can ship `script.lua`, executed in a sandboxed Lua
-  VM (Fengari) that drives the app through a versioned API.
-- **System integration** — tray icon, wallpaper rotation, desktop
-  notifications, Discord rich presence, run-at-startup, optional Booru
-  image downloading.
+- [x] macOS (27.2.1)
+- [ ] Windows 11
+- [ ] Linux
 
-## Installing a release
+Currently only macOS has been confirmed to work. Feel free to send me a confirmation for Windows or Linux and I will update this list.
+
+## Usage Instructions
+
+You can grab a ReactElectron build from the Releases tab. For Windows and Linux these are installers, for macOS it ships the built executable. You can of course also download the GitHub project and build the executable yourself.
+
+In the app, you can import a pack, adjust the settings and run it! Most fun is with scripted packs. I added features to tag moods across the gallery and moved the script designer right next to it. Old hand-written scripts can be converted into designs editable in this version.
+
+**Any damage you do to your computer with Edgeware is your own responsibility! The most dangerous settings are disabled in this fork, but there remains a risk of misuse or malicious packs I cannot properly assess.**
+
+## Installing a Release
 
 Download the artifact for your platform from the
 [releases page](https://github.com/blissfull-ignorance/EdgewarePlusPlus-ReactElectron/releases):
@@ -58,7 +36,7 @@ Download the artifact for your platform from the
 | Linux | `*-linux-*.AppImage` (or `.deb`) |
 
 Unsigned builds: macOS shows a Gatekeeper prompt (right-click → Open the
-first time) and Windows SmartScreen an "More info → Run anyway" step.
+first time) and Windows SmartScreen a "More info → Run anyway" step.
 
 Place content packs (directories or zips) in the `packs/` folder of the app's
 user-data directory, or import them from the config window:
@@ -67,7 +45,7 @@ user-data directory, or import them from the config window:
 - Windows: `%APPDATA%/Edgeware++/`
 - Linux: `~/.config/Edgeware++/`
 
-## Running from source
+## Running From Source
 
 Requires Node.js 20+.
 
@@ -95,7 +73,37 @@ Release artifacts (dmg / zip / nsis / AppImage / deb) are written to
 `release/`; `.github/workflows/release.yml` builds all platforms on a `v*`
 tag and attaches the artifacts to the GitHub release.
 
+## Frequently Asked Questions
+
+**Q: Where do I download more packs?**
+
+Please refer to the [original project](https://github.com/araten10/EdgewarePlusPlus).
+
+**Q: I found a bug!**
+
+Please open an issue here on the fork! Do not raise bugs concerning the fork in the original project, as this fork is not associated with the original project's maintainers.
+
+**Q: Will there be further development on this?**
+
+I do not plan further development at this moment.
+
+**Q: How was this fork made? (AI Disclosure)**
+
+This fork was built with local coding agents (OpenCode running Qwen3.6/8-27B, DeepSeek-V4-Flash and Qwen3.8-Flash-Next). It doubles as an exercise in software architecture and agentic development. The following development process was used:
+
+- Analyzed the Python version's features and config options to derive catalogs of what to port.
+- Defined the tech stack.
+- Defined project structure, design, flow diagrams and test plans before any coding. This produced a lot of software architecture documentation, which is intentionally not part of the repo history.
+- Split the work into feature-sized slices: rough UI, limited backend, automated tests, then the next feature, same procedure.
+- The coding agents worked through the tasks one by one, including overnight runs. This only worked well when steps were precisely scoped and success was mechanically testable, so every task was written that way.
+- Human review: mostly UI-driven, plus targeted code reviews.
+
+This project accompanied me for ~5 months. I restarted multiple times with different approaches and ended up learning a lot about local LLM models, Python quirks on macOS, test-driven software design, React and Electron, as well as app bundling. It was most intriguing to see the capability jumps of the tested local models within just a few months.
+
 ## License
 
-Edgeware++ is licensed under the terms in `COPYING` (GPL-3.0) with the MIT
-grant in `COPYING.MIT`. See `legacy-python/` for the original implementation.
+As of April 28 2025 all future versions of Edgeware++ are licensed under the GNU General Public License version 3 or any later version. Contributions prior to the specified date are licensed under the MIT License.
+
+---
+
+Thank you to araten10, marigold, PetitTournesol and the creators making packs for this!
