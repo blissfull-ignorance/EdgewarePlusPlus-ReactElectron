@@ -5,6 +5,9 @@
  * desktop picture is cached to disk and the state marked dirty. Stop, or the
  * next startup after a crash or panic, restores the cached original — pack
  * wallpapers, rotation and the panic image can never strand the desktop.
+ * Every path the app itself applies is recorded in an `applied` set: a
+ * desktop showing app output (a pack wallpaper left over from an unrestored
+ * session, a panic image) must never be captured as the user's original.
  * EDGWARE_PANIC_SKIP_WALLPAPER=1 disables the whole mechanism (tests).
  */
 import fs from "node:fs";
@@ -12,10 +15,31 @@ import path from "node:path";
 import { app } from "electron";
 import { logger } from "./logger";
 import { getWallpaper, setWallpaper } from "./wallpaper";
+import { getConfig, invalidateConfigCache } from "./configCache";
 
 interface WallpaperState {
   original: string;
   dirty: boolean;
+  /** Paths the app itself applied — never legitimate as the user's original. */
+  applied?: string[];
+}
+
+const APPLIED_CAP = 100;
+
+function norm(p: string): string {
+  return path.resolve(p.replace(/^~/, process.env.HOME ?? p));
+}
+
+/** Directories of the active pack and every registered pack. */
+function packDirs(): string[] {
+  const cfg = getConfig();
+  const dirs: string[] = [];
+  const push = (raw: unknown): void => {
+    if (typeof raw === "string" && raw) dirs.push(norm(raw));
+  };
+  push(cfg.packPath);
+  if (Array.isArray(cfg.packFolders)) cfg.packFolders.forEach(push);
+  return dirs;
 }
 
 function stateFile(): string {
@@ -35,7 +59,7 @@ function readState(): WallpaperState | null {
       typeof (parsed as WallpaperState).original === "string" &&
       typeof (parsed as WallpaperState).dirty === "boolean"
     ) {
-      return parsed as WallpaperState;
+      return migrateLegacyPoison(parsed as WallpaperState);
     }
   } catch {
     /* no state cached yet */
@@ -53,18 +77,49 @@ function writeState(state: WallpaperState): void {
 }
 
 /**
- * A path that is app output, not a user choice: the panic wallpaper by its
- * legacy name (the bundled default, a pack's override, and the old Python
- * app's copy are all `panic_wallpaper.*`). Caching one as the "original"
- * would make every restore re-apply a panic image over the user's desktop.
+ * One-time upgrade migration: builds before the applied set existed could
+ * cache a pack wallpaper as the "original" (captured while a previous
+ * session's pack wallpaper was still on screen). Such an original is app
+ * output — drop it and seed the applied set with it so re-capture rejects
+ * it too. Pack membership is checked against every registered pack folder,
+ * not just the active one: the poison is often left by a different pack.
+ */
+function migrateLegacyPoison(state: WallpaperState): WallpaperState {
+  if (state.applied) return state;
+  invalidateConfigCache();
+  const original = state.original ? norm(state.original) : "";
+  const insidePack = original && packDirs().some((dir) => original.startsWith(dir + path.sep));
+  if (insidePack) {
+    logger.warn(
+      `[Wallpaper] Legacy cached original is inside a pack (${original}); dropping it`
+    );
+    const migrated: WallpaperState = { original: "", dirty: false, applied: [original] };
+    writeState(migrated);
+    return migrated;
+  }
+  const migrated: WallpaperState = { ...state, applied: [] };
+  writeState(migrated);
+  return migrated;
+}
+
+/**
+ * The panic wallpaper by its legacy name (the bundled default, a pack's
+ * override, and the old Python app's copy are all `panic_wallpaper.*`).
  */
 function isPanicArtifact(p: string): boolean {
   return /^panic_wallpaper\.[a-z0-9]+$/i.test(path.basename(p));
 }
 
-/** A cached original we may safely restore: a real path, never a panic image. */
+/** App output, not a user choice: a panic image or a path the app applied. */
+function isAppArtifact(p: string, state: WallpaperState | null): boolean {
+  if (isPanicArtifact(p)) return true;
+  const n = norm(p);
+  return (state?.applied ?? []).some((a) => norm(a) === n);
+}
+
+/** A cached original we may safely restore: real, and never app output. */
 function usableOriginal(state: WallpaperState | null): boolean {
-  return !!state?.original && !isPanicArtifact(state.original);
+  return !!state?.original && !isAppArtifact(state.original, state);
 }
 
 /** Call before every wallpaper change the app itself causes. */
@@ -77,26 +132,26 @@ async function beforeWallpaperChange(): Promise<void> {
       return;
     }
     if (existing?.original) {
-      // A poisoned entry (captured while a panic image was on screen): drop
-      // it so the re-capture below replaces it. Re-dirtying it would make
-      // every later restore re-apply a panic wallpaper.
+      // A poisoned entry (app output captured as the original): drop it so
+      // the re-capture below replaces it. Re-dirtying it would make every
+      // later restore re-apply that image over the user's desktop.
       logger.warn(
-        `[Wallpaper] Cached original is a panic image (${existing.original}); dropping it and re-capturing`
+        `[Wallpaper] Cached original is app output (${existing.original}); dropping it and re-capturing`
       );
     }
     const current = await getWallpaper();
-    if (current && isPanicArtifact(current)) {
-      // The desktop still shows a panic image (e.g. an older session's or a
-      // legacy install's): caching it as the "original" would make every
-      // future restore re-apply a panic wallpaper over the user's desktop.
+    if (current && isAppArtifact(current, existing)) {
+      // The desktop still shows something the app put there (a pack
+      // wallpaper or panic image from an unrestored session): caching it as
+      // the "original" would strand it through every future restore.
       logger.warn(
-        `[Wallpaper] Current desktop is a panic image (${current}); not caching it as the original`
+        `[Wallpaper] Current desktop is app-applied (${current}); not caching it as the original`
       );
-      writeState({ original: "", dirty: false });
+      writeState({ original: "", dirty: false, applied: existing?.applied ?? [] });
       return;
     }
     if (current) {
-      writeState({ original: current, dirty: true });
+      writeState({ original: current, dirty: true, applied: existing?.applied ?? [] });
       logger.info(`[Wallpaper] Cached the user's original wallpaper: ${current}`);
     }
   } catch (err) {
@@ -113,12 +168,24 @@ async function beforeWallpaperChange(): Promise<void> {
  */
 export function applyWallpaper(filepath: string): Promise<void> {
   return serialize(async () => {
-    const alreadyDirty = readState()?.dirty === true;
+    const mem = !disabled();
+    const alreadyDirty = mem && readState()?.dirty === true;
     await beforeWallpaperChange();
+    if (mem) {
+      // Whatever happens next, this path is app output from now on: record
+      // it so no later capture mistakes it for the user's original.
+      const state = readState() ?? { original: "", dirty: false };
+      const n = norm(filepath);
+      const applied = state.applied ?? [];
+      if (!applied.some((a) => norm(a) === n)) {
+        state.applied = [...applied, n].slice(-APPLIED_CAP);
+        writeState(state);
+      }
+    }
     try {
       await setWallpaper(filepath);
     } catch (err) {
-      if (!alreadyDirty) {
+      if (mem && !alreadyDirty) {
         const state = readState();
         if (state?.dirty) writeState({ ...state, dirty: false });
       }
@@ -148,19 +215,19 @@ async function restoreNow(): Promise<boolean> {
   if (disabled()) return false;
   const state = readState();
   if (!state?.dirty) return false;
-  if (!state.original || isPanicArtifact(state.original)) {
-    // A poisoned or empty cache (the "original" was captured while a panic
-    // image was on screen): restoring it would re-apply a panic wallpaper.
-    // Drop the original so the next app change re-captures from the desktop.
+  if (!state.original || isAppArtifact(state.original, state)) {
+    // A poisoned or empty cache (the "original" was app output): restoring
+    // it would re-apply a pack or panic wallpaper. Drop the original so the
+    // next app change re-captures from the desktop; keep the applied set.
     logger.warn(
       `[Wallpaper] Cached original is unusable (${state.original || "empty"}); retiring the cache without restoring`
     );
-    writeState({ original: "", dirty: false });
+    writeState({ original: "", dirty: false, applied: state.applied ?? [] });
     return false;
   }
   if (!fs.existsSync(state.original)) {
     logger.warn(`[Wallpaper] Cached original no longer exists: ${state.original}`);
-    writeState({ original: "", dirty: false });
+    writeState({ original: "", dirty: false, applied: state.applied ?? [] });
     return false;
   }
   // Verify before re-applying: if the desktop already shows the original

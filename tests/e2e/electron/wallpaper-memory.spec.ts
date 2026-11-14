@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { appendFileSync, copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import {
   cleanupTempState,
@@ -169,5 +169,72 @@ test.describe("Wallpaper memory and panic wallpaper override", () => {
         }
       }, { timeout: 15_000 })
       .toBe(false);
+  });
+
+  test("startup drops a legacy pack-poisoned original instead of re-applying it", async () => {
+    // The shipped-release flaw: an old build cached a pack's corruption
+    // wallpaper as the "original" while it was on screen. The poisoned state
+    // survives the upgrade; the startup restore must retire it silently —
+    // never re-applying the pack image over the user's desktop.
+    await quitApp(running!);
+    running = null;
+
+    const packWall = path.join(packDir, "img", "wp.png");
+    const stateFile = path.join(state!.dir, "wallpaper_state.json");
+    writeFileSync(stateFile, JSON.stringify({ original: packWall, dirty: true }), "utf-8");
+    const appliedBefore = appliedLog().length;
+
+    running = await launch();
+    await expect
+      .poll(() => {
+        try {
+          return JSON.parse(readFileSync(stateFile, "utf-8")) as {
+            original?: string;
+            dirty?: boolean;
+            applied?: string[];
+          };
+        } catch {
+          return null;
+        }
+      }, { timeout: 30_000 })
+      .toEqual({ original: "", dirty: false, applied: [packWall] });
+    expect(appliedLog()).toHaveLength(appliedBefore);
+  });
+
+  test("after the retire, the user's own desktop is re-captured as the baseline", async () => {
+    // The recovery path for the shipped flaw: with the cache retired, the
+    // user sets their picture back (outside the app). The next app change
+    // captures it as the original, and Stop restores to it again.
+    const { window } = running!;
+    const packWall = path.join(packDir, "img", "wp.png");
+    const userDesk = path.join(state!.dir, "user-desktop.png");
+    copyFileSync(path.join(IMG_DIR, "globelw.png"), userDesk);
+    // The stub answers reads from the applied log: appending simulates the
+    // user setting this picture through macOS System Settings.
+    appendFileSync(path.join(state!.dir, "wallpaper_applied.log"), `${userDesk}\n`, "utf-8");
+
+    await advanceToLevel1(running!);
+    await expect
+      .poll(() => appliedLog().at(-1), { timeout: 30_000 })
+      .toMatch(/wp\.png$/);
+
+    await window.locator("[data-testid='start-stop-button']").click();
+    await expect
+      .poll(() => appliedLog().at(-1), { timeout: 15_000 })
+      .toBe(userDesk);
+
+    const stateFile = path.join(state!.dir, "wallpaper_state.json");
+    await expect
+      .poll(() => {
+        try {
+          return JSON.parse(readFileSync(stateFile, "utf-8")) as {
+            original?: string;
+            dirty?: boolean;
+          };
+        } catch {
+          return null;
+        }
+      }, { timeout: 15_000 })
+      .toEqual({ original: userDesk, dirty: false, applied: [packWall] });
   });
 });
