@@ -92,7 +92,7 @@ export function AppFrame({ view, onViewChange, actions, children }: AppFrameProp
             Edgeware++
           </Title>
           <Badge variant="subtle" size="sm" fw={500} style={{ marginLeft: 2 }}>
-            cross-platform
+            ReactElectron
           </Badge>
         </Group>
         {actions}
