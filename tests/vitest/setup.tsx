@@ -1,7 +1,15 @@
-import { vi } from "vitest";
+import { vi, afterEach } from "vitest";
 import "@testing-library/jest-dom/vitest";
 import { MantineProvider } from "@mantine/core";
 import { render } from "@testing-library/react";
+
+// Mantine's modal scroll lock defers a setState through a setTimeout when a
+// modal unmounts. Let pending macrotasks land while jsdom is still alive;
+// otherwise the timer fires after environment teardown as an uncaught
+// "window is not defined" and fails the whole run (seen on CI macOS).
+afterEach(async () => {
+  await new Promise((resolve) => setTimeout(resolve, 0));
+});
 
 // Mock zustand/middleware — devtools and persist should be no-ops in tests
 const mockMemoryStorage: Record<string, string> = {};

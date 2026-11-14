@@ -48,7 +48,8 @@ describe("uniqueDestPath", () => {
     temp = mkdtempSync(path.join(tmpdir(), "ewpp-unique-"));
   });
   afterAll(() => {
-    rmSync(temp, { recursive: true, force: true });
+    // Windows: extraction handles can linger a moment after the test.
+    rmSync(temp, { recursive: true, force: true, maxRetries: 20, retryDelay: 100 });
   });
 
   it("returns the plain path when free and (n) suffixes on collision", () => {
@@ -119,7 +120,8 @@ describe("extractPackZip", () => {
     temp = mkdtempSync(path.join(tmpdir(), "ewpp-extract-"));
   });
   afterAll(() => {
-    rmSync(temp, { recursive: true, force: true });
+    // Windows: extraction handles can linger a moment after the test.
+    rmSync(temp, { recursive: true, force: true, maxRetries: 20, retryDelay: 100 });
   });
 
   it("extracts a flat zip at the expected depth with real file content", async () => {
@@ -208,7 +210,7 @@ describe("extractPackZip", () => {
       "a/b/d/inner.json": JSON.stringify({ ok: true }),
     });
     await extractPackZip(zipPath, dest);
-    const all = readdirSync(dest, { recursive: true }).map((n) => String(n));
+    const all = readdirSync(dest, { recursive: true }).map((n) => String(n).replace(/\\/g, "/"));
     expect(all.some((n) => n.endsWith("c/deep.json"))).toBe(true);
     expect(all.some((n) => n.endsWith("d/inner.json"))).toBe(true);
     expect(existsSync(path.join(temp, "b"))).toBe(false);

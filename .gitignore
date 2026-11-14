@@ -194,6 +194,7 @@ coverage/
 # Release icon assets (tracked despite the generic build/ ignore)
 !build/
 build/*
+!build/afterPack.js
 !build/icon.icns
 !build/icon.ico
 !build/icon.png

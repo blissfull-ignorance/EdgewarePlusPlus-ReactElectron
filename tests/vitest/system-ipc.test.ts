@@ -64,7 +64,8 @@ describe("system IPC handlers (pack import / discovery / selection)", () => {
   });
 
   afterAll(() => {
-    rmSync(tempRoot, { recursive: true, force: true });
+    // Windows: the logger's write stream can hold a file open briefly.
+    rmSync(tempRoot, { recursive: true, force: true, maxRetries: 20, retryDelay: 100 });
     delete (globalThis as { __EWPP_TEST_USER_DATA?: string }).__EWPP_TEST_USER_DATA;
   });
 
