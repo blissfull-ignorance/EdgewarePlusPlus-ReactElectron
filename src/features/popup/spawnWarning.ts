@@ -39,7 +39,14 @@ export function collectSpawnBlockers(s: Settings, packHasScript: boolean): strin
   }
 
   const delay = Number(s.delay);
-  if (anyChanceLive && Number.isFinite(delay) && delay > SLOW_SPAWN_DELAY_MS) {
+  // Hibernate mode replaces the roll loop: bursts are scheduled by the
+  // hibernate delay range, so a slow roll delay blocks nothing while on.
+  if (
+    s.hibernateMode !== 1 &&
+    anyChanceLive &&
+    Number.isFinite(delay) &&
+    delay > SLOW_SPAWN_DELAY_MS
+  ) {
     const seconds = Math.round(delay / 100) / 10;
     issues.push(
       `Spawn Delay is ${seconds}s between popup rolls — at 100% image chance that is only one popup every ${seconds}s. Pack sessions can leave this value behind; lower it under Annoyance → Popup Tweaks.`

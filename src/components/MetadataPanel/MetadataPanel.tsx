@@ -8,6 +8,7 @@ import {
   IconSkull,
   IconSparkles,
 } from "@tabler/icons-react";
+import { useEffect, useState } from "react";
 import { useAppStore } from "../../stores/appStore";
 import { useCorruptionStore } from "../../stores/corruptionStore";
 import { useSettingsStore } from "../../stores/settingsStore";
@@ -15,12 +16,28 @@ import { usePackDiscovery } from "../../hooks/usePackDiscovery";
 import { lastSegment } from "../../utils/packPath";
 import { SectionCard } from "../SectionCard";
 
+/** Live "1m 23s" countdown to a scheduled instant; "—" when nothing pending. */
+function useCountdownText(target: number | null): string {
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    if (target === null) return;
+    const id = setInterval(() => setTick((t) => t + 1), 1000);
+    return () => clearInterval(id);
+  }, [target]);
+  if (target === null) return "—";
+  const seconds = Math.max(0, Math.ceil((target - Date.now()) / 1000));
+  if (seconds < 60) return `${seconds}s`;
+  return `${Math.floor(seconds / 60)}m ${seconds % 60}s`;
+}
+
 export function MetadataPanel({ onOpenPackManager }: { onOpenPackManager?: () => void }) {
   const popupsCount = useAppStore((s) => s.popupsCount);
   const isRunning = useAppStore((s) => s.isRunning);
   const corruptionLevels = useCorruptionStore((s) => s.levels);
   const maxLevel = Math.max(0, ...Object.keys(corruptionLevels).map(Number));
   const hibernateActive = useAppStore((s) => s.hibernateActive);
+  const hibernateNextBurst = useAppStore((s) => s.hibernateNextBurst);
+  const hibernateCountdown = useCountdownText(hibernateNextBurst);
   const currentLevel = useCorruptionStore((s) => s.currentLevel);
   const activeMoods = useCorruptionStore((s) => s.activeMoods);
   const driverType = useCorruptionStore((s) => s.driverType);
@@ -223,7 +240,7 @@ export function MetadataPanel({ onOpenPackManager }: { onOpenPackManager?: () =>
                 {hibernateState}
               </Badge>
               <Text size="sm" c="dimmed" data-testid="hibernate-countdown">
-                Countdown: {hibernateActive ? "In progress" : "—"}
+                Countdown: {hibernateActive ? "In progress" : hibernateCountdown}
               </Text>
             </Group>
           </SectionCard>

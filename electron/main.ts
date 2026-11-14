@@ -1,5 +1,6 @@
 import { restoreWallpaperIfDirty } from "./utils/wallpaperMemory";
 import { applyBaselineRevert } from "./utils/sessionBaseline";
+import { invalidateConfigCache } from "./utils/configCache";
 import { app, BrowserWindow } from "electron";
 import path from "path";
 
@@ -19,7 +20,6 @@ configurePackMediaScheme();
 import { registerHandlers as registerPackHandlers } from "./ipc/pack";
 import { registerHandlers as registerCorruptionHandlers } from "./ipc/corruption";
 import { registerHandlers as registerPopupHandlers, closeAllPopups } from "./ipc/popup";
-import { registerHandlers as registerHibernateHandlers } from "./ipc/hibernate";
 import { registerHandlers as registerScriptingHandlers, stopScripting } from "./ipc/scripting";
 import { registerHandlers as registerSystemHandlers } from "./ipc/system";
 import { registerHandlers as registerPanicHandlers } from "./ipc/panic";
@@ -46,11 +46,26 @@ applyHardwareAccelerationSetting();
 
 let win: BrowserWindow | null;
 
+// One runtime per userData directory: a second launch would spawn a parallel
+// popup session and race config.json writes against the first. The second
+// process exits; the first window wakes.
+const ownsInstance = app.requestSingleInstanceLock();
+if (!ownsInstance) {
+  app.quit();
+} else {
+  app.on("second-instance", () => {
+    if (win && !win.isDestroyed()) {
+      if (win.isMinimized()) win.restore();
+      win.show();
+      win.focus();
+    }
+  });
+}
+
 function registerAllHandlers(): void {
   registerPackHandlers();
   registerCorruptionHandlers();
   registerPopupHandlers();
-  registerHibernateHandlers();
   registerScriptingHandlers();
   registerSystemHandlers();
   registerPanicHandlers();
@@ -97,6 +112,7 @@ function createWindow(): void {
 }
 
 app.whenReady().then(() => {
+  if (!ownsInstance) return;
   registerPackMediaProtocol();
   registerAllHandlers();
   const packDir = activePackDir();
@@ -109,6 +125,9 @@ app.whenReady().then(() => {
   // config.json; the persisted baseline gives the user's values back
   // before any window reads the file.
   applyBaselineRevert();
+  // The revert rewrote config.json; make sure the live cache primes from the
+  // merged file, never a pre-revert snapshot.
+  invalidateConfigCache();
   createWindow();
   // A crash or panic mid-session can leave the pack's wallpaper applied;
   // the cached original comes back on the next boot.

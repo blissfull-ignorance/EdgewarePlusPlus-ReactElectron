@@ -1,48 +1,60 @@
 import { describe, expect, it } from "vitest";
-import { computeFadeInSteps, computeFadeOutSteps, computeSubliminalAlpha } from "../../src/utils/leet";
+import { planAudioFades, targetVolume } from "../../src/features/audio/audioFade";
+import { computeSubliminalAlpha } from "../../src/utils/leet";
 
-describe("computeFadeInSteps", () => {
-  it("returns correct number of steps at 60 ticks per second", () => {
-    // 600ms at 60 ticks/s = 36 intervals + the initial step.
-    expect(computeFadeInSteps(600, 0.5).length).toBe(37);
+/**
+ * Legacy audio.py fade scheduling: the fade-out must reach zero exactly at
+ * end-of-stream, and fades that together outlast the clip are scaled down
+ * proportionally.
+ */
+describe("planAudioFades", () => {
+  it("anchors the fade-out to the end of the clip", () => {
+    const plan = planAudioFades(10_000, 1000, 2000);
+    expect(plan.fadeInMs).toBe(1000);
+    expect(plan.fadeOutMs).toBe(2000);
+    expect(plan.fadeOutStartMs).toBe(8000);
   });
 
-  it("volume ramps from 0 to target volume", () => {
-    const steps = computeFadeInSteps(500, 0.8);
-    expect(steps[0]).toBeCloseTo(0, 2);
-    expect(steps[steps.length - 1]).toBeCloseTo(0.8, 1);
+  it("drops the fade-out when only the fade-in is configured", () => {
+    const plan = planAudioFades(10_000, 1000, 0);
+    expect(plan.fadeOutMs).toBe(0);
+    expect(plan.fadeOutStartMs).toBe(10_000);
   });
 
-  it("volume increases monotonically", () => {
-    const steps = computeFadeInSteps(1000, 0.5);
-    for (let i = 1; i < steps.length; i++) {
-      expect(steps[i]).toBeGreaterThanOrEqual(steps[i - 1]);
-    }
+  it("scales both fades proportionally when they outlast the clip", () => {
+    const plan = planAudioFades(1000, 3000, 1000);
+    expect(plan.fadeInMs + plan.fadeOutMs).toBe(1000);
+    // 3:1 ratio preserved.
+    expect(plan.fadeInMs).toBe(750);
+    expect(plan.fadeOutMs).toBe(250);
+    expect(plan.fadeOutStartMs).toBe(750);
   });
 
-  it("handles zero duration", () => {
-    const steps = computeFadeInSteps(0, 0.5);
-    expect(steps).toEqual([0.5]);
+  it("keeps only the fade-in when the duration is unknown (streaming)", () => {
+    const plan = planAudioFades(Number.NaN, 500, 500);
+    expect(plan.fadeInMs).toBe(500);
+    expect(plan.fadeOutMs).toBe(0);
+  });
+
+  it("treats hostile negative or NaN fades as zero", () => {
+    const plan = planAudioFades(5000, -100, Number.NaN);
+    expect(plan.fadeInMs).toBe(0);
+    expect(plan.fadeOutMs).toBe(0);
+    expect(plan.fadeOutStartMs).toBe(5000);
   });
 });
 
-describe("computeFadeOutSteps", () => {
-  it("volume ramps from current to 0", () => {
-    const steps = computeFadeOutSteps(500, 0.8);
-    expect(steps[0]).toBeCloseTo(0.8, 2);
-    expect(steps[steps.length - 1]).toBeCloseTo(0, 2);
+describe("targetVolume (audioVolume percent → element 0..1)", () => {
+  it("maps the percentage range", () => {
+    expect(targetVolume(100)).toBe(1);
+    expect(targetVolume(40)).toBeCloseTo(0.4, 5);
+    expect(targetVolume(0)).toBe(0);
   });
 
-  it("volume decreases monotonically", () => {
-    const steps = computeFadeOutSteps(1000, 0.5);
-    for (let i = 1; i < steps.length; i++) {
-      expect(steps[i]).toBeLessThanOrEqual(steps[i - 1]);
-    }
-  });
-
-  it("handles zero duration", () => {
-    const steps = computeFadeOutSteps(0, 0.5);
-    expect(steps).toEqual([0]);
+  it("clamps out-of-range and non-numeric values", () => {
+    expect(targetVolume(150)).toBe(1);
+    expect(targetVolume(-20)).toBe(0);
+    expect(targetVolume(Number.NaN)).toBe(1);
   });
 });
 

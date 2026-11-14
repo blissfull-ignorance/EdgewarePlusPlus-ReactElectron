@@ -103,29 +103,6 @@ test("popup:create rejects malformed type and mediaId", async () => {
   }
 });
 
-test("hibernate clamps hostile burst durations", async () => {
-  const state = createTempState({ kind: "media" });
-  baseSeed(state, state.seedPath);
-  const running = await launchApp(state);
-  try {
-    const t0 = Date.now();
-    await running.window.evaluate(() =>
-      (window as unknown as { api: { hibernate: { start: (t: string, d: number) => Promise<void> } } }).api.hibernate.start(
-        "Glitch",
-        1e9
-      )
-    );
-    expect(Date.now() - t0).toBeLessThan(2000);
-    expect(await running.window.evaluate(() => 1 + 1)).toBe(2);
-    await running.window.evaluate(() =>
-      (window as unknown as { api: { hibernate: { stop: () => Promise<void> } } }).api.hibernate.stop()
-    );
-  } finally {
-    await quitApp(running);
-    cleanupTempState(state);
-  }
-});
-
 test("the running session keeps its pack; switching applies on next start", async () => {
   const state = createTempState();
   const packA = path.join(state.packsDir, "Alpha Pack");

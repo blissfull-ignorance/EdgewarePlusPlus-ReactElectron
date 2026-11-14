@@ -4,11 +4,10 @@ import path from "path";
 import { execFile } from "child_process";
 import { promisify } from "util";
 import { logger } from "../utils/logger";
-import { skipHibernate } from "./hibernate";
 import { panicFromTray } from "./panic";
 import { setDiscordPresence as discordSetPresence } from "./discord";
-import { setWallpaper } from "../utils/wallpaper";
-import { beforeWallpaperChange, restoreWallpaperIfDirty } from "../utils/wallpaperMemory";
+import { applyWallpaper, restoreWallpaperIfDirty } from "../utils/wallpaperMemory";
+import { loadConfigOrNull, refreshConfig } from "../utils/configCache";
 import { autostartFilePath, buildAutostartEntry } from "../utils/autostart";
 import { activePackDir, loadAppIcon, resolveIconFile } from "../utils/appIcon";
 import {
@@ -158,7 +157,6 @@ function createTrayIcon(): Tray | null {
       {
         label: "Stop",
         click: () => {
-          ipcMain.emit("hibernate:stop");
           BrowserWindow.getAllWindows().forEach((win) => win.close());
           app.quit();
         },
@@ -166,7 +164,12 @@ function createTrayIcon(): Tray | null {
       {
         label: "Skip Hibernate",
         click: () => {
-          skipHibernate();
+          // The scheduler lives in the renderer now; the tray tells it to
+          // stand down instead of owning timers of its own.
+          const mainWin = BrowserWindow.getAllWindows().find(
+            (win) => !win.isDestroyed() && !win.webContents.getURL().includes("#/popup/")
+          );
+          mainWin?.webContents.send("hibernate:skip");
         },
       },
       { type: "separator" },
@@ -264,8 +267,7 @@ function registerHandlers(): void {
 
   ipcMain.handle("system:setWallpaper", async (_event, filepath: string): Promise<void> => {
     const expanded = filepath.startsWith("~") ? filepath.replace("~", app.getPath("home")) : filepath;
-    await beforeWallpaperChange();
-    await setWallpaper(expanded);
+    await applyWallpaper(expanded);
   });
 
   ipcMain.handle("wallpaper:restoreOriginal", async (): Promise<boolean> =>
@@ -531,6 +533,7 @@ function registerHandlers(): void {
       const tmpPath = `${configPath}.${process.pid}.${saveSeq++}.sync.tmp`;
       fs.writeFileSync(tmpPath, JSON.stringify(settings, null, 2), "utf-8");
       fs.renameSync(tmpPath, configPath);
+      refreshConfig(settings);
       event.returnValue = true;
     } catch (err) {
       logger.error("[System] Failed to flush settings on unload:", err);
@@ -539,8 +542,16 @@ function registerHandlers(): void {
   });
 
 ipcMain.handle("system:loadSettings", async (): Promise<Record<string, unknown> | null> => {
-    const configPath = path.join(dataDir(), "config.json");
-    return readJson<Record<string, unknown>>(configPath);
+    // Served from the live cache: a popup window mounting right after a
+    // settings change sees that change, not the last autosave snapshot.
+    return loadConfigOrNull();
+  });
+
+  // Renderer → main live view of settings: keeps main-side readers (popup
+  // geometry) current inside the autosave window. Never touches the disk;
+  // persistence stays with the save paths.
+  ipcMain.on("system:pushSettings", (_event, settings: unknown): void => {
+    refreshConfig(settings);
   });
 
   ipcMain.handle("system:saveSettings", async (_event, settings: Record<string, unknown>): Promise<void> => {
@@ -563,6 +574,7 @@ ipcMain.handle("system:loadSettings", async (): Promise<Record<string, unknown> 
       try {
         await fs.promises.writeFile(tmpPath, JSON.stringify(settings, null, 2), "utf-8");
         await fs.promises.rename(tmpPath, configPath);
+        refreshConfig(settings);
       } catch (err) {
         await fs.promises.rm(tmpPath, { force: true }).catch(() => undefined);
         throw err;

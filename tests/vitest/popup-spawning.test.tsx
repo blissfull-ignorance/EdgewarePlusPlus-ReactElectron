@@ -57,7 +57,7 @@ describe("usePopupLifecycle spawning (Electron mode)", () => {
       await result.current.spawnPopup("image", "img/foo.png");
     });
 
-    expect(window.api.popup.create).toHaveBeenCalledWith("image", "img/foo.png", undefined);
+    expect(window.api.popup.create).toHaveBeenCalledWith("image", "img/foo.png", undefined, undefined);
     expect(useAppStore.getState().popupsCount).toBe(1);
   });
 
@@ -68,7 +68,7 @@ describe("usePopupLifecycle spawning (Electron mode)", () => {
       await result.current.spawnPopup("image", "img/foo.png", "hypno/spiral.gif");
     });
 
-    expect(window.api.popup.create).toHaveBeenCalledWith("image", "img/foo.png", "hypno/spiral.gif");
+    expect(window.api.popup.create).toHaveBeenCalledWith("image", "img/foo.png", "hypno/spiral.gif", undefined);
   });
 
   it("spawnPopup returns null and does not increment when IPC fails", async () => {
@@ -209,7 +209,7 @@ describe("MainAppPage popup spawning", () => {
 
     await waitFor(
       () => {
-        expect(window.api.popup.create).toHaveBeenCalledWith("image", "img/foo.png", undefined);
+        expect(window.api.popup.create).toHaveBeenCalledWith("image", "img/foo.png", undefined, undefined);
       },
       { timeout: 3000 }
     );
@@ -231,7 +231,7 @@ describe("MainAppPage popup spawning", () => {
 
     await waitFor(
       () => {
-        expect(window.api.popup.create).toHaveBeenCalledWith("image", "img/foo.png", "hypno/spiral.gif");
+        expect(window.api.popup.create).toHaveBeenCalledWith("image", "img/foo.png", "hypno/spiral.gif", undefined);
       },
       { timeout: 3000 }
     );
@@ -252,7 +252,7 @@ describe("MainAppPage popup spawning", () => {
 
     await waitFor(
       () => {
-        expect(window.api.popup.create).toHaveBeenCalledWith("image", "img/foo.png", "default_hypno.gif");
+        expect(window.api.popup.create).toHaveBeenCalledWith("image", "img/foo.png", "default_hypno.gif", undefined);
       },
       { timeout: 3000 }
     );

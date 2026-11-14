@@ -14,6 +14,8 @@ export interface AppState {
   pendingStart: boolean;
   popupsCount: number;
   hibernateActive: boolean;
+  /** When the next hibernate burst fires; null while off or mid-burst. */
+  hibernateNextBurst: number | null;
 
   setPackPath: (path: string | null) => void;
   setTheme: (theme: ThemeType) => void;
@@ -24,6 +26,7 @@ export interface AppState {
   incrementPopups: () => void;
   decrementPopups: () => void;
   setHibernateActive: (active: boolean) => void;
+  setHibernateNextBurst: (time: number | null) => void;
 }
 
 export const useAppStore = create<AppState>()(
@@ -36,17 +39,20 @@ export const useAppStore = create<AppState>()(
         pendingStart: false,
         popupsCount: 0,
         hibernateActive: false,
+        hibernateNextBurst: null,
 
         setPackPath: (packPath) => set({ packPath }),
         setTheme: (themeType) => set({ themeType }),
         start: () => set({ isRunning: true }),
         requestStart: () => set({ pendingStart: true }),
         clearPendingStart: () => set({ pendingStart: false }),
-        stop: () => set({ isRunning: false, popupsCount: 0, hibernateActive: false }),
+        stop: () =>
+          set({ isRunning: false, popupsCount: 0, hibernateActive: false, hibernateNextBurst: null }),
         incrementPopups: () => set((s) => ({ popupsCount: s.popupsCount + 1 })),
         decrementPopups: () =>
           set((s) => ({ popupsCount: Math.max(0, s.popupsCount - 1) })),
         setHibernateActive: (hibernateActive) => set({ hibernateActive }),
+        setHibernateNextBurst: (hibernateNextBurst) => set({ hibernateNextBurst }),
       }),
       {
         name: "edgeware-app",

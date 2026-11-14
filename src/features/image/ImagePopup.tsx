@@ -19,6 +19,8 @@ export interface ImagePopupProps {
   hypnoGif?: string;
   /** Popup window ID: the window is resized to fit the image once measured. */
   popupId?: string;
+  /** Legacy pump-scare: auto-close this many ms after open, ignoring timeout settings. */
+  forcedTimeoutMs?: number;
 }
 
 export function ImagePopup({
@@ -30,6 +32,7 @@ export function ImagePopup({
   mediaHeight = 480,
   hypnoGif,
   popupId,
+  forcedTimeoutMs,
 }: ImagePopupProps) {
   const denialChance = useSettingsStore((s) => s.denialChance);
   const showCaptions = useSettingsStore((s) => s.showCaptions);
@@ -90,7 +93,7 @@ export function ImagePopup({
       buttonless={buttonless > 0}
       clicksToClose={clicksToClose}
       clickthroughEnabled={clickthrough > 0}
-      timeoutMs={timeoutPopups > 0 ? popupTimeout : 0}
+      timeoutMs={forcedTimeoutMs ?? (timeoutPopups > 0 ? popupTimeout : 0)}
       opacity={lkToggle === 1 && lkScaling > 0 ? lkScaling / 100 : 1}
     >
       <div

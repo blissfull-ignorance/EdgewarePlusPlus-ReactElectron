@@ -54,3 +54,16 @@ describe("collectSpawnBlockers", () => {
     expect(collectSpawnBlockers(settings({ timeoutPopups: 0, popupTimeout: 100 }), false)).toEqual([]);
   });
 });
+
+describe("collectSpawnBlockers with hibernate mode", () => {
+  it("does not flag a slow roll delay — bursts replace the roll loop", () => {
+    expect(
+      collectSpawnBlockers(settings({ delay: 60000, hibernateMode: 1, popupMod: 100 }), false)
+    ).toEqual([]);
+  });
+
+  it("still flags all-zero chances — bursts roll the same chances", () => {
+    const issues = collectSpawnBlockers(settings({ ...allZero, hibernateMode: 1 }), false);
+    expect(issues.join(" ")).toContain("Every popup chance is 0%");
+  });
+});

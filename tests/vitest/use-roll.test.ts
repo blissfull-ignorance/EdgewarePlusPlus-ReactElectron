@@ -180,3 +180,45 @@ describe("useRoll spawn-delay normalization (flood guard)", () => {
     expect(onSpawn).toHaveBeenCalledTimes(1);
   });
 });
+
+describe("useRoll hibernate pause (legacy: hibernate replaces the roll loop)", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    useAppStore.getState().start();
+    useSettingsStore.setState({
+      popupMod: 100,
+      vidMod: 0,
+      audioMod: 0,
+      promptMod: 0,
+      capPopChance: 0,
+      webMod: 0,
+      notificationChance: 0,
+      singleMode: 0,
+      delay: 1000,
+      hibernateMode: 1,
+    });
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    useAppStore.getState().stop();
+  });
+
+  it("does not tick while hibernateMode is on", () => {
+    const onSpawn = vi.fn();
+    renderHook(() => useRoll({ onSpawn }));
+    act(() => vi.advanceTimersByTime(10_000));
+    expect(onSpawn).not.toHaveBeenCalled();
+  });
+
+  it("resumes ticking when hibernateMode is turned off mid-session", () => {
+    const onSpawn = vi.fn();
+    renderHook(() => useRoll({ onSpawn }));
+    act(() => vi.advanceTimersByTime(3000));
+    expect(onSpawn).not.toHaveBeenCalled();
+
+    act(() => useSettingsStore.setState({ hibernateMode: 0 }));
+    act(() => vi.advanceTimersByTime(1100));
+    expect(onSpawn).toHaveBeenCalled();
+  });
+});

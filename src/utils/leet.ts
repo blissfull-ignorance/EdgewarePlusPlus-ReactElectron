@@ -34,48 +34,6 @@ export function levenshteinDistance(a: string, b: string): number {
 }
 
 /**
- * Compute the volume steps for a fade-in ramp.
- *
- * Legacy behavior: 60 ticks per second, 16ms intervals.
- * Volume ramps linearly from 0 to targetVolume over durationMs.
- */
-export function computeFadeInSteps(durationMs: number, targetVolume: number): number[] {
-  if (durationMs <= 0) return [targetVolume];
-
-  const tickRate = 60;
-  const interval = 1000 / tickRate;
-  const steps = Math.ceil(durationMs / interval);
-  const delta = targetVolume / steps;
-
-  const result: number[] = [];
-  for (let i = 0; i <= steps; i++) {
-    result.push(Math.min(targetVolume, i * delta));
-  }
-  return result;
-}
-
-/**
- * Compute the volume steps for a fade-out ramp.
- *
- * Legacy behavior: 60 ticks per second, 16ms intervals.
- * Volume ramps linearly from currentVolume to 0 over durationMs.
- */
-export function computeFadeOutSteps(durationMs: number, currentVolume: number): number[] {
-  if (durationMs <= 0) return [0];
-
-  const tickRate = 60;
-  const interval = 1000 / tickRate;
-  const steps = Math.ceil(durationMs / interval);
-  const delta = currentVolume / steps;
-
-  const result: number[] = [];
-  for (let i = 0; i <= steps; i++) {
-    result.push(Math.max(0, currentVolume - i * delta));
-  }
-  return result;
-}
-
-/**
  * Subliminal alpha inversion — preserved from legacy exactly.
  *
  * Legacy uses: int((1 - opacity) * 255)

@@ -141,7 +141,8 @@ export interface ElectronAPI {
     create: (
       type: "image" | "video" | "audio" | "subliminal" | "prompt",
       mediaId: string,
-      hypnoGif?: string
+      hypnoGif?: string,
+      pumpScare?: boolean
     ) => Promise<{ id: string }>;
     /** Close a single popup by its ID */
     closePopup: (id: string) => Promise<void>;
@@ -160,10 +161,8 @@ export interface ElectronAPI {
     onClosed: (callback: (id: string) => void) => () => void;
   };
   hibernate: {
-    /** Start hibernate scheduler with given burst type and duration (seconds) */
-    start: (type: string, durationInSec: number) => Promise<void>;
-    /** Stop the hibernate scheduler */
-    stop: () => Promise<void>;
+    /** Tray "Skip Hibernate": stand the renderer scheduler down. */
+    onSkip: (callback: () => void) => () => void;
   };
   scripting: {
     /** Execute a Lua script from the pack and return success/failure */
@@ -222,6 +221,8 @@ export interface ElectronAPI {
     loadSettings: () => Promise<Record<string, unknown> | null>;
     /** Synchronous last-chance write of settings from the renderer's unload hook */
     flushSettings: (values: Record<string, unknown>) => boolean;
+    /** Push the live settings into the main process cache (no disk write). */
+    pushSettings: (values: Record<string, unknown>) => void;
     /** Save settings to config.json on disk */
     saveSettings: (settings: Record<string, unknown>) => Promise<void>;
     /** Send a native desktop notification */

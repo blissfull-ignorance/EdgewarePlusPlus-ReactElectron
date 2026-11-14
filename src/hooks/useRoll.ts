@@ -77,6 +77,10 @@ export function useRoll(options: UseRollOptions = {}) {
     const raw = Number(s.delay);
     return Math.max(100, Number.isFinite(raw) ? raw : 5000);
   });
+  // Legacy: hibernate mode REPLACES the normal roll loop — while it is on,
+  // popups only ever come from bursts (main_edgeware.py). The scheduler hook
+  // owns the spawning in that case.
+  const hibernateMode = useSettingsStore((s) => s.hibernateMode);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const tick = useCallback(() => {
@@ -95,7 +99,7 @@ export function useRoll(options: UseRollOptions = {}) {
       intervalRef.current = null;
     }
 
-    if (!isRunning) return;
+    if (!isRunning || hibernateMode === 1) return;
 
     intervalRef.current = setInterval(tick, delay);
 
@@ -105,5 +109,5 @@ export function useRoll(options: UseRollOptions = {}) {
         intervalRef.current = null;
       }
     };
-  }, [isRunning, delay, tick]);
+  }, [isRunning, hibernateMode, delay, tick]);
 }

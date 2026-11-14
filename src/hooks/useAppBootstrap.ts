@@ -43,4 +43,23 @@ export function useAppBootstrap(isPopupRoute: boolean) {
     }, 5000);
     return () => clearInterval(interval);
   }, [isPopupRoute]);
+
+  // Main-process readers (popup geometry) must see settings changes at once,
+  // not at the next autosave tick: every change is pushed into the main-side
+  // cache. Persistence still runs on the autosave cadence.
+  useEffect(() => {
+    if (isPopupRoute) return;
+    let last = "";
+    const push = () => {
+      const store = useSettingsStore.getState();
+      if (!store.loaded) return;
+      const record = collectSettingsValues(store);
+      const json = JSON.stringify(record);
+      if (json === last) return;
+      last = json;
+      window.api?.system.pushSettings?.(record);
+    };
+    push();
+    return useSettingsStore.subscribe(push);
+  }, [isPopupRoute]);
 }

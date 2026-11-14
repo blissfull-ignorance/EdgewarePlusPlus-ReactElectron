@@ -1,161 +1,143 @@
+/**
+ * @file HibernateScheduler — pure scheduling for legacy hibernate mode
+ * (legacy-python features/hibernate.py).
+ *
+ * Hibernate replaces the normal popup loop: sleep a random delay in
+ * [hibernateMin, hibernateMax], fire a burst, repeat. A burst is a list of
+ * tick delays; each tick rolls the popup targets exactly like a normal tick.
+ * All randomness arrives through `rand` so the schedules are deterministic
+ * under test; hostile settings are clamped so a burst can never allocate an
+ * unbounded timer array.
+ */
+
 export type BurstType = "Original" | "Spaced" | "Glitch" | "Ramp" | "Pump-Scare" | "Chaos";
 
-export interface BurstScheduleOptions {
+/** Hostile wakeupActivity guard: a burst never queues more ticks than this. */
+export const MAX_BURST_POPUPS = 1000;
+/** Hostile hibernateLength guard: one hour of burst at most. */
+export const MAX_BURST_DURATION_MS = 3_600_000;
+/** Same floor the roll loop uses for a hand-edited delay. */
+export const MIN_TICK_DELAY_MS = 100;
+
+const CHAOS_TYPES: BurstType[] = ["Original", "Spaced", "Glitch", "Ramp", "Pump-Scare"];
+
+export interface BurstPlan {
+  /** Chaos is resolved to the concrete type that will run. */
   type: BurstType;
-  numPopups: number;
-  burstDuration: number;
-  seed: number;
-}
-
-export interface BurstSchedule {
-  intervals: number[];
-  selectedType: BurstType;
   isPumpScare: boolean;
+  /**
+   * Delay before each tick; the first entry is the delay before the first
+   * spawn (0 = immediate). Sum ≈ the burst's wall-clock length.
+   */
+  intervalsMs: number[];
 }
 
-const CHAOS_TYPES: BurstType[] = ["Spaced", "Glitch", "Ramp", "Pump-Scare"];
-
-/**
- * Simple deterministic random number generator (Mulberry32).
- * Returns values in [0, 1).
- */
-function mulberry32(seed: number): () => number {
-  let state = seed | 0;
-  return () => {
-    state = (state + 0x6d2b79f5) | 0;
-    let t = Math.imul(state ^ (state >>> 15), 1 | state);
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
+export interface BurstPlanOptions {
+  type: BurstType;
+  wakeupActivity: number;
+  hibernateLengthMs: number;
+  popupDelayMs: number;
+  rand: () => number;
 }
 
-/**
- * Spaced: distribute N popups evenly over burstDuration.
- * Returns array of intervals between each popup.
- */
-export function computeSpacedIntervals(numPopups: number, burstDuration: number, _seed: number): number[] {
-  if (numPopups === 0) return [];
-  const interval = burstDuration / numPopups;
-  return Array.from({ length: numPopups }, () => interval);
+function clampInt(value: number, min: number, max: number, fallback: number): number {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return fallback;
+  return Math.min(max, Math.max(min, Math.round(n)));
 }
 
-/**
- * Glitch: distribute N popups at random intervals over burstDuration.
- * Uses random break points summed to total duration.
- */
-export function computeGlitchIntervals(numPopups: number, burstDuration: number, seed: number): number[] {
-  if (numPopups === 0) return [];
-  if (numPopups === 1) return [burstDuration];
+/** Legacy `random.randint(a, b)` — inclusive on both ends. */
+function randInt(rand: () => number, min: number, max: number): number {
+  if (max <= min) return min;
+  return min + Math.floor(rand() * (max - min + 1));
+}
 
-  const rand = mulberry32(seed);
-  const breakpoints: number[] = [];
-  for (let i = 0; i < numPopups - 1; i++) {
-    breakpoints.push(rand() * burstDuration);
-  }
-  breakpoints.sort((a, b) => a - b);
-
-  const intervals: number[] = [];
-  let prev = 0;
-  for (const bp of breakpoints) {
-    intervals.push(bp - prev);
-    prev = bp;
-  }
-  intervals.push(burstDuration - prev);
-
-  return intervals;
+export function resolveBurstType(type: BurstType, rand: () => number): BurstType {
+  if (type !== "Chaos") return type;
+  return CHAOS_TYPES[Math.min(CHAOS_TYPES.length - 1, Math.floor(rand() * CHAOS_TYPES.length))];
 }
 
 /**
- * Ramp: accelerating frequency — early intervals are long, later intervals are short.
- * Uses exponential decay: interval[i] proportional to (1 - i/(N-1))^2
+ * Delay in ms until the next burst: randint(min, max), tolerant of a hostile
+ * or inverted range (min > max collapses to min).
  */
-export function computeRampIntervals(numPopups: number, burstDuration: number, _seed: number): number[] {
-  if (numPopups === 0) return [];
-  if (numPopups === 1) return [burstDuration];
-
-  const weights: number[] = [];
-  let weightSum = 0;
-  for (let i = 0; i < numPopups; i++) {
-    const progress = i / (numPopups - 1);
-    const weight = Math.pow(1 - progress, 2);
-    weights.push(weight);
-    weightSum += weight;
-  }
-
-  return weights.map((w) => (w / weightSum) * burstDuration);
+export function computeNextHibernateDelay(
+  min: number,
+  max: number,
+  rand: () => number
+): number {
+  const lo = clampInt(min, 0, MAX_BURST_DURATION_MS, 0);
+  const hi = clampInt(max, 0, MAX_BURST_DURATION_MS, 0);
+  if (hi <= lo) return lo;
+  return randInt(rand, lo, hi);
 }
 
 /**
- * Pump-Scare: very brief intervals — popup flashes on then off immediately.
- * Intervals are tiny fractions of the burst duration (simulating rapid on/off).
+ * Plan one burst. Tick counts and gaps follow the legacy per-type loops:
+ * - Original: randint(activity/2, activity) immediate ticks.
+ * - Spaced: a tick every popup delay for hibernateLength (delay-driven).
+ * - Glitch: `activity` ticks; gap = choice([0, base, base/m, base*m]).
+ * - Ramp: `activity` ticks accelerating from length/4 gaps toward delay*0.9.
+ * - Pump-Scare: a single tick (the caller spawns one image + one audio).
  */
-export function computePumpScareIntervals(numPopups: number, burstDuration: number, _seed: number): number[] {
-  if (numPopups === 0) return [];
-  const interval = burstDuration / numPopups;
-  return Array.from({ length: numPopups }, () => Math.max(50, interval * 0.05));
-}
+export function planBurst({
+  type,
+  wakeupActivity,
+  hibernateLengthMs,
+  popupDelayMs,
+  rand,
+}: BurstPlanOptions): BurstPlan {
+  const resolved = resolveBurstType(type, rand);
+  const activity = clampInt(wakeupActivity, 1, MAX_BURST_POPUPS, 20);
+  const length = clampInt(hibernateLengthMs, 0, MAX_BURST_DURATION_MS, 15000);
+  const delay = clampInt(popupDelayMs, MIN_TICK_DELAY_MS, MAX_BURST_DURATION_MS, 5000);
 
-/**
- * Original: instant barrage — all popups fire at once (0ms intervals).
- */
-function computeOriginalIntervals(numPopups: number): number[] {
-  return Array.from({ length: numPopups }, () => 0);
-}
-
-/**
- * Select a random burst type for Chaos mode.
- */
-export function selectChaosType(seed: number): BurstType {
-  const idx = seed % CHAOS_TYPES.length;
-  return CHAOS_TYPES[Math.abs(idx)];
-}
-
-/**
- * Compute the full burst schedule based on type.
- */
-export function computeBurstSchedule({ type, numPopups, burstDuration, seed }: BurstScheduleOptions): BurstSchedule {
-  let resolvedType = type;
-  if (type === "Chaos") {
-    resolvedType = selectChaosType(seed);
+  if (resolved === "Pump-Scare") {
+    return { type: resolved, isPumpScare: true, intervalsMs: [0] };
   }
 
-  let intervals: number[];
-  let isPumpScare = false;
-
-  switch (resolvedType) {
-    case "Original":
-      intervals = computeOriginalIntervals(numPopups);
-      break;
-    case "Spaced":
-      intervals = computeSpacedIntervals(numPopups, burstDuration, seed);
-      break;
-    case "Glitch":
-      intervals = computeGlitchIntervals(numPopups, burstDuration, seed);
-      break;
-    case "Ramp":
-      intervals = computeRampIntervals(numPopups, burstDuration, seed);
-      break;
-    case "Pump-Scare":
-      intervals = computePumpScareIntervals(numPopups, burstDuration, seed);
-      isPumpScare = true;
-      break;
-    default:
-      intervals = computeOriginalIntervals(numPopups);
+  if (resolved === "Original") {
+    const count = randInt(rand, Math.floor(activity / 2), activity);
+    return { type: resolved, isPumpScare: false, intervalsMs: Array.from({ length: count }, () => 0) };
   }
 
-  return {
-    intervals,
-    selectedType: resolvedType,
-    isPumpScare,
-  };
-}
+  if (resolved === "Spaced") {
+    const count = Math.max(1, Math.floor(length / delay));
+    const intervals = [0];
+    for (let i = 1; i < count; i++) intervals.push(delay);
+    return { type: resolved, isPumpScare: false, intervalsMs: intervals };
+  }
 
-/**
- * Compute the delay (in ms) until the next hibernate burst.
- * Returns a random value between min and max (inclusive).
- */
-export function computeNextHibernateDelay(min: number, max: number, seed: number): number {
-  if (min === max) return min;
-  const rand = mulberry32(seed);
-  return Math.floor(min + rand() * (max - min));
+  if (resolved === "Glitch") {
+    const base = Math.max(1, Math.floor(length / activity));
+    const intervals = [0];
+    for (let i = 1; i < activity; i++) {
+      const modifier = randInt(rand, 2, 4);
+      const choices = [0, base, Math.floor(base / modifier), base * modifier];
+      intervals.push(choices[Math.min(choices.length - 1, Math.floor(rand() * choices.length))]);
+    }
+    return { type: resolved, isPumpScare: false, intervalsMs: intervals };
+  }
+
+  // Ramp: legacy loop — gap starts at length/4 and shrinks by an accelerating
+  // divisor; once under 100 ms the cadence locks to delay*0.9.
+  const intervals = [0];
+  let delayModifier = Math.max(1, Math.floor(length / 4));
+  let accelerate = 1;
+  let elapsed = 0;
+  let halfway = false;
+  for (let i = 1; i < activity; i++) {
+    if (!halfway && elapsed >= length / 2) halfway = true;
+    let gap: number;
+    if (delayModifier < 100) {
+      gap = Math.floor(delay * 0.9);
+    } else {
+      accelerate *= halfway ? 1.05 : 1.1;
+      delayModifier = delayModifier / accelerate;
+      gap = Math.round(delay + delayModifier);
+    }
+    intervals.push(gap);
+    elapsed += gap;
+  }
+  return { type: resolved, isPumpScare: false, intervalsMs: intervals };
 }

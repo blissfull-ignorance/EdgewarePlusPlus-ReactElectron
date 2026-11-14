@@ -21,11 +21,16 @@ export function usePopupLifecycle() {
   const decrementPopups = useAppStore((s) => s.decrementPopups);
 
   const spawnPopup = useCallback(
-      async (type: "image" | "video" | "audio" | "subliminal" | "prompt", mediaId: string, hypnoGif?: string): Promise<string | null> => {
+      async (
+        type: "image" | "video" | "audio" | "subliminal" | "prompt",
+        mediaId: string,
+        hypnoGif?: string,
+        pumpScare?: boolean
+      ): Promise<string | null> => {
       if (!window.api) return null;
 
       try {
-        const result = await window.api.popup.create(type, mediaId, hypnoGif);
+        const result = await window.api.popup.create(type, mediaId, hypnoGif, pumpScare);
         if (!result || !result.id) {
           console.error("[usePopupLifecycle] popup:create returned no id");
           return null;

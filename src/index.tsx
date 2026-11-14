@@ -4,10 +4,18 @@ import "@mantine/core/styles.css";
 import "@mantine/dropzone/styles.css";
 import App from "./App";
 import { useSettingsStore } from "./stores/settingsStore";
+import { bootstrapDecision, isElectronRenderer, PreloadFailureScreen } from "./features/preloadGuard";
 import "./styles.css";
 
-// Mock window.api for non-Electron environments (Vite dev server, Playwright E2E)
-if (typeof window !== "undefined" && !(window as unknown as Record<string, unknown>).api) {
+// The fallback stub is for non-Electron environments only (Vite dev server,
+// browser-layer E2E). Inside Electron a missing bridge is a broken install
+// and must surface, not be papered over.
+const boot = bootstrapDecision(
+  typeof navigator !== "undefined" && isElectronRenderer(navigator.userAgent),
+  typeof window !== "undefined" && Boolean((window as unknown as Record<string, unknown>).api)
+);
+
+if (boot === "stub" && typeof window !== "undefined") {
   (window as unknown as Record<string, unknown>).api = {
     pack: {
       loadInfo: async () => null,
@@ -63,7 +71,9 @@ if (typeof window !== "undefined" && !(window as unknown as Record<string, unkno
       onBlocked: () => () => {},
     },
     popup: {
-      create: async (_type: string, _mediaId: string, _hypnoGif?: string) => ({ id: `popup-${Date.now()}` }),
+      create: async (_type: string, _mediaId: string, _hypnoGif?: string, _pumpScare?: boolean) => ({
+        id: `popup-${Date.now()}`,
+      }),
       closePopup: async () => undefined,
       closeAll: async () => undefined,
       sizeToMedia: async (_id: string, _w: number, _h: number, _lowkey?: boolean) => ({ width: 400, height: 300 }),
@@ -71,8 +81,7 @@ if (typeof window !== "undefined" && !(window as unknown as Record<string, unkno
       onClosed: () => () => {},
     },
     hibernate: {
-      start: async () => undefined,
-      stop: async () => undefined,
+      onSkip: () => () => {},
     },
     scripting: {
       runLua: async () => false,
@@ -111,6 +120,7 @@ if (typeof window !== "undefined" && !(window as unknown as Record<string, unkno
       // harness starts straight on the app UI.
       loadSettings: async () => ({ showLoadingFlair: 0 }),
       flushSettings: () => true,
+      pushSettings: () => undefined,
       saveSettings: async () => undefined,
       sendNotification: async () => undefined,
       openExternal: async () => false,
@@ -133,7 +143,11 @@ const container = document.getElementById("root")!;
 const root = createRoot(container);
 
 root.render(
-  <StrictMode>
-    <App />
-  </StrictMode>
+  boot === "fatal" ? (
+    <PreloadFailureScreen />
+  ) : (
+    <StrictMode>
+      <App />
+    </StrictMode>
+  )
 );

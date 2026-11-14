@@ -1,216 +1,188 @@
 import { describe, expect, it } from "vitest";
 import {
-  computeBurstSchedule,
-  computeSpacedIntervals,
-  computeGlitchIntervals,
-  computeRampIntervals,
-  computePumpScareIntervals,
-  selectChaosType,
   computeNextHibernateDelay,
+  planBurst,
+  resolveBurstType,
+  MAX_BURST_POPUPS,
 } from "../../src/features/hibernate/HibernateScheduler";
 
-describe("computeSpacedIntervals", () => {
-  it("distributes popups evenly over duration", () => {
-    const intervals = computeSpacedIntervals(5, 1000, 0);
-    expect(intervals.length).toBe(5);
-    const total = intervals.reduce((sum, val) => sum + val, 0);
-    expect(total).toBe(1000);
-    const expectedInterval = 1000 / 5;
-    for (const interval of intervals) {
-      expect(interval).toBeCloseTo(expectedInterval, -1);
-    }
+/** Deterministic rand from a fixed sequence. */
+function seq(values: number[]): () => number {
+  let i = 0;
+  return () => values[i++ % values.length];
+}
+
+describe("computeNextHibernateDelay (legacy randint(min, max))", () => {
+  it("is inclusive on both ends", () => {
+    expect(computeNextHibernateDelay(1000, 2000, () => 0)).toBe(1000);
+    expect(computeNextHibernateDelay(1000, 2000, () => 0.999999)).toBe(2000);
+    expect(computeNextHibernateDelay(1000, 2000, () => 0.5)).toBe(1500);
   });
 
-  it("returns empty array for zero popups", () => {
-    const intervals = computeSpacedIntervals(0, 1000, 0);
-    expect(intervals).toEqual([]);
+  it("collapses an inverted or equal range to the minimum", () => {
+    expect(computeNextHibernateDelay(5000, 1000, () => 0.7)).toBe(5000);
+    expect(computeNextHibernateDelay(3000, 3000, () => 0.1)).toBe(3000);
   });
 
-  it("returns single interval for one popup", () => {
-    const intervals = computeSpacedIntervals(1, 1000, 0);
-    expect(intervals).toEqual([1000]);
-  });
-});
-
-describe("computeGlitchIntervals", () => {
-  it("creates popups at irregular intervals", () => {
-    const intervals1 = computeGlitchIntervals(5, 1000, 0);
-    const intervals2 = computeGlitchIntervals(5, 1000, 42);
-
-    expect(intervals1.length).toBe(5);
-    expect(intervals2.length).toBe(5);
-
-    // Glitch intervals should vary between different seeds
-    const total1 = intervals1.reduce((sum, val) => sum + val, 0);
-    const total2 = intervals2.reduce((sum, val) => sum + val, 0);
-    expect(total1).toBeCloseTo(1000, -1);
-    expect(total2).toBeCloseTo(1000, -1);
-
-    // Intervals from different seeds should differ
-    const allSame = intervals1.every((val, i) => Math.abs(val - intervals2[i]) < 0.01);
-    expect(allSame).toBe(false);
-  });
-
-  it("each interval is positive", () => {
-    const intervals = computeGlitchIntervals(3, 500, 0);
-    for (const interval of intervals) {
-      expect(interval).toBeGreaterThan(0);
-    }
+  it("clamps hostile ranges to the burst-duration ceiling", () => {
+    expect(computeNextHibernateDelay(0, 1e12, () => 0.5)).toBeLessThanOrEqual(3_600_000);
+    expect(computeNextHibernateDelay(Number.NaN, 1000, () => 0)).toBe(0);
   });
 });
 
-describe("computeRampIntervals", () => {
-  it("creates popups with increasing frequency", () => {
-    const intervals = computeRampIntervals(5, 1000, 0);
-    expect(intervals.length).toBe(5);
-
-    // First intervals should be longer than last intervals
-    const firstHalf = intervals.slice(0, Math.floor(intervals.length / 2));
-    const secondHalf = intervals.slice(Math.floor(intervals.length / 2));
-
-    const avgFirst = firstHalf.reduce((sum, val) => sum + val, 0) / firstHalf.length;
-    const avgSecond = secondHalf.reduce((sum, val) => sum + val, 0) / secondHalf.length;
-
-    expect(avgFirst).toBeGreaterThan(avgSecond);
+describe("resolveBurstType", () => {
+  it("passes concrete types through", () => {
+    expect(resolveBurstType("Glitch", () => 0)).toBe("Glitch");
   });
 
-  it("total duration roughly matches target", () => {
-    const intervals = computeRampIntervals(5, 1000, 0);
-    const total = intervals.reduce((sum, val) => sum + val, 0);
-    expect(total).toBeCloseTo(1000, -1);
-  });
-
-  it("returns empty array for zero popups", () => {
-    const intervals = computeRampIntervals(0, 1000, 0);
-    expect(intervals).toEqual([]);
+  it("Chaos picks among the five real types — Original included (legacy)", () => {
+    const seen = new Set<string>();
+    for (let i = 0; i < 5; i++) seen.add(resolveBurstType("Chaos", seq([i / 5])));
+    expect(seen.has("Original")).toBe(true);
+    expect(seen.has("Spaced")).toBe(true);
+    expect(seen.has("Glitch")).toBe(true);
+    expect(seen.has("Ramp")).toBe(true);
+    expect(seen.has("Pump-Scare")).toBe(true);
+    expect(seen.has("Chaos")).toBe(false);
   });
 });
 
-describe("computePumpScareIntervals", () => {
-  it("creates very short intervals for rapid flash effect", () => {
-    const intervals = computePumpScareIntervals(5, 5000, 0);
-    expect(intervals.length).toBe(5);
-    for (const interval of intervals) {
-      expect(interval).toBeGreaterThanOrEqual(50);
-      expect(interval).toBeLessThan(500);
-    }
-  });
-
-  it("intervals are very short compared to burst duration", () => {
-    const intervals = computePumpScareIntervals(5, 5000, 0);
-    const maxInterval = Math.max(...intervals);
-    expect(maxInterval).toBeLessThan(5000 / 5);
-  });
-});
-
-describe("computeBurstSchedule", () => {
-  it("schedules spaced burst correctly", () => {
-    const schedule = computeBurstSchedule({
-      type: "Spaced",
-      numPopups: 4,
-      burstDuration: 4000,
-      seed: 0,
-    });
-
-    expect(schedule.intervals.length).toBe(4);
-    const total = schedule.intervals.reduce((sum, val) => sum + val, 0);
-    expect(total).toBeCloseTo(4000, -1);
-  });
-
-  it("schedules glitch burst correctly", () => {
-    const schedule = computeBurstSchedule({
-      type: "Glitch",
-      numPopups: 4,
-      burstDuration: 4000,
-      seed: 42,
-    });
-
-    expect(schedule.intervals.length).toBe(4);
-  });
-
-  it("schedules ramp burst correctly", () => {
-    const schedule = computeBurstSchedule({
-      type: "Ramp",
-      numPopups: 4,
-      burstDuration: 4000,
-      seed: 0,
-    });
-
-    expect(schedule.intervals.length).toBe(4);
-    const firstHalf = schedule.intervals.slice(0, 2);
-    const secondHalf = schedule.intervals.slice(2);
-    const avgFirst = firstHalf.reduce((s, v) => s + v, 0) / 2;
-    const avgSecond = secondHalf.reduce((s, v) => s + v, 0) / 2;
-    expect(avgFirst).toBeGreaterThan(avgSecond);
-  });
-
-  it("schedules pump-scare burst correctly", () => {
-    const schedule = computeBurstSchedule({
-      type: "Pump-Scare",
-      numPopups: 4,
-      burstDuration: 4000,
-      seed: 0,
-    });
-
-    expect(schedule.intervals.length).toBe(4);
-    expect(schedule.isPumpScare).toBe(true);
-  });
-
-  it("schedules original burst as instant barrage", () => {
-    const schedule = computeBurstSchedule({
+describe("planBurst — Original (instant barrage)", () => {
+  it("spawns randint(activity/2, activity) immediate ticks", () => {
+    const plan = planBurst({
       type: "Original",
-      numPopups: 4,
-      burstDuration: 4000,
-      seed: 0,
+      wakeupActivity: 20,
+      hibernateLengthMs: 15000,
+      popupDelayMs: 5000,
+      rand: seq([0]),
     });
-
-    expect(schedule.intervals.length).toBe(4);
-    for (const interval of schedule.intervals) {
-      expect(interval).toBe(0);
-    }
+    expect(plan.intervalsMs).toHaveLength(10); // randint(10, 20) with rand 0 → 10
+    expect(plan.intervalsMs.every((i) => i === 0)).toBe(true);
   });
 
-  it("schedules chaos burst selecting random type", () => {
-    const schedule = computeBurstSchedule({
-      type: "Chaos",
-      numPopups: 4,
-      burstDuration: 4000,
-      seed: 123,
+  it("upper end of the range with rand near 1", () => {
+    const plan = planBurst({
+      type: "Original",
+      wakeupActivity: 20,
+      hibernateLengthMs: 15000,
+      popupDelayMs: 5000,
+      rand: () => 0.999999,
     });
-
-    expect(schedule.intervals.length).toBe(4);
-    expect(["Spaced", "Glitch", "Ramp", "Pump-Scare"]).toContain(schedule.selectedType);
+    expect(plan.intervalsMs).toHaveLength(20);
   });
 });
 
-describe("selectChaosType", () => {
-  it("returns one of the valid burst types", () => {
-    const validTypes = ["Spaced", "Glitch", "Ramp", "Pump-Scare"];
-    for (let i = 0; i < 20; i++) {
-      const selected = selectChaosType(i);
-      expect(validTypes).toContain(selected);
-    }
+describe("planBurst — Spaced (delay-driven, legacy)", () => {
+  it("ticks every popup delay for the burst length, not by wakeupActivity", () => {
+    const plan = planBurst({
+      type: "Spaced",
+      wakeupActivity: 999, // must be ignored
+      hibernateLengthMs: 10000,
+      popupDelayMs: 2000,
+      rand: () => 0,
+    });
+    expect(plan.intervalsMs).toEqual([0, 2000, 2000, 2000, 2000]); // floor(10000/2000) ticks
   });
 
-  it("deterministic based on seed", () => {
-    expect(selectChaosType(0)).toBe(selectChaosType(0));
-    expect(selectChaosType(5)).toBe(selectChaosType(5));
+  it("always ticks at least once", () => {
+    const plan = planBurst({
+      type: "Spaced",
+      wakeupActivity: 5,
+      hibernateLengthMs: 100,
+      popupDelayMs: 5000,
+      rand: () => 0,
+    });
+    expect(plan.intervalsMs).toEqual([0]);
   });
 });
 
-describe("computeNextHibernateDelay", () => {
-  it("returns delay within min-max range", () => {
-    const min = 30000;
-    const max = 60000;
-    for (let seed = 0; seed < 50; seed++) {
-      const delay = computeNextHibernateDelay(min, max, seed);
-      expect(delay).toBeGreaterThanOrEqual(min);
-      expect(delay).toBeLessThanOrEqual(max);
-    }
+describe("planBurst — Glitch (legacy choice-set gaps)", () => {
+  it("produces activity ticks whose gaps come from [0, base, base/m, base*m]", () => {
+    const plan = planBurst({
+      type: "Glitch",
+      wakeupActivity: 4,
+      hibernateLengthMs: 12000,
+      popupDelayMs: 5000,
+      rand: seq([0, 0, 0, 0, 0, 0, 0]),
+    });
+    expect(plan.intervalsMs).toHaveLength(4);
+    expect(plan.intervalsMs[0]).toBe(0);
+    // base = 12000/4 = 3000; with rand 0: modifier=2, choice index 0 → gap 0.
+    expect(plan.intervalsMs.slice(1).every((g) => [0, 3000, 1500, 750, 6000, 12000].includes(g))).toBe(
+      true
+    );
   });
 
-  it("returns min when min equals max", () => {
-    const delay = computeNextHibernateDelay(5000, 5000, 0);
-    expect(delay).toBe(5000);
+  it("sums to a plausible burst window", () => {
+    const plan = planBurst({
+      type: "Glitch",
+      wakeupActivity: 10,
+      hibernateLengthMs: 10000,
+      popupDelayMs: 5000,
+      rand: seq([0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5]),
+    });
+    const total = plan.intervalsMs.reduce((a, b) => a + b, 0);
+    expect(total).toBeLessThanOrEqual(10 * (10000 / 10) * 4);
+  });
+});
+
+describe("planBurst — Ramp (accelerating)", () => {
+  it("gaps shrink over the burst and lock to delay*0.9 below the floor", () => {
+    const plan = planBurst({
+      type: "Ramp",
+      wakeupActivity: 30,
+      hibernateLengthMs: 20000,
+      popupDelayMs: 1000,
+      rand: () => 0,
+    });
+    expect(plan.intervalsMs[0]).toBe(0);
+    const gaps = plan.intervalsMs.slice(1);
+    // Early gaps are large (length/4 territory), later gaps hit the 0.9*delay floor.
+    expect(gaps[0]).toBeGreaterThan(gaps[gaps.length - 1]);
+    expect(gaps[gaps.length - 1]).toBe(900);
+    // Monotonic non-increasing overall trend: first half average > second half.
+    const half = Math.floor(gaps.length / 2);
+    const avg = (a: number[]) => a.reduce((x, y) => x + y, 0) / a.length;
+    expect(avg(gaps.slice(0, half))).toBeGreaterThan(avg(gaps.slice(half)));
+  });
+});
+
+describe("planBurst — Pump-Scare", () => {
+  it("is a single tick flagged pump-scare (caller spawns image+audio)", () => {
+    const plan = planBurst({
+      type: "Pump-Scare",
+      wakeupActivity: 20,
+      hibernateLengthMs: 15000,
+      popupDelayMs: 5000,
+      rand: () => 0,
+    });
+    expect(plan.isPumpScare).toBe(true);
+    expect(plan.intervalsMs).toEqual([0]);
+  });
+});
+
+describe("planBurst — hostile settings clamps", () => {
+  it("caps a runaway wakeupActivity so no unbounded array is allocated", () => {
+    const plan = planBurst({
+      type: "Original",
+      wakeupActivity: 1e9,
+      hibernateLengthMs: 15000,
+      popupDelayMs: 5000,
+      rand: () => 0.5,
+    });
+    expect(plan.intervalsMs.length).toBeLessThanOrEqual(MAX_BURST_POPUPS);
+    expect(plan.intervalsMs.length).toBeGreaterThan(0);
+  });
+
+  it("survives NaN settings with sane defaults", () => {
+    const plan = planBurst({
+      type: "Spaced",
+      wakeupActivity: Number.NaN,
+      hibernateLengthMs: Number.NaN,
+      popupDelayMs: Number.NaN,
+      rand: () => 0,
+    });
+    expect(plan.intervalsMs.length).toBeGreaterThanOrEqual(1);
+    expect(plan.intervalsMs.every((n) => Number.isFinite(n) && n >= 0)).toBe(true);
   });
 });

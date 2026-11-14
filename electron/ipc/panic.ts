@@ -23,8 +23,7 @@ import { destroyDiscord } from "./discord";
 import { closeAllPopups } from "./popup";
 import { activePackPath } from "./pack";
 import { getLuaVM } from "../scripting/fengariAdapter";
-import { setWallpaper } from "../utils/wallpaper";
-import { beforeWallpaperChange } from "../utils/wallpaperMemory";
+import { applyWallpaper } from "../utils/wallpaperMemory";
 
 export interface PanicResult {
   ok: boolean;
@@ -86,8 +85,7 @@ async function doPanic(): Promise<void> {
     try {
       const realPath = materializePanicWallpaper();
       if (realPath) {
-        await beforeWallpaperChange();
-        await setWallpaper(realPath);
+        await applyWallpaper(realPath);
       }
     } catch (err) {
       logger.error("[Panic] Failed to set panic wallpaper:", err);

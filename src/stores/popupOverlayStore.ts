@@ -25,12 +25,19 @@ export interface InAppPopup {
   mediaId: string;
   /** Optional spiral GIF to overlay on top of an image/video pop. */
   hypnoGif?: string;
+  /** Legacy pump-scare: this pop force-closes shortly after opening. */
+  pumpScare?: boolean;
   position: InAppPopupPosition;
 }
 
 export interface PopupOverlayState {
   popups: InAppPopup[];
-  addPopup: (popup: { type: InAppPopupType; mediaId: string; hypnoGif?: string }) => string;
+  addPopup: (popup: {
+    type: InAppPopupType;
+    mediaId: string;
+    hypnoGif?: string;
+    pumpScare?: boolean;
+  }) => string;
   removePopup: (id: string) => void;
   clearAll: () => void;
 }
@@ -52,7 +59,7 @@ export const usePopupOverlayStore = create<PopupOverlayState>()(
   devtools(
     (set) => ({
       popups: [],
-      addPopup: ({ type, mediaId, hypnoGif }) => {
+      addPopup: ({ type, mediaId, hypnoGif, pumpScare }) => {
         popupCounter += 1;
         const id = `popup-${Date.now()}-${popupCounter}`;
         const width = 300 + Math.floor(Math.random() * 200);
@@ -62,6 +69,7 @@ export const usePopupOverlayStore = create<PopupOverlayState>()(
           type,
           mediaId,
           hypnoGif,
+          pumpScare,
           position: randomPosition(width, height),
         };
         set((s) => ({ popups: [...s.popups, popup] }));

@@ -53,7 +53,7 @@ function writeState(state: WallpaperState): void {
 }
 
 /** Call before every wallpaper change the app itself causes. */
-export async function beforeWallpaperChange(): Promise<void> {
+async function beforeWallpaperChange(): Promise<void> {
   if (disabled()) return;
   try {
     const existing = readState();
@@ -71,6 +71,27 @@ export async function beforeWallpaperChange(): Promise<void> {
   }
 }
 
+/**
+ * Cache the original, then apply the new wallpaper. If the apply fails and
+ * this change is what dirtied the state, the flag is cleared again: a
+ * wallpaper that never actually changed should not leave a restore pending.
+ * A crash before returning keeps the flag set — a pending restore is the
+ * crash-safe direction.
+ */
+export async function applyWallpaper(filepath: string): Promise<void> {
+  const alreadyDirty = readState()?.dirty === true;
+  await beforeWallpaperChange();
+  try {
+    await setWallpaper(filepath);
+  } catch (err) {
+    if (!alreadyDirty) {
+      const state = readState();
+      if (state?.dirty) writeState({ ...state, dirty: false });
+    }
+    throw err;
+  }
+}
+
 /** Restore the cached original when a previous change left it applied. */
 export async function restoreWallpaperIfDirty(): Promise<boolean> {
   if (disabled()) return false;
@@ -80,6 +101,18 @@ export async function restoreWallpaperIfDirty(): Promise<boolean> {
     logger.warn(`[Wallpaper] Cached original no longer exists: ${state.original}`);
     writeState({ ...state, dirty: false });
     return false;
+  }
+  // Verify before re-applying: if the desktop already shows the original
+  // (a failed apply, or the user restored it themselves), retire the flag
+  // instead of performing a pointless visible re-set.
+  try {
+    const current = await getWallpaper();
+    if (current === state.original) {
+      writeState({ ...state, dirty: false });
+      return false;
+    }
+  } catch (err) {
+    logger.warn("[Wallpaper] Could not read the current wallpaper; restoring anyway:", err);
   }
   logger.info(`[Wallpaper] Restoring the original wallpaper: ${state.original}`);
   await setWallpaper(state.original);

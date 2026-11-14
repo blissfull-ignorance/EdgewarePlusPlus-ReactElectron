@@ -311,3 +311,51 @@ describe("system IPC handlers (pack import / discovery / selection)", () => {
     expect(JSON.parse(readFileSync(configPath(), "utf-8"))).toEqual({ popupMod: 42 });
   });
 });
+
+describe("settings live cache (push-through)", () => {
+  let cacheRoot: string;
+  const configPath = () => path.join(cacheRoot, "data", "config.json");
+
+  beforeAll(() => {
+    cacheRoot = mkdtempSync(path.join(tmpdir(), "ewpp-settings-cache-"));
+  });
+
+  beforeEach(async () => {
+    (globalThis as { __EWPP_TEST_USER_DATA?: string }).__EWPP_TEST_USER_DATA = cacheRoot;
+    rmSync(path.join(cacheRoot, "data"), { recursive: true, force: true });
+    handlers = {};
+    vi.resetModules();
+    const { registerHandlers } = await import("../../electron/ipc/system");
+    registerHandlers();
+  });
+
+  afterAll(() => {
+    rmSync(cacheRoot, { recursive: true, force: true });
+    delete (globalThis as { __EWPP_TEST_USER_DATA?: string }).__EWPP_TEST_USER_DATA;
+  });
+
+  it("system:pushSettings refreshes loadSettings without touching the disk", async () => {
+    mkdirSync(path.dirname(configPath()), { recursive: true });
+    writeFileSync(configPath(), JSON.stringify({ lkCorner: 1 }));
+
+    handlers["system:pushSettings"]({}, { lkCorner: 3, popupMod: 7 });
+
+    expect(await handlers["system:loadSettings"]()).toEqual({ lkCorner: 3, popupMod: 7 });
+    // Persistence is still the save paths' job alone.
+    expect(JSON.parse(readFileSync(configPath(), "utf-8"))).toEqual({ lkCorner: 1 });
+  });
+
+  it("saveSettings refreshes the cache as part of persisting", async () => {
+    await handlers["system:saveSettings"]({}, { lkCorner: 2 });
+    expect(await handlers["system:loadSettings"]()).toEqual({ lkCorner: 2 });
+    expect(JSON.parse(readFileSync(configPath(), "utf-8"))).toEqual({ lkCorner: 2 });
+  });
+
+  it("pushSettings ignores payloads that are not settings objects", async () => {
+    mkdirSync(path.dirname(configPath()), { recursive: true });
+    writeFileSync(configPath(), JSON.stringify({ lkCorner: 1 }));
+    handlers["system:pushSettings"]({}, "garbage");
+    handlers["system:pushSettings"]({}, [1, 2]);
+    expect(await handlers["system:loadSettings"]()).toEqual({ lkCorner: 1 });
+  });
+});

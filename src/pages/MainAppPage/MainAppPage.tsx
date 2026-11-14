@@ -11,7 +11,8 @@ import { ErrorBoundary } from "../../components/ErrorBoundary";
 import { AppFrame, type MainView } from "../../components/shell/AppFrame";
 import { GalleryPanel } from "../../features/gallery/GalleryPanel";
 import { CreatorPanel } from "../../features/creator/CreatorPanel";
-import { useRoll, type PopupType } from "../../hooks/useRoll";
+import { useRoll, duePopups, type PopupType } from "../../hooks/useRoll";
+import { useHibernateScheduler } from "../../features/hibernate/useHibernateScheduler";
 import { usePopupLifecycle } from "../../hooks/usePopupLifecycle";
 import { useMitosis, type MitosisSpawn } from "../../features/mitosis/useMitosis";
 import { selectMedia, type SelectedMedia } from "../../features/popup/selectMedia";
@@ -46,8 +47,14 @@ export function MainAppPage() {
       mediaId: string;
       mediaType: "image" | "video" | "audio" | "prompt" | "caption";
       hypnoGif?: string;
+      pumpScare?: boolean;
     }) => {
-      const id = usePopupOverlayStore.getState().addPopup({ type: media.mediaType, mediaId: media.mediaId, hypnoGif: media.hypnoGif });
+      const id = usePopupOverlayStore.getState().addPopup({
+        type: media.mediaType,
+        mediaId: media.mediaId,
+        hypnoGif: media.hypnoGif,
+        pumpScare: media.pumpScare,
+      });
       useAppStore.getState().incrementPopups();
       return id;
     },
@@ -57,7 +64,7 @@ export function MainAppPage() {
   const { spawnPopup, closeAll } = usePopupLifecycle();
 
   const dispatchMedia = useCallback(
-    async (media: SelectedMedia | null) => {
+    async (media: SelectedMedia | null, pumpScare?: boolean) => {
       if (!media || !useAppStore.getState().isRunning) return;
       // Web pops do not open a window: like the original app they just launch a
       // pack url in the system's default browser.
@@ -102,9 +109,9 @@ export function MainAppPage() {
 
       let id: string | null = null;
       if (limits.popupRenderMode === "electron") {
-        id = await spawnPopup(popType, ref, hypnoGif);
+        id = await spawnPopup(popType, ref, hypnoGif, pumpScare);
       } else {
-        id = addInAppPopup({ mediaId: ref, mediaType: popType, hypnoGif });
+        id = addInAppPopup({ mediaId: ref, mediaType: popType, hypnoGif, pumpScare });
       }
       if (id) registerOpenPopup(id, popType);
     },
@@ -156,7 +163,7 @@ export function MainAppPage() {
   }, []);
 
   const onSpawn = useCallback(
-    (type: PopupType) => {
+    (type: PopupType, pumpScare?: boolean) => {
       // The legacy subliminal popup carries text, not media: it bypasses
       // media selection and the per-type media caps entirely.
       if (type === "caption") {
@@ -168,13 +175,31 @@ export function MainAppPage() {
         return;
       }
       selectMedia(type)
-        .then(dispatchMedia)
+        .then((media) => dispatchMedia(media, pumpScare))
         .catch((err) => logger.error("[MainAppPage] Failed to select popup media:", err));
     },
     [dispatchMedia, spawnTextPopup, spawnNotification]
   );
 
   useRoll({ onSpawn });
+
+  // Legacy hibernate mode: while it is on, the roll loop is replaced by
+  // scheduled bursts (useRoll pauses on hibernateMode). Each burst tick
+  // rolls the targets exactly like a normal tick; pump-scare bursts spawn
+  // one image + one audio popup that force-close after 2.5 s.
+  const hibernateTick = useCallback(() => {
+    const settings = useSettingsStore.getState();
+    if (!useAppStore.getState().isRunning) return;
+    for (const type of duePopups(settings)) onSpawn(type);
+  }, [onSpawn]);
+
+  const hibernatePumpScare = useCallback(() => {
+    if (!useAppStore.getState().isRunning) return;
+    onSpawn("image", true);
+    onSpawn("audio", true);
+  }, [onSpawn]);
+
+  useHibernateScheduler({ active: isRunning, onBurstTick: hibernateTick, onPumpScare: hibernatePumpScare });
 
   const onMitosisSpawns = useCallback(
     (spawns: MitosisSpawn[]) => {

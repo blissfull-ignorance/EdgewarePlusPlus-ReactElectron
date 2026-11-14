@@ -60,7 +60,8 @@ const electronAPI: ElectronAPI = {
     },
   },
   popup: {
-    create: (type, mediaId, hypnoGif) => ipcRenderer.invoke("popup:create", type, mediaId, hypnoGif),
+    create: (type, mediaId, hypnoGif, pumpScare) =>
+      ipcRenderer.invoke("popup:create", type, mediaId, hypnoGif, pumpScare),
     closePopup: (id) => ipcRenderer.invoke("popup:closePopup", id),
     closeAll: () => ipcRenderer.invoke("popup:closeAll"),
     sizeToMedia: (id, mediaWidth, mediaHeight, lowkey) =>
@@ -75,9 +76,11 @@ const electronAPI: ElectronAPI = {
     },
   },
   hibernate: {
-    start: (type, durationInSec) =>
-      ipcRenderer.invoke("hibernate:start", type, durationInSec),
-    stop: () => ipcRenderer.invoke("hibernate:stop"),
+    onSkip: (callback: () => void) => {
+      const listener = (): void => callback();
+      ipcRenderer.on("hibernate:skip", listener);
+      return () => ipcRenderer.removeListener("hibernate:skip", listener);
+    },
   },
   scripting: {
     runLua: (scriptName) => ipcRenderer.invoke("scripting:runLua", scriptName),
@@ -128,6 +131,7 @@ const electronAPI: ElectronAPI = {
     },
     loadSettings: () => ipcRenderer.invoke("system:loadSettings"),
     flushSettings: (values) => ipcRenderer.sendSync("system:saveSettingsSync", values),
+    pushSettings: (values) => ipcRenderer.send("system:pushSettings", values),
     saveSettings: (settings) =>
       ipcRenderer.invoke("system:saveSettings", settings),
     sendNotification: (title, message, attachmentPath) =>

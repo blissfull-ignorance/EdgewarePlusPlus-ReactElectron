@@ -9,10 +9,10 @@
  * on the `"closed"` event.
  */
 import { app, ipcMain, BrowserWindow, screen } from "electron";
-import fs from "node:fs";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { logger } from "../utils/logger";
+import { getSettingNumber } from "../utils/configCache";
 import { lowkeyPosition } from "../../src/features/popup/lowkeyPosition";
 import { legacyPopupSize } from "../../src/features/popup/legacySize";
 import { initialMoveState, stepMove, type MoveState } from "../../src/features/popup/windowMovement";
@@ -107,18 +107,9 @@ function getPrimaryMonitorBounds() {
   return screen.getPrimaryDisplay().workArea;
 }
 
-/** Read a raw numeric/boolean setting value from the persisted config. */
+/** Read a raw numeric/boolean setting from the live settings cache. */
 function readSetting(key: string): number {
-  try {
-    const cfg = fs.readFileSync(
-      path.join(app.getPath("userData"), "data", "config.json"),
-      "utf-8"
-    );
-    const parsed = JSON.parse(cfg) as Record<string, unknown>;
-    return Number(parsed[key]) || 0;
-  } catch {
-    return 0;
-  }
+  return getSettingNumber(key);
 }
 
 /**
@@ -128,7 +119,8 @@ function readSetting(key: string): number {
 function createPopupWindow(
   type: "image" | "video" | "audio" | "subliminal" | "prompt",
   mediaId: string,
-  hypnoGif?: string
+  hypnoGif?: string,
+  pumpScare?: boolean
 ): { id: string } {
   const id = `popup-${Date.now()}-${Math.random().toString(36).slice(2)}`;
   const bounds = getPrimaryMonitorBounds();
@@ -185,8 +177,11 @@ function createPopupWindow(
   });
 
   const url = getPopupUrl();
-  const hypnoSeg = hypnoGif ? `?h=${encodeURIComponent(hypnoGif)}` : "";
-  popupWin.loadURL(`${url}#/popup/${type}/${encodeURIComponent(mediaId)}/${id}${hypnoSeg}`);
+  const query = [hypnoGif ? `h=${encodeURIComponent(hypnoGif)}` : "", pumpScare ? "ps=1" : ""]
+    .filter(Boolean)
+    .join("&");
+  const querySeg = query ? `?${query}` : "";
+  popupWin.loadURL(`${url}#/popup/${type}/${encodeURIComponent(mediaId)}/${id}${querySeg}`);
   if (type === "prompt") {
     popupWin.webContents.once("did-finish-load", () => {
       if (!popupWin.isDestroyed()) popupWin.focus();
@@ -241,7 +236,8 @@ function registerHandlers(): void {
       event,
       type: "image" | "video" | "audio" | "subliminal" | "prompt",
       mediaId: string,
-      hypnoGif?: string
+      hypnoGif?: string,
+      pumpScare?: boolean
     ): Promise<{ id: string }> => {
       const POPUP_TYPES = ["image", "video", "audio", "subliminal", "prompt"] as const;
       if (!POPUP_TYPES.includes(type) || typeof mediaId !== "string" || !mediaId || mediaId.length > 2048) {
@@ -250,7 +246,7 @@ function registerHandlers(): void {
       }
       try {
         mainWin = BrowserWindow.fromWebContents(event.sender);
-        return createPopupWindow(type, mediaId, hypnoGif);
+        return createPopupWindow(type, mediaId, hypnoGif, pumpScare === true);
       } catch (err) {
         logger.error("[Popup] Failed to create popup:", err);
         throw err;

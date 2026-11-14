@@ -47,7 +47,13 @@ export interface PopupRoute {
   popupId: string;
   /** Optional spiral GIF to overlay on top of image/video pops. */
   hypnoGif?: string;
+  /** Legacy pump-scare: this pop force-closes shortly after opening. */
+  pumpScare?: boolean;
 }
+
+// Legacy pump-scare: popups spawned by a pump-scare burst close 2.5 s after
+// opening, whatever the timeout settings say (popup.py try_pump_scare).
+const PUMP_SCARE_CLOSE_MS = 2500;
 
 const POPUP_DIR: Record<PopupRoute["type"], MediaDir | null> = {
   image: "img",
@@ -60,20 +66,25 @@ const POPUP_DIR: Record<PopupRoute["type"], MediaDir | null> = {
 export function parsePopupRoute(hash: string): PopupRoute | null {
   const match = hash.match(/^#\/popup\/(image|video|audio|subliminal|prompt)\/([^/]+)\/(.+)$/);
   if (!match) return null;
-  // The id segment may carry a trailing `?h=<gif>` (spiral overlay) inside the hash.
+  // The id segment may carry a trailing `?h=<gif>&ps=1` (spiral overlay,
+  // pump-scare force-close) inside the hash.
   const idPart = match[3];
   const qIdx = idPart.indexOf("?");
   const popupId = qIdx >= 0 ? idPart.slice(0, qIdx) : idPart;
   let hypnoGif: string | undefined;
+  let pumpScare = false;
   if (qIdx >= 0) {
-    const match = idPart.slice(qIdx + 1).match(/(?:^|&)h=([^&]*)/);
-    if (match?.[1]) hypnoGif = decodeURIComponent(match[1]);
+    const query = idPart.slice(qIdx + 1);
+    const h = query.match(/(?:^|&)h=([^&]*)/);
+    if (h?.[1]) hypnoGif = decodeURIComponent(h[1]);
+    pumpScare = /(?:^|&)ps=1(?:&|$)/.test(query);
   }
   return {
     type: match[1] as PopupRoute["type"],
     mediaId: decodeURIComponent(match[2]),
     popupId,
     hypnoGif,
+    pumpScare: pumpScare || undefined,
   };
 }
 
@@ -121,6 +132,7 @@ export function PopupWindow({ route }: { route: PopupRoute }) {
         popupId={route.popupId}
         mediaWidth={viewport.width}
         mediaHeight={viewport.height}
+        forcedTimeoutMs={route.pumpScare ? PUMP_SCARE_CLOSE_MS : undefined}
       />
     );
   }
@@ -135,6 +147,7 @@ export function PopupWindow({ route }: { route: PopupRoute }) {
         popupId={route.popupId}
         mediaWidth={viewport.width}
         mediaHeight={viewport.height}
+        forcedTimeoutMs={route.pumpScare ? PUMP_SCARE_CLOSE_MS : undefined}
       />
     );
   }
@@ -164,7 +177,11 @@ export function PopupWindow({ route }: { route: PopupRoute }) {
             Audio
           </Text>
         </div>
-        <AudioPopup audioUrl={mediaUrl} onClose={handleClose} />
+        <AudioPopup
+          audioUrl={mediaUrl}
+          onClose={handleClose}
+          forcedCloseMs={route.pumpScare ? PUMP_SCARE_CLOSE_MS : undefined}
+        />
       </PopupShell>
     );
   }

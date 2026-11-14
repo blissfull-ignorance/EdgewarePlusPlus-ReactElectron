@@ -19,6 +19,8 @@ export interface VideoPopupProps {
   hypnoGif?: string;
   /** Popup window ID: the window is resized to fit the video once measured. */
   popupId?: string;
+  /** Legacy pump-scare: auto-close this many ms after open, ignoring timeout settings. */
+  forcedTimeoutMs?: number;
 }
 
 export function VideoPopup({
@@ -29,6 +31,7 @@ export function VideoPopup({
   mediaHeight = 480,
   hypnoGif,
   popupId,
+  forcedTimeoutMs,
 }: VideoPopupProps) {
   const videoVolume = useSettingsStore((s) => s.videoVolume / 100);
   const buttonless = useSettingsStore((s) => s.buttonless);
@@ -107,7 +110,7 @@ export function VideoPopup({
       buttonless={buttonless > 0}
       clicksToClose={clicksToClose}
       clickthroughEnabled={clickthrough > 0}
-      timeoutMs={timeoutPopups > 0 ? popupTimeout : 0}
+      timeoutMs={forcedTimeoutMs ?? (timeoutPopups > 0 ? popupTimeout : 0)}
       opacity={lkToggle === 1 && lkScaling > 0 ? lkScaling / 100 : 1}
     >
       <div style={{ width: "100%", height: "100%" }}>

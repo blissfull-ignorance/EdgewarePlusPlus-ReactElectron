@@ -6,7 +6,7 @@ import { execSync } from "node:child_process";
 import electronExecutable from "electron";
 
 const REPO_ROOT = path.resolve(__dirname, "../../..");
-const DIST_MAIN = path.join(REPO_ROOT, "dist-electron", "main.js");
+export const DIST_MAIN = path.join(REPO_ROOT, "dist-electron", "main.js");
 const DEV_SERVER_URL = "http://localhost:5173";
 
 export const LOCAL_SEED_PACK = path.join(REPO_ROOT, "packs", "Edgeware++ Test Pack V2");
