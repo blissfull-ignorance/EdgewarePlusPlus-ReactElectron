@@ -1,8 +1,10 @@
 # Edgeware++
 
+![EdgewarePlusPlus-ReactElectron running on macOS](screenshots/demo.png)
+
 Edgeware++ is a fetish-designed program (so 18+ only!!!) that essentially spawns popups over your screen in many different ways. These popups can include images, videos, audio, prompts, etc. It's also highly customizable, with the ability to download "packs" people have made and use them yourself. It can be ended at any time and also scheduled in ways to be used more passively.
 
-**Edgeware++ is not a virus, nor does it install itself onto your computer**. Edgeware **can** potentially modify files on your computer or be configured to start delayed. The most dangerous settings (deleting or replacing files) have not been included in this fork.
+**Edgeware++ is not a virus and it does not install itself**. You launch an installer on Windows and Linux, or drag the app to Applications on macOS. Edgeware **can** potentially modify files on your computer or be configured to start delayed. The most dangerous settings (deleting or replacing files) have not been included in this fork.
 
 ## What Is This Fork?
 
