@@ -52,7 +52,7 @@ describe("uniqueDestPath", () => {
     // the OS temp directory is ephemeral on CI runners — a leftover folder
     // must never fail the run.
     try {
-      rmSync(temp, { recursive: true, force: true, maxRetries: 20, retryDelay: 250 });
+      rmSync(temp, { recursive: true, force: true });
     } catch {
       /* nothing to do */
     }
@@ -130,7 +130,7 @@ describe("extractPackZip", () => {
     // the OS temp directory is ephemeral on CI runners — a leftover folder
     // must never fail the run.
     try {
-      rmSync(temp, { recursive: true, force: true, maxRetries: 20, retryDelay: 250 });
+      rmSync(temp, { recursive: true, force: true });
     } catch {
       /* nothing to do */
     }

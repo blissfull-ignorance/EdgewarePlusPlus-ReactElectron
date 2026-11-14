@@ -67,7 +67,7 @@ describe("system IPC handlers (pack import / discovery / selection)", () => {
     // Best effort: the logger's write stream can outlive the suite on
     // Windows; the OS temp directory is ephemeral on CI runners.
     try {
-      rmSync(tempRoot, { recursive: true, force: true, maxRetries: 20, retryDelay: 250 });
+      rmSync(tempRoot, { recursive: true, force: true });
     } catch {
       /* nothing to do */
     }
