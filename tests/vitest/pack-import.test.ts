@@ -48,8 +48,14 @@ describe("uniqueDestPath", () => {
     temp = mkdtempSync(path.join(tmpdir(), "ewpp-unique-"));
   });
   afterAll(() => {
-    // Windows: extraction handles can linger a moment after the test.
-    rmSync(temp, { recursive: true, force: true, maxRetries: 20, retryDelay: 100 });
+    // Best effort: on Windows extraction handles can outlive the suite, and
+    // the OS temp directory is ephemeral on CI runners — a leftover folder
+    // must never fail the run.
+    try {
+      rmSync(temp, { recursive: true, force: true, maxRetries: 20, retryDelay: 250 });
+    } catch {
+      /* nothing to do */
+    }
   });
 
   it("returns the plain path when free and (n) suffixes on collision", () => {
@@ -120,8 +126,14 @@ describe("extractPackZip", () => {
     temp = mkdtempSync(path.join(tmpdir(), "ewpp-extract-"));
   });
   afterAll(() => {
-    // Windows: extraction handles can linger a moment after the test.
-    rmSync(temp, { recursive: true, force: true, maxRetries: 20, retryDelay: 100 });
+    // Best effort: on Windows extraction handles can outlive the suite, and
+    // the OS temp directory is ephemeral on CI runners — a leftover folder
+    // must never fail the run.
+    try {
+      rmSync(temp, { recursive: true, force: true, maxRetries: 20, retryDelay: 250 });
+    } catch {
+      /* nothing to do */
+    }
   });
 
   it("extracts a flat zip at the expected depth with real file content", async () => {

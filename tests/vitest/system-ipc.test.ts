@@ -64,8 +64,13 @@ describe("system IPC handlers (pack import / discovery / selection)", () => {
   });
 
   afterAll(() => {
-    // Windows: the logger's write stream can hold a file open briefly.
-    rmSync(tempRoot, { recursive: true, force: true, maxRetries: 20, retryDelay: 100 });
+    // Best effort: the logger's write stream can outlive the suite on
+    // Windows; the OS temp directory is ephemeral on CI runners.
+    try {
+      rmSync(tempRoot, { recursive: true, force: true, maxRetries: 20, retryDelay: 250 });
+    } catch {
+      /* nothing to do */
+    }
     delete (globalThis as { __EWPP_TEST_USER_DATA?: string }).__EWPP_TEST_USER_DATA;
   });
 
