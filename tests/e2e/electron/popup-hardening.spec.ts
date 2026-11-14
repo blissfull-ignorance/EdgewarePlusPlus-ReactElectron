@@ -208,6 +208,38 @@ test("buttonless popups close when the media itself is clicked", async () => {
   });
 });
 
+test("a normal popup closes on a single click anywhere on its window", async () => {
+  // The pack's click-to-close intent (index.json maxClicks, 1 by default)
+  // applies without buttonless or multi-click: one click on the media ends
+  // the popup, wherever it lands on the window.
+  const { window, app } = running!;
+  await window.evaluate(() => {
+    (
+      window as unknown as {
+        __settingsStore: { getState: () => { setRaw: (v: Record<string, unknown>) => void } };
+      }
+    ).__settingsStore.getState().setRaw({ buttonless: 0, multiClick: 0 });
+  });
+  await window.evaluate(() =>
+    (
+      window as unknown as { api: { popup: { create: (t: string, m: string) => Promise<unknown> } } }
+    ).api.popup.create("image", "globelw.png")
+  );
+  const popup = await app.waitForEvent("window", {
+    predicate: (w) => w.url().includes("/popup/image"),
+    timeout: 15_000,
+  });
+  await popup.waitForSelector("[data-testid='image-popup-img']", { timeout: 15_000 });
+  // The close button stays as an affordance in normal mode.
+  await expect(popup.locator("[data-testid='close-button']")).toBeVisible();
+  await popup.locator("[data-testid='image-popup-img']").click({ force: true });
+  await expect
+    .poll(() => app.windows().filter((w) => w.url().includes("/popup/image")).length, {
+      timeout: 10_000,
+    })
+    .toBe(0);
+});
+
 test("prompt popups accept keyboard input", async () => {
   const { window, app } = running!;
   await window.evaluate(() =>

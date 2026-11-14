@@ -328,3 +328,19 @@ describe("wallpaperRefResolves (pack-root-relative wallpaper check)", () => {
     expect(wallpaperRefResolves("ghost.png", img, root)).toBe(false);
   });
 });
+
+describe("edgeware_levels registry (manual skip resume)", () => {
+  it("generated scripts expose every level body in order", () => {
+    const lua = generateLua(design);
+    expect(lua).toContain(`edgeware_levels = { level1, level2, level3 }`);
+    // The registry sits after the level definitions, before the start line.
+    const registry = lua.indexOf("edgeware_levels");
+    expect(registry).toBeGreaterThan(lua.indexOf("local function level1"));
+    expect(registry).toBeLessThan(lua.indexOf("level1)"));
+  });
+
+  it("single-level designs still carry the registry", () => {
+    const one = { ...design, levels: [design.levels[0]] };
+    expect(generateLua(one)).toContain("edgeware_levels = { level1 }");
+  });
+});

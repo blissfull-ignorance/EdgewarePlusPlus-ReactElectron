@@ -10,7 +10,7 @@
 
 import * as lua from "fengari/src/lua";
 // lua_sethook/LUA_MASKCOUNT exist at runtime but are missing from fengari's typings.
-const { lua_sethook, LUA_MASKCOUNT } = lua as unknown as {
+const { lua_sethook, LUA_MASKCOUNT, lua_getglobal, lua_istable } = lua as unknown as {
   lua_sethook: (
     L: number,
     func: (() => void) | null,
@@ -18,6 +18,8 @@ const { lua_sethook, LUA_MASKCOUNT } = lua as unknown as {
     count: number
   ) => number;
   LUA_MASKCOUNT: number;
+  lua_getglobal: (L: number, name: Uint8Array) => number;
+  lua_istable: (L: number, index: number) => boolean;
 };
 import * as lauxlib from "fengari/src/lauxlib";
 import * as lualib from "fengari/src/lualib";
@@ -127,7 +129,11 @@ export class FengariVM {
   constructor() {
     this.L = 0;
     this.transitionCallbacks = new Map();
-    this.callbackCounter = 0;
+    // Lua's registry reserves integer keys 1 (main thread) and 2 (globals);
+    // callback refs must start above LUA_RIDX_LAST or they clobber the
+    // registry — a clobbered globals slot surfaces as a panic the first
+    // time any C-side lua_getglobal runs.
+    this.callbackCounter = 2;
     this._currentLevel = 0;
     this._initialized = false;
     try {
@@ -407,6 +413,48 @@ export class FengariVM {
     if (!refs) return;
     this.pendingByPopup.delete(id);
     for (const ref of refs) this.invokeRef(ref);
+  }
+
+  /**
+   * Abandon the script's pending work: un-fired after() timers and on_stop
+   * callbacks waiting on popups. A manual corruption skip uses this to end
+   * the current scripted event; nothing scheduled is invoked.
+   */
+  cancelPendingChain(): void {
+    for (const timer of this.timers) clearTimeout(timer);
+    this.timers.clear();
+    this.pendingByPopup.clear();
+  }
+
+  /**
+   * Run a generated script's level body directly through the edgeware_levels
+   * registry the designer emits, so a manual skip resumes the chain at the
+   * new level instead of leaving the old chain to advance on its own.
+   * Returns false for hand-written scripts without the registry or for
+   * levels beyond the script's end.
+   */
+  runLevel(level: number): boolean {
+    if (!this._initialized || !this.L || !Number.isInteger(level) || level < 1) return false;
+    lua_getglobal(this.L, to_luastring("edgeware_levels"));
+    if (!lua_istable(this.L, -1)) {
+      lua_pop(this.L, 1);
+      return false;
+    }
+    lua_rawgeti(this.L, -1, level);
+    const found = lua_isfunction(this.L, -1);
+    // Slots above the table after the attempt: pcall consumes the function
+    // and leaves nothing on success, or the error message in its place.
+    let above = 1;
+    if (found) {
+      if (this.runProtected(2000, () => lua_pcall(this.L, 0, 0, 0)) !== LUA_OK) {
+        const err = lua_tojsstring(this.L, -1);
+        logger.error(`[FengariVM] Skipped level body error: ${err ?? "unknown"}`);
+      } else {
+        above = 0;
+      }
+    }
+    lua_pop(this.L, above + 1); // + the registry table
+    return found;
   }
 
   /** Attach a callback ref to a spawned popup, or fire it when none spawned. */

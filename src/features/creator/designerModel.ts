@@ -261,6 +261,10 @@ export function generateLua(design: DesignerScript): string {
     }
     lines.push("");
   }
+  // Registry the manual skip uses to resume the chain at a chosen level.
+  lines.push(
+    `edgeware_levels = { ${Array.from({ length: n }, (_, i) => `level${i + 1}`).join(", ")} }`
+  );
   lines.push(`after(${clampMs(design.startDelaySeconds * 1000)}, level1)`);
   return lines.join("\n") + "\n";
 }

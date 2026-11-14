@@ -144,7 +144,8 @@ describe("panic-image poisoning guard", () => {
     getMock.mockResolvedValue("/some/where/EdgewarePlusPlusMacosPython/data/panic_wallpaper.png");
     await applyWallpaper("/pack/new.jpg");
     expect(setMock).toHaveBeenCalledWith("/pack/new.jpg");
-    expect(readState()).toBeNull(); // nothing cached → nothing to restore
+    // Nothing usable is cached, so no restore can re-apply a panic image.
+    expect(readState()).toEqual({ original: "", dirty: false });
   });
 
   it("retires a poisoned cache instead of restoring the panic image", async () => {
@@ -158,6 +159,20 @@ describe("panic-image poisoning guard", () => {
     await expect(restoreWallpaperIfDirty()).resolves.toBe(false);
     expect(setMock).not.toHaveBeenCalled();
     expect(readState()?.dirty).toBe(false);
+  });
+
+  it("re-captures instead of re-dirtying a poisoned cache on the next change", async () => {
+    // The exact resurrection the field logs showed: retire marks the
+    // poisoned entry clean, the next wallpaper change must NOT re-dirty it.
+    const poisoned = path.join(userRoot, "panic_wallpaper.png");
+    writeFileSync(poisoned, "x");
+    writeFileSync(
+      path.join(userRoot, "wallpaper_state.json"),
+      JSON.stringify({ original: poisoned, dirty: false })
+    );
+    getMock.mockResolvedValue("/Users/flst01/Pictures/realdesk.jpg");
+    await applyWallpaper("/pack/new.jpg");
+    expect(readState()).toEqual({ original: "/Users/flst01/Pictures/realdesk.jpg", dirty: true });
   });
 
   it("still caches and restores ordinary wallpapers (including pack files)", async () => {

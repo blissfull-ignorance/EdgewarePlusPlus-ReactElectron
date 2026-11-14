@@ -127,10 +127,10 @@ export function ImagePopup({
         )}
 
         <Center
-          // With a close button, clicks on the media do nothing (legacy);
-          // buttonless mode closes on any click and multi-click counts
-          // every click, so both let them bubble to the shell handler.
-          onClick={buttonless || clicksToClose > 0 ? undefined : (e) => e.stopPropagation()}
+          // Clicking anywhere on the popup counts as a close click; the
+          // pack's maxClicks decides how many clicks are needed (one when
+          // multi-click mode is off). The close button stays as an
+          // affordance until buttonless or multi-click hides it.
           style={{
             width: "100%",
             height: "100%",

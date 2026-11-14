@@ -77,6 +77,32 @@ function advanceCorruptionLevel(): number {
   return next;
 }
 
+/**
+ * Manual "skip": end the current scripted event, then step the corruption
+ * progression by one. Pending chain work (after() timers, on_stop
+ * callbacks) is abandoned and open popups closed, so a skipped voice
+ * section truly stops. Designed scripts carry an edgeware_levels registry,
+ * so the chain resumes at the new level's body; hand-written scripts
+ * without one fall back to a plain counter advance.
+ */
+function skipCorruptionLevel(): number {
+  const vm = getLuaVM();
+  const base = Math.max(vm?.getCurrentLevel() ?? 0, mirroredLevel());
+  const next = base + 1;
+  vm?.cancelPendingChain();
+  closeAllPopups();
+  if (vm?.runLevel(next)) {
+    // The level body's own corrupt() advanced the counter and injected the
+    // transition; nothing else to do.
+    logger.info(`[Scripting] Skipped ahead: chain ended, level ${next} resumed`);
+    return next;
+  }
+  vm?.setCurrentLevel(next);
+  injectLevel(next);
+  logger.info(`[Scripting] Skipped to level ${next} (no resumable script chain)`);
+  return next;
+}
+
 function dataDir(): string {
   return path.join(app.getPath("userData"), "data");
 }
@@ -376,8 +402,8 @@ function registerHandlers(): void {
     }
   );
 
-  /** Manual "skip": advance the corruption level by one (testing aid). */
-  ipcMain.handle("scripting:advanceLevel", async (): Promise<number> => advanceCorruptionLevel());
+  /** Manual "skip": end the current scripted event and advance one level. */
+  ipcMain.handle("scripting:advanceLevel", async (): Promise<number> => skipCorruptionLevel());
 
   ipcMain.handle(
     "scripting:readScript",

@@ -62,14 +62,27 @@ function isPanicArtifact(p: string): boolean {
   return /^panic_wallpaper\.[a-z0-9]+$/i.test(path.basename(p));
 }
 
+/** A cached original we may safely restore: a real path, never a panic image. */
+function usableOriginal(state: WallpaperState | null): boolean {
+  return !!state?.original && !isPanicArtifact(state.original);
+}
+
 /** Call before every wallpaper change the app itself causes. */
 async function beforeWallpaperChange(): Promise<void> {
   if (disabled()) return;
   try {
     const existing = readState();
-    if (existing) {
+    if (existing && usableOriginal(existing)) {
       if (!existing.dirty) writeState({ ...existing, dirty: true });
       return;
+    }
+    if (existing?.original) {
+      // A poisoned entry (captured while a panic image was on screen): drop
+      // it so the re-capture below replaces it. Re-dirtying it would make
+      // every later restore re-apply a panic wallpaper.
+      logger.warn(
+        `[Wallpaper] Cached original is a panic image (${existing.original}); dropping it and re-capturing`
+      );
     }
     const current = await getWallpaper();
     if (current && isPanicArtifact(current)) {
@@ -79,6 +92,7 @@ async function beforeWallpaperChange(): Promise<void> {
       logger.warn(
         `[Wallpaper] Current desktop is a panic image (${current}); not caching it as the original`
       );
+      writeState({ original: "", dirty: false });
       return;
     }
     if (current) {
@@ -134,18 +148,19 @@ async function restoreNow(): Promise<boolean> {
   if (disabled()) return false;
   const state = readState();
   if (!state?.dirty) return false;
-  if (!fs.existsSync(state.original)) {
-    logger.warn(`[Wallpaper] Cached original no longer exists: ${state.original}`);
-    writeState({ ...state, dirty: false });
+  if (!state.original || isPanicArtifact(state.original)) {
+    // A poisoned or empty cache (the "original" was captured while a panic
+    // image was on screen): restoring it would re-apply a panic wallpaper.
+    // Drop the original so the next app change re-captures from the desktop.
+    logger.warn(
+      `[Wallpaper] Cached original is unusable (${state.original || "empty"}); retiring the cache without restoring`
+    );
+    writeState({ original: "", dirty: false });
     return false;
   }
-  if (isPanicArtifact(state.original)) {
-    // A poisoned cache (the "original" was captured while a panic image was
-    // on screen): restoring it would re-apply a panic wallpaper. Retire it.
-    logger.warn(
-      `[Wallpaper] Cached original is a panic image (${state.original}); retiring the cache without restoring`
-    );
-    writeState({ ...state, dirty: false });
+  if (!fs.existsSync(state.original)) {
+    logger.warn(`[Wallpaper] Cached original no longer exists: ${state.original}`);
+    writeState({ original: "", dirty: false });
     return false;
   }
   // Verify before re-applying: if the desktop already shows the original
