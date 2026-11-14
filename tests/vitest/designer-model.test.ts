@@ -198,10 +198,12 @@ describe("designerModel", () => {
   });
 
   it("caps hostile marker dimensions", () => {
+    // Comfortably over every cap (200 levels / 100 moods / 50 actions)
+    // without turning the fixture's own JSON round trip into a GC stress.
     const huge = `-- [EDGWARE-DESIGNER]${JSON.stringify({
       version: 1,
       startDelaySeconds: 1,
-      levels: Array.from({ length: 10_000 }, () => ({
+      levels: Array.from({ length: 1000 }, () => ({
         addMoods: Array.from({ length: 500 }, (_, i) => `m${i}`),
         removeMoods: [],
         actions: Array.from({ length: 500 }, () => ({ kind: "image" })),

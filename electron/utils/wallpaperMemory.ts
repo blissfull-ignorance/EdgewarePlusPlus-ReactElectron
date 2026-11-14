@@ -52,6 +52,16 @@ function writeState(state: WallpaperState): void {
   }
 }
 
+/**
+ * A path that is app output, not a user choice: the panic wallpaper by its
+ * legacy name (the bundled default, a pack's override, and the old Python
+ * app's copy are all `panic_wallpaper.*`). Caching one as the "original"
+ * would make every restore re-apply a panic image over the user's desktop.
+ */
+function isPanicArtifact(p: string): boolean {
+  return /^panic_wallpaper\.[a-z0-9]+$/i.test(path.basename(p));
+}
+
 /** Call before every wallpaper change the app itself causes. */
 async function beforeWallpaperChange(): Promise<void> {
   if (disabled()) return;
@@ -62,6 +72,15 @@ async function beforeWallpaperChange(): Promise<void> {
       return;
     }
     const current = await getWallpaper();
+    if (current && isPanicArtifact(current)) {
+      // The desktop still shows a panic image (e.g. an older session's or a
+      // legacy install's): caching it as the "original" would make every
+      // future restore re-apply a panic wallpaper over the user's desktop.
+      logger.warn(
+        `[Wallpaper] Current desktop is a panic image (${current}); not caching it as the original`
+      );
+      return;
+    }
     if (current) {
       writeState({ original: current, dirty: true });
       logger.info(`[Wallpaper] Cached the user's original wallpaper: ${current}`);
@@ -117,6 +136,15 @@ async function restoreNow(): Promise<boolean> {
   if (!state?.dirty) return false;
   if (!fs.existsSync(state.original)) {
     logger.warn(`[Wallpaper] Cached original no longer exists: ${state.original}`);
+    writeState({ ...state, dirty: false });
+    return false;
+  }
+  if (isPanicArtifact(state.original)) {
+    // A poisoned cache (the "original" was captured while a panic image was
+    // on screen): restoring it would re-apply a panic wallpaper. Retire it.
+    logger.warn(
+      `[Wallpaper] Cached original is a panic image (${state.original}); retiring the cache without restoring`
+    );
     writeState({ ...state, dirty: false });
     return false;
   }

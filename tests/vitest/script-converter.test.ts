@@ -99,14 +99,14 @@ describe("designFromScript", () => {
   });
 
   it("splits later segments at each corrupt()", () => {
-    expect(design.levels[0].actions).toContainEqual({ kind: "image", file: "after1.png" });
+    expect(design.levels[0].actions).toContainEqual({ kind: "image", file: "after1.png", afterPrevious: true });
     // close_popups() ran before the second corrupt(), so it belongs to level 1.
-    expect(design.levels[0].actions).toContainEqual({ kind: "close_popups" });
-    expect(design.levels[1].actions).toContainEqual({ kind: "set_close_text", text: "Nggh~!" });
-    expect(design.levels[1].actions).toContainEqual({ kind: "subliminal", text: "TWO" });
-    expect(design.levels[1].actions).toContainEqual({ kind: "web", text: "https://example.com/x" });
-    expect(design.levels[1].actions).toContainEqual({ kind: "prompt" });
-    expect(design.levels[2].actions).toContainEqual({ kind: "audio", file: "Voice 4.mp3" });
+    expect(design.levels[0].actions).toContainEqual({ kind: "close_popups", afterPrevious: true });
+    expect(design.levels[1].actions).toContainEqual({ kind: "set_close_text", text: "Nggh~!", afterPrevious: true });
+    expect(design.levels[1].actions).toContainEqual({ kind: "subliminal", text: "TWO", afterPrevious: true });
+    expect(design.levels[1].actions).toContainEqual({ kind: "web", text: "https://example.com/x", afterPrevious: true });
+    expect(design.levels[1].actions).toContainEqual({ kind: "prompt", afterPrevious: true });
+    expect(design.levels[2].actions).toContainEqual({ kind: "audio", file: "Voice 4.mp3", afterPrevious: true });
   });
 
   it("uses the chained audio as the level advance", () => {
@@ -121,10 +121,10 @@ describe("designFromScript", () => {
     expect(report).toContain("multiple_popups() call(s) dropped");
     expect(report).toContain("web(nil)");
     expect(report).toContain("roll() with a computed chance");
-    expect(report).toContain("Callback chains were flattened");
+    expect(report).toContain("chained action(s) kept their audio on_stop sequence");
     // The rolled.png guard was computed, so the action survives unguarded.
-    expect(design.levels[0].actions).toContainEqual({ kind: "image", file: "rolled.png" });
-    expect(design.levels[0].actions).toContainEqual({ kind: "image", file: "loop.png" });
+    expect(design.levels[0].actions).toContainEqual({ kind: "image", file: "rolled.png", afterPrevious: true });
+    expect(design.levels[0].actions).toContainEqual({ kind: "image", file: "loop.png", afterPrevious: true });
   });
 
   it("produces a script that round-trips back through the parser", () => {
@@ -132,7 +132,7 @@ describe("designFromScript", () => {
     const reparsed = parseDesignerScript(lua);
     expect(reparsed).not.toBeNull();
     expect(reparsed!.levels).toHaveLength(3);
-    expect(reparsed!.levels[1].actions).toContainEqual({ kind: "set_close_text", text: "Nggh~!" });
+    expect(reparsed!.levels[1].actions).toContainEqual({ kind: "set_close_text", text: "Nggh~!", afterPrevious: true });
   });
 
   it("keeps legacy pack-root wallpapers out of the img/ convention", () => {
@@ -239,5 +239,62 @@ end)
       file: "b.png",
       delayMs: 1500,
     });
+  });
+});
+
+describe("conversion preserves audio callback chains (AAP voice pattern)", () => {
+  const CHAIN = `require("edgeware_v0")
+function delayed_audio(ms, file, on_stop)
+  after(ms, function() audio(file, on_stop) end)
+end
+corrupt()
+audio("V1.mp3", stepb)
+function stepb()
+  if true then
+    audio("V2.mp3", stepc)
+  end
+end
+function stepc()
+  delayed_audio(500, "V3.mp3", nil)
+end
+`;
+  const { design, notes } = designFromScript(CHAIN, {});
+  const actions = design.levels[0].actions;
+
+  it("marks every chained voice afterPrevious, keeping delays", () => {
+    expect(actions).toContainEqual({ kind: "audio", file: "V1.mp3" });
+    expect(actions).toContainEqual({ kind: "audio", file: "V2.mp3", afterPrevious: true });
+    expect(actions).toContainEqual({
+      kind: "audio",
+      file: "V3.mp3",
+      afterPrevious: true,
+      delayMs: 500,
+    });
+    expect(notes.join(" ")).toContain("kept their audio on_stop sequence");
+  });
+
+  it("generates nested on_stop callbacks — sequential playback, not a burst", () => {
+    const lua = generateLua(design);
+    expect(lua).toMatch(/audio\("V1\.mp3", function\(\)\n\s+audio\("V2\.mp3", function\(\)\n\s+after\(500, function\(\)\n\s+audio\("V3\.mp3"\)/);
+  });
+
+  it("round-trips the chain flags through the marker", () => {
+    const reparsed = parseDesignerScript(generateLua(design));
+    expect(reparsed?.levels[0].actions).toContainEqual({
+      kind: "audio",
+      file: "V2.mp3",
+      afterPrevious: true,
+    });
+  });
+
+  it("does not replay the advance audio: the next level nests inside it", () => {
+    const { design: adv } = designFromScript(
+      'require("edgeware_v0")\ncorrupt()\naudio("A.mp3", s2)\nfunction s2()\ncorrupt()\nend\n',
+      {}
+    );
+    expect(adv.levels[0].advance).toEqual({ mode: "audio", file: "A.mp3" });
+    const lua = generateLua(adv);
+    expect(lua.match(/audio\("A\.mp3"/g) ?? []).toHaveLength(1);
+    expect(lua).toMatch(/audio\("A\.mp3", function\(\)\n\s+level2\(\)\n\s+end\)/);
   });
 });

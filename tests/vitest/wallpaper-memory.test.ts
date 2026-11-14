@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
@@ -120,5 +120,55 @@ describe("wallpaperMemory apply/restore contract", () => {
     await expect(restoreWallpaperIfDirty()).resolves.toBe(false);
     expect(setMock).not.toHaveBeenCalled();
     expect(readState()?.dirty).toBe(false);
+  });
+});
+
+describe("panic-image poisoning guard", () => {
+  beforeEach(() => {
+    userRoot = mkdtempSync(path.join(tmpdir(), "ewpp-wall-mem-"));
+    (globalThis as { __EWPP_TEST_USER_DATA?: string }).__EWPP_TEST_USER_DATA = userRoot;
+    delete process.env.EDGWARE_PANIC_SKIP_WALLPAPER;
+    getMock.mockReset();
+    setMock.mockReset();
+    setMock.mockResolvedValue(undefined);
+  });
+
+  afterEach(() => {
+    rmSync(userRoot, { recursive: true, force: true });
+    delete (globalThis as { __EWPP_TEST_USER_DATA?: string }).__EWPP_TEST_USER_DATA;
+  });
+
+  it("refuses to cache a panic wallpaper as the user's original", async () => {
+    // The desktop still shows a legacy install's panic image at the first
+    // change: caching it would make every future restore re-apply it.
+    getMock.mockResolvedValue("/some/where/EdgewarePlusPlusMacosPython/data/panic_wallpaper.png");
+    await applyWallpaper("/pack/new.jpg");
+    expect(setMock).toHaveBeenCalledWith("/pack/new.jpg");
+    expect(readState()).toBeNull(); // nothing cached → nothing to restore
+  });
+
+  it("retires a poisoned cache instead of restoring the panic image", async () => {
+    const poisoned = path.join(userRoot, "panic_wallpaper.png");
+    writeFileSync(poisoned, "x");
+    writeFileSync(
+      path.join(userRoot, "wallpaper_state.json"),
+      JSON.stringify({ original: poisoned, dirty: true })
+    );
+    getMock.mockResolvedValue("/desktop/current.jpg");
+    await expect(restoreWallpaperIfDirty()).resolves.toBe(false);
+    expect(setMock).not.toHaveBeenCalled();
+    expect(readState()?.dirty).toBe(false);
+  });
+
+  it("still caches and restores ordinary wallpapers (including pack files)", async () => {
+    const packWall = path.join(userRoot, "packs", "CaliaWare", "wallpapergood.png");
+    mkdirSync(path.dirname(packWall), { recursive: true });
+    writeFileSync(packWall, "x");
+    getMock.mockResolvedValue(packWall);
+    await applyWallpaper("/pack/new.jpg");
+    expect(readState()).toEqual({ original: packWall, dirty: true });
+    getMock.mockResolvedValue("/pack/new.jpg");
+    await expect(restoreWallpaperIfDirty()).resolves.toBe(true);
+    expect(setMock).toHaveBeenLastCalledWith(packWall);
   });
 });

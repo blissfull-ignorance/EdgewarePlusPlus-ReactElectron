@@ -787,3 +787,75 @@ test("a converted script runs its level's events sequentially, not all at once",
     cleanupTempState(state);
   }
 });
+
+test("a converted voice chain plays its audios one after another", async () => {
+  ensureElectronBuild();
+  const state: TempState = createTempState({ kind: "media" });
+  const dir = state.seedPath;
+  // The AddictAcceptanceProgram pattern: each voice names the next as its
+  // on_stop callback, so playback is strictly sequential.
+  const handwritten = [
+    'require("edgeware_v0")',
+    'audio("think.wav", v2)',
+    "function v2()",
+    '  audio("think.wav", v3)',
+    "end",
+    "function v3()",
+    '  audio("think.wav", nil)',
+    "end",
+  ].join("\n");
+  writeFileSync(path.join(dir, "script.lua"), handwritten);
+  seedConfig(state, {
+    packPath: dir,
+    popupRenderMode: "electron",
+    popupMod: 0,
+    vidMod: 0,
+    audioMod: 0,
+    promptMod: 0,
+    webMod: 0,
+    capPopChance: 0,
+    timeoutPopups: 0,
+    corruptionMode: 0,
+    corruptionTrigger: "Script",
+    delay: 60000,
+  });
+  const running = await launchApp(state, {
+    EDGWARE_STUB_BROWSER: "1",
+    EDGWARE_PANIC_SKIP_WALLPAPER: "1",
+  });
+  try {
+    await openDesigner(running.window);
+    await running.window.locator("[data-testid='designer-import-script']").click();
+    await expect(running.window.locator("[data-testid='designer-convert-pending']")).toBeVisible();
+
+    const seen = new Map<string, number>();
+    const t0 = Date.now();
+    running.app.on("window", (w) => {
+      const watch = setInterval(() => {
+        try {
+          const m = w.url().match(/#\/popup\/audio\/[^/]+\/(popup-[^?/]+)/);
+          if (m && !seen.has(m[1])) {
+            seen.set(m[1], Date.now() - t0);
+            clearInterval(watch);
+          }
+        } catch {
+          clearInterval(watch);
+        }
+      }, 25);
+      setTimeout(() => clearInterval(watch), 30000).unref?.();
+    });
+
+    await running.window.locator("[data-testid='designer-test-run']").click();
+    await expect.poll(() => seen.size, { timeout: 30000 }).toBe(3);
+
+    const times = [...seen.values()].sort((a, b) => a - b);
+    // Each think.wav is 0.6s: sequential playback means the third voice can
+    // only start after two full playthroughs. All-at-once would be < 500ms.
+    expect(times[2] - times[0]).toBeGreaterThanOrEqual(900);
+
+    await running.window.locator("[data-testid='start-stop-button']").click();
+  } finally {
+    await quitApp(running);
+    cleanupTempState(state);
+  }
+});

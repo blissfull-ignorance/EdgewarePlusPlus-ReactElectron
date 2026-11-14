@@ -42,6 +42,12 @@ export interface DesignerAction {
    * `after(ms, function() … end)` sequencing.
    */
   delayMs?: number;
+  /**
+   * Fires when the PREVIOUS action completes (audio: when its playback
+   * ends) instead of at level start — how converted scripts keep the
+   * original's `audio(file, next)` callback chains sequential.
+   */
+  afterPrevious?: boolean;
 }
 
 export interface DesignerLevel {
@@ -125,24 +131,80 @@ function actionCall(action: DesignerLevel["actions"][number]): string | null {
   }
 }
 
-function actionLine(action: DesignerLevel["actions"][number]): string | null {
+function indentLines(lines: string[]): string[] {
+  return lines.map((l) => `  ${l}`);
+}
+
+/**
+ * Render one action as lua lines (no level-body indent). `children` are the
+ * actions that run when THIS action completes: for audio they become the
+ * on_stop callback — exactly the original script's `audio(file, next)`
+ * chain. Non-audio actions cannot host a callback, so children continue as
+ * plain siblings.
+ */
+function renderAction(action: DesignerAction, children: string[]): string[] | null {
   const call = actionCall(action);
   if (!call) return null;
-  const guarded =
-    action.chance !== undefined && action.chance >= 1 && action.chance <= 99
-      ? `if roll(${Math.round(action.chance)}) then\n    ${call}\n  end`
-      : call;
-  // A delayed action keeps the original script's staggered timing: it fires
-  // inside after(ms, …) instead of synchronously at level entry. The chance
-  // roll happens when it fires, not when it is scheduled.
-  if (action.delayMs !== undefined && action.delayMs > 0) {
-    const body = guarded
-      .split("\n")
-      .map((l) => `    ${l}`)
-      .join("\n");
-    return `  after(${clampMs(action.delayMs)}, function()\n${body}\n  end)`;
+  let lines: string[];
+  if (children.length > 0 && action.kind === "audio") {
+    lines = [
+      `audio(${action.file ? luaString(action.file) : "nil"}, function()`,
+      ...indentLines(children),
+      "end)",
+    ];
+  } else if (children.length > 0) {
+    lines = [call, ...children];
+  } else {
+    lines = [call];
   }
-  return `  ${guarded}`;
+  if (action.chance !== undefined && action.chance >= 1 && action.chance <= 99) {
+    lines = [`if roll(${Math.round(action.chance)}) then`, ...indentLines(lines), "end"];
+  }
+  // A delayed action keeps the original script's staggered timing: it fires
+  // inside after(ms, …) instead of synchronously. The chance roll happens
+  // when it fires, not when it is scheduled.
+  if (action.delayMs !== undefined && action.delayMs > 0) {
+    lines = [`after(${clampMs(action.delayMs)}, function()`, ...indentLines(lines), "end)"];
+  }
+  return lines;
+}
+
+/**
+ * Render a level's action statements. Consecutive `afterPrevious` actions
+ * nest inside the completion callback of the audio before them (sequential
+ * voice chains). `finalCallback` (the advance to the next level) is placed
+ * at the completion of the action at `attachIdx` — the audio whose end
+ * drives the transition — instead of replaying that audio in parallel;
+ * pass -1 to append it nowhere (the caller emits its own advance line).
+ */
+function renderLevelActions(
+  actions: DesignerAction[],
+  finalCallback: string[] | null,
+  attachIdx: number
+): string[] {
+  const out: string[] = [];
+  let i = 0;
+  while (i < actions.length) {
+    const run = [actions[i]];
+    const runStart = i;
+    let j = i + 1;
+    while (j < actions.length && actions[j].afterPrevious) {
+      run.push(actions[j]);
+      j++;
+    }
+    const attachInRun = finalCallback !== null && attachIdx >= runStart && attachIdx < j;
+    let childLines: string[] | null = null;
+    for (let k = j - 1; k >= runStart; k--) {
+      if (attachInRun && k === attachIdx) {
+        childLines = [...(childLines ?? []), ...finalCallback!];
+      }
+      const rendered = renderAction(actions[k], childLines ?? []);
+      if (rendered) childLines = rendered;
+    }
+    if (childLines) out.push(...indentLines(childLines));
+    i = j;
+  }
+  return out;
 }
 
 export function generateLua(design: DesignerScript): string {
@@ -163,16 +225,35 @@ export function generateLua(design: DesignerScript): string {
   for (let i = n; i >= 1; i--) {
     lines.push(`local function level${i}()`);
     lines.push("  corrupt()");
-    for (const action of design.levels[i - 1].actions) {
-      const line = actionLine(action);
-      if (line) lines.push(line);
+    const level = design.levels[i - 1];
+    const advance = level.advance;
+    // When the advance audio is also one of the level's actions (the norm
+    // for converted chains), the next level nests inside that action's
+    // completion instead of replaying the audio in parallel.
+    let advanceIdx = -1;
+    if (i < n && advance.mode === "audio") {
+      for (let k = level.actions.length - 1; k >= 0; k--) {
+        const a = level.actions[k];
+        if (a.kind === "audio" && a.file === advance.file) {
+          advanceIdx = k;
+          break;
+        }
+      }
     }
-    const advance = design.levels[i - 1].advance;
+    lines.push(
+      ...renderLevelActions(
+        level.actions,
+        advanceIdx >= 0 ? [`level${i + 1}()`] : null,
+        advanceIdx
+      )
+    );
     if (i === n || advance.mode === "end") {
       lines.push("  -- final level of this design");
       lines.push("end");
     } else if (advance.mode === "audio") {
-      lines.push(`  audio(${luaString(advance.file)}, function() level${i + 1}() end)`);
+      if (advanceIdx < 0) {
+        lines.push(`  audio(${luaString(advance.file)}, function() level${i + 1}() end)`);
+      }
       lines.push("end");
     } else {
       lines.push(`  after(${clampMs(advance.seconds * 1000)}, level${i + 1})`);
@@ -389,6 +470,7 @@ function sanitizeDesign(design: DesignerScript): DesignerScript {
                 ? Math.min(MAX_LUA_DELAY_MS, Math.round(a.delayMs))
                 : undefined;
             if (delayMs !== undefined) clean.delayMs = delayMs;
+            if (a.afterPrevious === true) clean.afterPrevious = true;
             return clean;
           }),
         advance:
@@ -584,19 +666,24 @@ interface ScannedCall {
   pos: number;
 }
 
-/** Span of `function <name>(...) ... end`, or null when not defined. */
+/** Span of `function <name>(...) … end`, or null when not defined. */
 function functionBodySpan(code: string, name: string): { start: number; end: number } | null {
   const def = new RegExp(`\\bfunction\\s+${name}\\s*\\(`);
   const m = def.exec(code);
   if (!m) return null;
+  // Lua blocks nest under one `end` each: function/then/do/repeat open,
+  // elseif borrows its `then` (so it self-corrects), end/until close.
   let depth = 0;
-  const re = /\bfunction\b|\bend\b/g;
+  const re = /\b(function|then|do|elseif|end|repeat|until)\b/g;
   re.lastIndex = m.index;
   let match: RegExpExecArray | null;
   while ((match = re.exec(code))) {
-    if (match[0] === "function") depth++;
-    else {
-      depth--;
+    if (match[0] === "function" || match[0] === "then" || match[0] === "do" || match[0] === "repeat") {
+      depth += 1;
+    } else if (match[0] === "elseif") {
+      depth -= 1; // the matching `then` re-adds it
+    } else {
+      depth -= 1; // end | until
       if (depth === 0) return { start: m.index, end: match.index + match[0].length };
     }
   }
@@ -719,6 +806,30 @@ export function designFromScript(lua: string, corruption: unknown): ConversionRe
   const insideDefinition = (pos: number): boolean =>
     definitionSpans.some((d) => pos >= d.start && pos < d.end);
 
+  // Spans of every script-local function: a call inside a function that an
+  // earlier audio named as its on_stop callback belongs to that chain.
+  const fnSpans: Array<{ name: string; start: number; end: number }> = [];
+  for (const name of definedFns) {
+    const span = functionBodySpan(code, name);
+    if (span) fnSpans.push({ name, ...span });
+  }
+  const innermostFnAt = (pos: number): string | null => {
+    let best: { name: string; size: number } | null = null;
+    for (const f of fnSpans) {
+      if (pos > f.start && pos < f.end) {
+        const size = f.end - f.start;
+        if (!best || size < best.size) best = { name: f.name, size };
+      }
+    }
+    return best?.name ?? null;
+  };
+  // Functions named as an audio call's on_stop callback (directly, or via
+  // after(ms, fn) inside an anonymous callback): their bodies run when that
+  // audio ends, so their actions become sequential chain links.
+  const chainTargets = new Set<string>();
+  const pendingDelay = new Map<string, number>();
+  const pendingApplied = new Set<string>();
+
   // Spans of after(<ms>, …) calls with a literal delay: API calls inside
   // them fire at that offset from the enclosing scope, and the design keeps
   // the stagger by carrying the delay on the action.
@@ -765,6 +876,7 @@ export function designFromScript(lua: string, corruption: unknown): ConversionRe
   let chainedCalls = 0;
   let computedRolls = 0;
   let delayedActions = 0;
+  let chainedLinks = 0;
 
   const callRe = /\b([A-Za-z_]\w*)\s*\(/g;
   let callm: RegExpExecArray | null;
@@ -842,6 +954,31 @@ export function designFromScript(lua: string, corruption: unknown): ConversionRe
     }
     if (delayMs === undefined) delayMs = delayForPos(callm.index);
 
+    // Sequential voice chains: an audio's callback argument names the
+    // function that runs when playback ends.
+    if (kind === "audio") {
+      const argTexts = parts.slice(1).map((p) => p.trim());
+      const cbName = argTexts.find((p) => definedFns.has(p));
+      if (cbName) {
+        chainTargets.add(cbName);
+      } else {
+        const anon = argTexts.find((p) => p.includes("function"));
+        if (anon) {
+          const delayed = /\bafter\(\s*(\d+)\s*,\s*([A-Za-z_]\w*)\s*\)/.exec(anon);
+          const bare = /\b([A-Za-z_]\w*)\s*\(\s*\)/.exec(anon);
+          const ref = delayed?.[2] ?? bare?.[1];
+          if (
+            ref &&
+            definedFns.has(ref) &&
+            !(API_CALL_NAMES as readonly string[]).includes(ref)
+          ) {
+            chainTargets.add(ref);
+            if (delayed) pendingDelay.set(ref, Number(delayed[1]));
+          }
+        }
+      }
+    }
+
     calls.push({ kind, literal, chained, chance, delayMs, pos: callm.index });
   }
 
@@ -915,6 +1052,18 @@ export function designFromScript(lua: string, corruption: unknown): ConversionRe
       action.delayMs = Math.min(MAX_LUA_DELAY_MS, Math.round(call.delayMs));
       delayedActions++;
     }
+    // Chain link: this call lives inside a function some earlier audio
+    // named as its on_stop callback, so it plays when that audio ends.
+    const host = innermostFnAt(call.pos);
+    if (host && chainTargets.has(host)) {
+      action.afterPrevious = true;
+      chainedLinks++;
+      const pd = pendingDelay.get(host);
+      if (pd !== undefined && !pendingApplied.has(host) && pd > 0) {
+        pendingApplied.add(host);
+        action.delayMs = Math.min(MAX_LUA_DELAY_MS, Math.max(action.delayMs ?? 0, pd));
+      }
+    }
     target.actions.push(action);
 
     // Advance hint: an audio with a callback carries the chain onward.
@@ -964,8 +1113,15 @@ export function designFromScript(lua: string, corruption: unknown): ConversionRe
   if (scanBudgetHit) {
     notes.push("The script's nesting exceeded the conversion scan budget — later actions were not converted.");
   }
-  if (chainedCalls > 0) {
-    notes.push("Callback chains were flattened into level order — check each level's Advance setting.");
+  if (chainedLinks > 0) {
+    notes.push(
+      `${chainedLinks} chained action(s) kept their audio on_stop sequence — each plays when the previous one ends.`
+    );
+  }
+  if (chainedCalls > chainedLinks) {
+    notes.push(
+      `${chainedCalls - chainedLinks} callback argument(s) could not be resolved to a chain — check those levels' Advance settings.`
+    );
   }
   if (delayedActions > 0) {
     notes.push(

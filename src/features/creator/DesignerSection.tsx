@@ -12,6 +12,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Badge,
   Button,
+  Checkbox,
   Chip,
   Group,
   NumberInput,
@@ -379,6 +380,21 @@ function LevelCard({
               aria-label={`Action ${i + 1} delay milliseconds`}
               data-testid={`designer-action-delay-${index}-${i}`}
             />
+            {i > 0 ? (
+              <Checkbox
+                size="xs"
+                label="after prev"
+                checked={action.afterPrevious === true}
+                onChange={(e) =>
+                  setAction(i, {
+                    ...action,
+                    afterPrevious: e.currentTarget.checked ? true : undefined,
+                  })
+                }
+                aria-label={`Action ${i + 1} plays after the previous one ends`}
+                data-testid={`designer-action-afterprev-${index}-${i}`}
+              />
+            ) : null}
             <Button size="xs" variant="subtle" color="red" aria-label="Remove action" onClick={() => removeAction(i)}>
               <IconTrash size={12} />
             </Button>
