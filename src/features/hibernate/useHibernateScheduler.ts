@@ -111,6 +111,7 @@ export function useHibernateScheduler(options: UseHibernateSchedulerOptions) {
     setState({ isActive: true, nextBurstTime: null, countdownSeconds: 0 });
 
     const finish = () => {
+      burstTimersRef.current = [];
       setHibernateActive(false);
       if (useSettingsStore.getState().hibernateMode === 1 && useAppStore.getState().isRunning) {
         armRef.current();

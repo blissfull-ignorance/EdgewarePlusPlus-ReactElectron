@@ -4,6 +4,7 @@ import {
   planBurst,
   resolveBurstType,
   MAX_BURST_POPUPS,
+  type BurstType,
 } from "../../src/features/hibernate/HibernateScheduler";
 
 /** Deterministic rand from a fixed sequence. */
@@ -32,13 +33,23 @@ describe("computeNextHibernateDelay (legacy randint(min, max))", () => {
 
   it("clamps hostile ranges to the burst-duration ceiling", () => {
     expect(computeNextHibernateDelay(0, 1e12, () => 0.5)).toBeLessThanOrEqual(3_600_000);
-    expect(computeNextHibernateDelay(Number.NaN, 1000, () => 0)).toBe(0);
+    expect(computeNextHibernateDelay(Number.NaN, 1000, () => 0)).toBe(1000);
+  });
+
+  it("floors the sleep so an all-zero range cannot storm", () => {
+    expect(computeNextHibernateDelay(0, 0, () => 0)).toBe(1000);
+    expect(computeNextHibernateDelay(500, 800, () => 0.9)).toBe(1000);
+    expect(computeNextHibernateDelay(-10, -5, () => 0)).toBe(1000);
   });
 });
 
 describe("resolveBurstType", () => {
   it("passes concrete types through", () => {
     expect(resolveBurstType("Glitch", () => 0)).toBe("Glitch");
+  });
+
+  it("an unknown name from a hand-edited config bursts as Original", () => {
+    expect(resolveBurstType("Nonsense" as BurstType, () => 0)).toBe("Original");
   });
 
   it("Chaos picks among the five real types — Original included (legacy)", () => {

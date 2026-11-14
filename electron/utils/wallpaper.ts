@@ -142,8 +142,7 @@ export async function setWallpaper(filepath: string): Promise<void> {
     return;
   }
   if (!fs.existsSync(filepath)) {
-    logger.error("[Wallpaper] Wallpaper file does not exist:", filepath);
-    return;
+    throw new Error(`Wallpaper file does not exist: ${filepath}`);
   }
 
   try {
@@ -154,10 +153,11 @@ export async function setWallpaper(filepath: string): Promise<void> {
     } else if (process.platform === "win32") {
       await setWallpaperWindows(filepath);
     } else {
-      logger.warn("[Wallpaper] Unsupported platform for wallpaper:", process.platform);
+      throw new Error(`Unsupported platform for wallpaper: ${process.platform}`);
     }
   } catch (err) {
     logger.error("[Wallpaper] Wallpaper set failed:", err);
+    throw err;
   }
 }
 

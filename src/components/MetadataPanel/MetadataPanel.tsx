@@ -63,8 +63,9 @@ export function MetadataPanel({ onOpenPackManager }: { onOpenPackManager?: () =>
     return `${minutes}m ${secs}s`;
   };
 
-  const hibernateState = hibernateMode ? (hibernateActive ? "Active" : "Enabled, Idle") : "Disabled";
-  const hibernateColor = hibernateMode ? (hibernateActive ? "teal" : "blue") : "gray";
+  const hibernateOn = hibernateMode === 1;
+  const hibernateState = hibernateOn ? (hibernateActive ? "Active" : "Enabled, Idle") : "Disabled";
+  const hibernateColor = hibernateOn ? (hibernateActive ? "teal" : "blue") : "gray";
 
   return (
     <div data-testid="metadata-panel">

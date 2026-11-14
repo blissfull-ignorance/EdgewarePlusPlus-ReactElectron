@@ -20,6 +20,11 @@ export const MAX_BURST_POPUPS = 1000;
 export const MAX_BURST_DURATION_MS = 3_600_000;
 /** Same floor the roll loop uses for a hand-edited delay. */
 export const MIN_TICK_DELAY_MS = 100;
+/**
+ * Sleep floor between bursts: min=max=0 (UI-reachable) must not collapse
+ * into a zero-delay burst storm.
+ */
+export const MIN_HIBERNATE_SLEEP_MS = 1000;
 
 const CHAOS_TYPES: BurstType[] = ["Original", "Spaced", "Glitch", "Ramp", "Pump-Scare"];
 
@@ -60,13 +65,18 @@ function randInt(rand: () => number, min: number, max: number): number {
 }
 
 export function resolveBurstType(type: BurstType, rand: () => number): BurstType {
-  if (type !== "Chaos") return type;
-  return CHAOS_TYPES[Math.min(CHAOS_TYPES.length - 1, Math.floor(rand() * CHAOS_TYPES.length))];
+  if (type === "Chaos") {
+    return CHAOS_TYPES[Math.min(CHAOS_TYPES.length - 1, Math.floor(rand() * CHAOS_TYPES.length))];
+  }
+  // A hand-edited config can name anything; unknown names burst as Original,
+  // the simplest real pattern, instead of silently picking the Ramp tail.
+  return CHAOS_TYPES.includes(type) ? type : "Original";
 }
 
 /**
  * Delay in ms until the next burst: randint(min, max), tolerant of a hostile
- * or inverted range (min > max collapses to min).
+ * or inverted range (min > max collapses to min) and floored so an all-zero
+ * range still spaces bursts a second apart.
  */
 export function computeNextHibernateDelay(
   min: number,
@@ -75,8 +85,8 @@ export function computeNextHibernateDelay(
 ): number {
   const lo = clampInt(min, 0, MAX_BURST_DURATION_MS, 0);
   const hi = clampInt(max, 0, MAX_BURST_DURATION_MS, 0);
-  if (hi <= lo) return lo;
-  return randInt(rand, lo, hi);
+  const delay = hi <= lo ? lo : randInt(rand, lo, hi);
+  return Math.max(MIN_HIBERNATE_SLEEP_MS, delay);
 }
 
 /** Convert absolute tick times into consecutive delays. */

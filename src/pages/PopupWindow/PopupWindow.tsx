@@ -68,6 +68,15 @@ export function parsePopupRoute(hash: string): PopupRoute | null {
   if (!match) return null;
   // The id segment may carry a trailing `?h=<gif>&ps=1` (spiral overlay,
   // pump-scare force-close) inside the hash.
+  // Malformed percent-encoding (a hand-typed hash) must not blank the
+  // window: keep the raw segment instead of throwing during render.
+  const safeDecode = (s: string): string => {
+    try {
+      return decodeURIComponent(s);
+    } catch {
+      return s;
+    }
+  };
   const idPart = match[3];
   const qIdx = idPart.indexOf("?");
   const popupId = qIdx >= 0 ? idPart.slice(0, qIdx) : idPart;
@@ -76,12 +85,12 @@ export function parsePopupRoute(hash: string): PopupRoute | null {
   if (qIdx >= 0) {
     const query = idPart.slice(qIdx + 1);
     const h = query.match(/(?:^|&)h=([^&]*)/);
-    if (h?.[1]) hypnoGif = decodeURIComponent(h[1]);
+    if (h?.[1]) hypnoGif = safeDecode(h[1]);
     pumpScare = /(?:^|&)ps=1(?:&|$)/.test(query);
   }
   return {
     type: match[1] as PopupRoute["type"],
-    mediaId: decodeURIComponent(match[2]),
+    mediaId: safeDecode(match[2]),
     popupId,
     hypnoGif,
     pumpScare: pumpScare || undefined,

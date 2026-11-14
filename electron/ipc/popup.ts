@@ -317,7 +317,9 @@ function registerHandlers(): void {
   ipcMain.handle("popup:startMoving", async (_event, id: string): Promise<boolean> => {
     const win = popupWindows.get(id);
     if (!win || win.isDestroyed() || movers.has(id)) return false;
-    const speed = readSetting("movingSpeed") || 5;
+    // Hostile speeds (Infinity, huge ints) would produce NaN positions or
+    // teleporting; the mover is only meaningful at desktop-plausible rates.
+    const speed = Math.min(100, readSetting("movingSpeed")) || 5;
     const start = win.getBounds();
     movers.set(id, initialMoveState(start.x, start.y, speed));
     ensureMoverLoop();

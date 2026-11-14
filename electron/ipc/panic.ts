@@ -85,7 +85,12 @@ async function doPanic(): Promise<void> {
     try {
       const realPath = materializePanicWallpaper();
       if (realPath) {
-        await applyWallpaper(realPath);
+        // Panic must not wait on a wedged Apple Events queue: give the
+        // desktop swap a beat, then escape regardless.
+        await Promise.race([
+          applyWallpaper(realPath),
+          new Promise<void>((resolve) => setTimeout(resolve, 1500)),
+        ]);
       }
     } catch (err) {
       logger.error("[Panic] Failed to set panic wallpaper:", err);

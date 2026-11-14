@@ -320,6 +320,12 @@ describe("system IPC handlers (pack import / discovery / selection)", () => {
 
 describe("settings live cache (push-through)", () => {
   let cacheRoot: string;
+  const pushFromMainWindow = (payload: unknown): void => {
+    handlers["system:pushSettings"](
+      { sender: { getURL: () => "http://localhost:5173/" } },
+      payload
+    );
+  };
   const configPath = () => path.join(cacheRoot, "data", "config.json");
 
   beforeAll(() => {
@@ -344,7 +350,7 @@ describe("settings live cache (push-through)", () => {
     mkdirSync(path.dirname(configPath()), { recursive: true });
     writeFileSync(configPath(), JSON.stringify({ lkCorner: 1 }));
 
-    handlers["system:pushSettings"]({}, { lkCorner: 3, popupMod: 7 });
+    pushFromMainWindow({ lkCorner: 3, popupMod: 7 });
 
     expect(await handlers["system:loadSettings"]()).toEqual({ lkCorner: 3, popupMod: 7 });
     // Persistence is still the save paths' job alone.
@@ -354,7 +360,7 @@ describe("settings live cache (push-through)", () => {
   it("saveSettings refreshes the cache as part of persisting", async () => {
     // Prime the cache with a sentinel: without the save-path refresh, the
     // stale sentinel (not the disk) is what loadSettings would keep serving.
-    handlers["system:pushSettings"]({}, { sentinel: true });
+    pushFromMainWindow({ sentinel: true });
     await handlers["system:saveSettings"]({}, { lkCorner: 2 });
     expect(await handlers["system:loadSettings"]()).toEqual({ lkCorner: 2 });
     expect(JSON.parse(readFileSync(configPath(), "utf-8"))).toEqual({ lkCorner: 2 });
@@ -363,8 +369,18 @@ describe("settings live cache (push-through)", () => {
   it("pushSettings ignores payloads that are not settings objects", async () => {
     mkdirSync(path.dirname(configPath()), { recursive: true });
     writeFileSync(configPath(), JSON.stringify({ lkCorner: 1 }));
-    handlers["system:pushSettings"]({}, "garbage");
-    handlers["system:pushSettings"]({}, [1, 2]);
+    pushFromMainWindow("garbage");
+    pushFromMainWindow([1, 2]);
+    expect(await handlers["system:loadSettings"]()).toEqual({ lkCorner: 1 });
+  });
+
+  it("pushSettings from a popup-window sender is refused", async () => {
+    mkdirSync(path.dirname(configPath()), { recursive: true });
+    writeFileSync(configPath(), JSON.stringify({ lkCorner: 1 }));
+    handlers["system:pushSettings"](
+      { sender: { getURL: () => "http://localhost:5173/#/popup/image/x.png/p1" } },
+      { lkCorner: 3 }
+    );
     expect(await handlers["system:loadSettings"]()).toEqual({ lkCorner: 1 });
   });
 });

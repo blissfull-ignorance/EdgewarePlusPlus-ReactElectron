@@ -78,22 +78,40 @@ async function beforeWallpaperChange(): Promise<void> {
  * A crash before returning keeps the flag set — a pending restore is the
  * crash-safe direction.
  */
-export async function applyWallpaper(filepath: string): Promise<void> {
-  const alreadyDirty = readState()?.dirty === true;
-  await beforeWallpaperChange();
-  try {
-    await setWallpaper(filepath);
-  } catch (err) {
-    if (!alreadyDirty) {
-      const state = readState();
-      if (state?.dirty) writeState({ ...state, dirty: false });
+export function applyWallpaper(filepath: string): Promise<void> {
+  return serialize(async () => {
+    const alreadyDirty = readState()?.dirty === true;
+    await beforeWallpaperChange();
+    try {
+      await setWallpaper(filepath);
+    } catch (err) {
+      if (!alreadyDirty) {
+        const state = readState();
+        if (state?.dirty) writeState({ ...state, dirty: false });
+      }
+      throw err;
     }
-    throw err;
-  }
+  });
+}
+
+/**
+ * All desktop mutations serialize through one queue: an apply racing a
+ * restore could otherwise leave the pack wallpaper applied while the dirty
+ * flag is already retired, stranding it past every future boot.
+ */
+let queue: Promise<unknown> = Promise.resolve();
+function serialize<T>(task: () => Promise<T>): Promise<T> {
+  const run = queue.then(task, task);
+  queue = run.catch(() => undefined);
+  return run;
 }
 
 /** Restore the cached original when a previous change left it applied. */
-export async function restoreWallpaperIfDirty(): Promise<boolean> {
+export function restoreWallpaperIfDirty(): Promise<boolean> {
+  return serialize(restoreNow);
+}
+
+async function restoreNow(): Promise<boolean> {
   if (disabled()) return false;
   const state = readState();
   if (!state?.dirty) return false;

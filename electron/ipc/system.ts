@@ -7,7 +7,12 @@ import { logger } from "../utils/logger";
 import { panicFromTray } from "./panic";
 import { setDiscordPresence as discordSetPresence } from "./discord";
 import { applyWallpaper, restoreWallpaperIfDirty } from "../utils/wallpaperMemory";
-import { loadConfigOrNull, refreshConfig } from "../utils/configCache";
+import {
+  currentConfigRevision,
+  loadConfigOrNull,
+  refreshConfig,
+  refreshConfigFromSave,
+} from "../utils/configCache";
 import { autostartFilePath, buildAutostartEntry } from "../utils/autostart";
 import { activePackDir, loadAppIcon, resolveIconFile } from "../utils/appIcon";
 import {
@@ -164,11 +169,16 @@ function createTrayIcon(): Tray | null {
       {
         label: "Skip Hibernate",
         click: () => {
-          // The scheduler lives in the renderer now; the tray tells it to
-          // stand down instead of owning timers of its own.
-          const mainWin = BrowserWindow.getAllWindows().find(
-            (win) => !win.isDestroyed() && !win.webContents.getURL().includes("#/popup/")
-          );
+          // The scheduler lives in the renderer: skip fires its pending
+          // burst now (the hook ignores the click mid-burst or with the
+          // mode off). Prefer a window whose navigation has committed so a
+          // just-created popup (still about:blank) cannot swallow the click.
+          const live = BrowserWindow.getAllWindows().filter((win) => !win.isDestroyed());
+          const mainWin =
+            live.find((win) => {
+              const url = win.webContents.getURL();
+              return url !== "" && !url.includes("#/popup/");
+            }) ?? live[0];
           mainWin?.webContents.send("hibernate:skip");
         },
       },
@@ -526,6 +536,11 @@ function registerHandlers(): void {
    * when the app quits.
    */
   ipcMain.on("system:saveSettingsSync", (event, settings: unknown): void => {
+    if (!settings || typeof settings !== "object" || Array.isArray(settings)) {
+      logger.error("[System] saveSettingsSync rejected a non-object payload");
+      event.returnValue = false;
+      return;
+    }
     try {
       const dir = dataDir();
       if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
@@ -549,8 +564,10 @@ ipcMain.handle("system:loadSettings", async (): Promise<Record<string, unknown> 
 
   // Renderer → main live view of settings: keeps main-side readers (popup
   // geometry) current inside the autosave window. Never touches the disk;
-  // persistence stays with the save paths.
-  ipcMain.on("system:pushSettings", (_event, settings: unknown): void => {
+  // persistence stays with the save paths. Only the main window owns the
+  // settings view — a popup renderer must not be able to poison the cache.
+  ipcMain.on("system:pushSettings", (event, settings: unknown): void => {
+    if (event.sender.getURL().includes("#/popup/")) return;
     refreshConfig(settings);
   });
 
@@ -561,6 +578,7 @@ ipcMain.handle("system:loadSettings", async (): Promise<Record<string, unknown> 
       logger.error("[System] saveSettings rejected a non-object payload");
       return;
     }
+    const cacheRevBeforeWrite = currentConfigRevision();
     try {
       const dir = dataDir();
       if (!fs.existsSync(dir)) {
@@ -574,7 +592,9 @@ ipcMain.handle("system:loadSettings", async (): Promise<Record<string, unknown> 
       try {
         await fs.promises.writeFile(tmpPath, JSON.stringify(settings, null, 2), "utf-8");
         await fs.promises.rename(tmpPath, configPath);
-        refreshConfig(settings);
+        // A push that arrived mid-write carries newer state than this
+        // snapshot; the cache keeps it and only the disk took the older save.
+        refreshConfigFromSave(settings, cacheRevBeforeWrite);
       } catch (err) {
         await fs.promises.rm(tmpPath, { force: true }).catch(() => undefined);
         throw err;
