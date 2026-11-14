@@ -476,6 +476,30 @@ function registerHandlers(): void {
   );
 
   ipcMain.handle(
+    "system:selectPackInitFolder",
+    async (): Promise<{ cancelled: boolean; folderPath?: string }> => {
+      const override = process.env.EDGWARE_PACK_INIT_TEST_PATH;
+      if (override) {
+        return { cancelled: false, folderPath: override };
+      }
+      const windows = BrowserWindow.getAllWindows();
+      const parent = windows.find((w) => !w.webContents.isDestroyed());
+      const result = parent
+        ? await dialog.showOpenDialog(parent, {
+            title: "Choose a folder for the new pack",
+            buttonLabel: "Initialize",
+            properties: ["openDirectory", "createDirectory"],
+          })
+        : await dialog.showOpenDialog({
+            title: "Choose a folder for the new pack",
+            buttonLabel: "Initialize",
+            properties: ["openDirectory", "createDirectory"],
+          });
+      return { cancelled: result.canceled, folderPath: result.filePaths[0] };
+    }
+  );
+
+  ipcMain.handle(
     "system:validatePackFolder",
     async (
       _event,

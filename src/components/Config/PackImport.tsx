@@ -6,6 +6,7 @@ import {
   IconAlertCircle,
   IconFileZip,
   IconFolderPlus,
+  IconSparkles,
   IconUpload,
   IconX,
 } from "@tabler/icons-react";
@@ -16,6 +17,7 @@ interface PackImportProps {
   onReject: (rejections: FileRejection[]) => void;
   onImportFromDisk: () => void;
   onAddFolder: () => void;
+  onInitPack: () => void;
   importing: boolean;
   progress: number | null;
   error: string | null;
@@ -27,6 +29,7 @@ const PackImport = ({
   onReject,
   onImportFromDisk,
   onAddFolder,
+  onInitPack,
   importing,
   progress,
   error,
@@ -44,7 +47,7 @@ const PackImport = ({
     <SectionCard
       icon={<IconFileZip size={16} />}
       title="Import New Pack"
-      description="Drop a pack zip into the library, or pick one from disk."
+      description="Drop a pack zip into the library, pick one from disk, or start an empty pack of your own."
     >
       <Dropzone
         onDrop={handleDrop}
@@ -122,6 +125,15 @@ const PackImport = ({
           data-testid="pack-add-folder-button"
         >
           Add existing pack folder…
+        </Button>
+        <Button
+          variant="default"
+          leftSection={<IconSparkles size={15} />}
+          onClick={onInitPack}
+          disabled={importing}
+          data-testid="pack-init-button"
+        >
+          Initialize new pack…
         </Button>
       </Group>
 

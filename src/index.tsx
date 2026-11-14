@@ -49,6 +49,7 @@ if (boot === "stub" && typeof window !== "undefined") {
       getEditableIndex: async () => null,
       setFileTags: async () => null,
       deleteFile: async () => ({ ok: false, error: "Not available in the browser preview" }),
+      initPack: async () => ({ ok: false, error: "Not available in the browser preview" }),
       addMood: async () => null,
       removeMood: async () => null,
       renameMood: async () => null,
@@ -115,6 +116,7 @@ if (boot === "stub" && typeof window !== "undefined") {
         name: filepath.split("/").pop() ?? "Imported Pack",
       }),
       selectZip: async () => ({ cancelled: true, filePaths: [] }),
+      selectPackInitFolder: async () => ({ cancelled: true }),
       selectPackFolder: async () => ({ cancelled: true }),
       validatePackFolder: async () => ({
         ok: false,

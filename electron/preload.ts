@@ -26,6 +26,7 @@ const electronAPI: ElectronAPI = {
     getEditableIndex: (packPath) => ipcRenderer.invoke("pack:getEditableIndex", packPath),
     setFileTags: (packPath, file, tags) => ipcRenderer.invoke("pack:setFileTags", packPath, file, tags),
     deleteFile: (packPath, kind, file) => ipcRenderer.invoke("pack:deleteFile", packPath, kind, file),
+    initPack: (folderPath) => ipcRenderer.invoke("pack:initPack", folderPath),
     addMood: (packPath, name) => ipcRenderer.invoke("pack:addMood", packPath, name),
     removeMood: (packPath, name) => ipcRenderer.invoke("pack:removeMood", packPath, name),
     renameMood: (packPath, from, to) => ipcRenderer.invoke("pack:renameMood", packPath, from, to),
@@ -114,6 +115,7 @@ const electronAPI: ElectronAPI = {
     listPacks: () => ipcRenderer.invoke("system:listPacks"),
     importPack: (filepath) => ipcRenderer.invoke("system:importPack", filepath),
     selectZip: () => ipcRenderer.invoke("system:selectZip"),
+    selectPackInitFolder: () => ipcRenderer.invoke("system:selectPackInitFolder"),
     selectPackFolder: () => ipcRenderer.invoke("system:selectPackFolder"),
     validatePackFolder: (folderPath) =>
       ipcRenderer.invoke("system:validatePackFolder", folderPath),

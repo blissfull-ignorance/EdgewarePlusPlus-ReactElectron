@@ -300,6 +300,53 @@ export function GeneralPanel({ tab = "start", onTabChange }: GeneralPanelProps) 
     }
   }, [setRaw, save, refreshPacks]);
 
+  const handleInitPack = useCallback(async () => {
+    setFolderWarning(null);
+    let picked: { cancelled: boolean; folderPath?: string };
+    try {
+      picked = await window.api.system.selectPackInitFolder();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Unknown error";
+      setFolderWarning(message);
+      showToast({
+        id: "pack-init-error",
+        title: "Could not open the folder picker",
+        description: message,
+        color: "red",
+        icon: <IconAlertCircle size={18} />,
+        duration: 10000,
+      });
+      return;
+    }
+    if (picked.cancelled || !picked.folderPath) return;
+    const init = await window.api.pack.initPack(picked.folderPath);
+    if (!init.ok || !init.path) {
+      const message = init.error ?? "That folder could not be initialized.";
+      setFolderWarning(message);
+      showToast({
+        id: "pack-init-error",
+        title: "Could not initialize the pack",
+        description: message,
+        color: "red",
+        icon: <IconAlertCircle size={18} />,
+        duration: 10000,
+      });
+      return;
+    }
+    const current = useSettingsStore.getState().packFolders ?? [];
+    setRaw({ packFolders: [...new Set([...current, init.path])], packPath: init.path });
+    await save();
+    await refreshPacks();
+    showToast({
+      id: "pack-init-done",
+      title: `Created ${lastSegment(init.path)}`,
+      description: "The empty pack is selected. Add media files and design it in Mood tagging and Script designer.",
+      color: "teal",
+      icon: <IconCircleCheck size={18} />,
+      duration: 8000,
+    });
+  }, [setRaw, save, refreshPacks]);
+
   const handleOpenLibrary = useCallback(async () => {
     await window.api.system.openPackLibrary();
   }, []);
@@ -334,6 +381,7 @@ export function GeneralPanel({ tab = "start", onTabChange }: GeneralPanelProps) 
               onReject={handleRejectedDrop}
               onImportFromDisk={() => void handleImportFromDisk()}
               onAddFolder={() => void handleAddFolder()}
+              onInitPack={() => void handleInitPack()}
               importing={importing}
               progress={importProgress}
               error={importError}

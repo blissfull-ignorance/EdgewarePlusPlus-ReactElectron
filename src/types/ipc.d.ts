@@ -97,6 +97,10 @@ export interface ElectronAPI {
     getEditableIndex: (packPath: string) => Promise<Record<string, unknown> | null>;
     /** Creator tools: set a file's exact mood tags; resolves the new index. */
     setFileTags: (packPath: string, file: string, tags: string[]) => Promise<Record<string, unknown> | null>;
+    /** Initialize an empty folder into a brand-new pack. */
+    initPack: (
+      folderPath: string
+    ) => Promise<{ ok: boolean; error?: string; path?: string }>;
     /** Delete one pack media file and strip its mood tags. */
     deleteFile: (
       packPath: string,
@@ -229,6 +233,7 @@ export interface ElectronAPI {
     /** Native zip picker (main-process dialog); returns the selected path(s) */
     selectZip: () => Promise<ZipSelection>;
     /** Native directory picker for adding an existing pack folder */
+    selectPackInitFolder: () => Promise<FolderSelection>;
     selectPackFolder: () => Promise<FolderSelection>;
     /** Validate a folder as a pack (loose: exists; info.json/index.json preferred) */
     validatePackFolder: (folderPath: string) => Promise<FolderValidation>;

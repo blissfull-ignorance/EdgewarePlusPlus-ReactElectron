@@ -90,6 +90,7 @@ if (typeof window !== "undefined") {
       getEditableIndex: vi.fn().mockResolvedValue(null),
       setFileTags: vi.fn().mockResolvedValue(null),
       deleteFile: vi.fn().mockResolvedValue({ ok: true }),
+      initPack: vi.fn().mockResolvedValue({ ok: true }),
       addMood: vi.fn().mockResolvedValue(null),
       removeMood: vi.fn().mockResolvedValue(null),
       renameMood: vi.fn().mockResolvedValue(null),
@@ -158,6 +159,7 @@ if (typeof window !== "undefined") {
         name: filepath.split("/").pop() ?? "Imported Pack",
       })),
       selectZip: vi.fn().mockResolvedValue({ cancelled: true, filePaths: [] }),
+      selectPackInitFolder: vi.fn().mockResolvedValue({ cancelled: true }),
       selectPackFolder: vi.fn().mockResolvedValue({ cancelled: true }),
       validatePackFolder: vi
         .fn()

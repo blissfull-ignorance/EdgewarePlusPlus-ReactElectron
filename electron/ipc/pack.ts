@@ -986,6 +986,66 @@ function registerHandlers(): void {
   );
 
   /**
+   * Initialize an empty folder into a brand-new pack: the manifests the
+   * app reads (info.json, index.json) plus the media directories. A folder
+   * that already is a pack, or still holds files, is refused — this must
+   * never overwrite anything.
+   */
+  ipcMain.handle(
+    "pack:initPack",
+    async (
+      _event,
+      folderPath: unknown
+    ): Promise<{ ok: boolean; error?: string; path?: string }> => {
+      if (typeof folderPath !== "string" || !folderPath) {
+        return { ok: false, error: "No folder was chosen." };
+      }
+      const dir = path.resolve(folderPath.replace(/^~/, process.env.HOME ?? folderPath));
+      if (!fs.existsSync(dir) || !fs.statSync(dir).isDirectory()) {
+        return { ok: false, error: "That location does not exist." };
+      }
+      if (looksLikePack(dir)) {
+        return { ok: false, error: "That folder is already a pack. Add it with the folder button instead." };
+      }
+      // Pack scaffolding (media dirs the user may have created by hand) is
+      // welcome; any other file means the folder is not a fresh start.
+      const strays = fs.readdirSync(dir, { withFileTypes: true }).filter((e) => {
+        if (e.name.startsWith(".")) return false;
+        if (e.isDirectory() && ["img", "vid", "aud", "hypno"].includes(e.name)) return false;
+        return true;
+      });
+      if (strays.length > 0) {
+        return { ok: false, error: "The folder is not empty. Choose an empty folder for a new pack." };
+      }
+      const name = path.basename(dir);
+      const id =
+        name
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, "-")
+          .replace(/^-+|-+$/g, "") || "pack";
+      try {
+        writePackJson(path.join(dir, "info.json"), {
+          name,
+          id,
+          creator: "",
+          version: "1.0",
+          description: "A new empty pack.",
+        });
+        writePackJson(path.join(dir, "index.json"), { default: {}, moods: [] });
+        for (const sub of ["img", "vid", "aud"]) {
+          fs.mkdirSync(path.join(dir, sub), { recursive: true });
+        }
+      } catch (err) {
+        logger.error("[Pack] Failed to initialize pack:", err);
+        return { ok: false, error: "Could not write the pack files." };
+      }
+      invalidateGalleryScan();
+      logger.info(`[Pack] Initialized a new pack at ${dir}`);
+      return { ok: true, path: dir };
+    }
+  );
+
+  /**
    * Delete one media file from the pack and strip its mood tags, so the
    * index never keeps a phantom entry for a file that is gone. The name
    * must be a plain file name inside the kind's media directory.

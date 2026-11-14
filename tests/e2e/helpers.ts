@@ -158,6 +158,7 @@ export async function launchApp(page: Page, options: LaunchOptions = {}): Promis
           getEditableIndex: async () => null,
           setFileTags: async () => null,
           deleteFile: async () => ({ ok: false, error: "stub" }),
+          initPack: async () => ({ ok: false, error: "stub" }),
           addMood: async () => null,
           removeMood: async () => null,
           renameMood: async () => null,
@@ -238,6 +239,7 @@ export async function launchApp(page: Page, options: LaunchOptions = {}): Promis
             name: filepath.split("/").pop() ?? "Imported Pack",
           }),
           selectZip: async () => ({ cancelled: true, filePaths: [] }),
+          selectPackInitFolder: async () => ({ cancelled: true }),
           selectPackFolder: async () => ({ cancelled: true }),
           validatePackFolder: async () => ({
             ok: false,
