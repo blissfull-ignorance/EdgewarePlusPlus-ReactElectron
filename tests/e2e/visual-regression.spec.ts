@@ -95,6 +95,9 @@ test.describe("Visual Regression — styled app", () => {
 
     // Startup auto-selects the first pack and saves it — that save must toast.
     await expect(page.getByText("Settings saved")).toBeVisible({ timeout: 8000 });
+    // The toast must sit below the 60px app header, never behind it.
+    const toastBox = await page.locator("[data-testid='toast-stack']").boundingBox();
+    expect(toastBox?.y).toBeGreaterThanOrEqual(60);
     await expect(page.getByText("Settings saved")).toBeHidden();
 
     await page.locator("[data-testid='main-tabs']").getByRole("button", { name: "Config" }).click();

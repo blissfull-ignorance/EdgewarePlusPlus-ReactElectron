@@ -39,7 +39,9 @@ export function ToastStack() {
         data-testid="toast-stack"
         style={{
           position: "fixed",
-          top: 16,
+          // Below the 60px app header (zIndex 1200): a toast at the window
+          // top would sit behind the bar and be unreadable.
+          top: 76,
           right: 16,
           zIndex: 1000,
           display: "flex",
