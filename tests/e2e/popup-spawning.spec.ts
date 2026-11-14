@@ -99,7 +99,7 @@ test.describe("Popup spawning — hybrid render modes", () => {
     await page.getByRole("tab", { name: "Modes" }).click();
 
     const select = page.getByRole("textbox", { name: "Popup Render Mode" });
-    await expect(select).toHaveValue("Electron Windows (Topmost)");
+    await expect(select).toHaveValue("Topmost Electron Windows");
     await select.click();
     await page.getByRole("option", { name: "In-App Overlay", exact: true }).click();
 

@@ -23,7 +23,6 @@ import { registerHandlers as registerPopupHandlers, closeAllPopups } from "./ipc
 import { registerHandlers as registerScriptingHandlers, stopScripting } from "./ipc/scripting";
 import { registerHandlers as registerSystemHandlers } from "./ipc/system";
 import { registerHandlers as registerPanicHandlers } from "./ipc/panic";
-import { registerHandlers as registerBooruHandlers } from "./ipc/booru";
 import { activePackDir, loadAppIcon, logResolvedIcon } from "./utils/appIcon";
 import { logger } from "./utils/logger";
 import fs from "node:fs";
@@ -69,7 +68,6 @@ function registerAllHandlers(): void {
   registerScriptingHandlers();
   registerSystemHandlers();
   registerPanicHandlers();
-  registerBooruHandlers();
 }
 
 function createWindow(): void {

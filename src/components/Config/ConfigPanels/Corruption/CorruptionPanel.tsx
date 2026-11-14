@@ -37,7 +37,7 @@ export function CorruptionPanel() {
   return (
     <SectionCard
       icon={<IconSkull size={16} />}
-      title="Corruption Mode (Guided Mode)"
+      title="Corruption Mode"
       description="Escalating guided mode driven by pack level transitions."
     >
       {corruptionError ? (
@@ -110,7 +110,7 @@ export function CorruptionPanel() {
           max={1000}
           step={1}
           disabled={!corruptionMode}
-          description="Popups before transition (if popup trigger)"
+          description="Used when the transition trigger is popups"
         />
 
         <ConfigSlider
@@ -121,7 +121,7 @@ export function CorruptionPanel() {
           max={1000}
           step={1}
           disabled={!corruptionMode}
-          description="Launches before transition (if launch trigger)"
+          description="Used when the transition trigger is app launches"
         />
 
         <ConfigToggle

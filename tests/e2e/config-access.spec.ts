@@ -41,16 +41,35 @@ test.describe("Config Access — Tab Toggle", () => {
     await expect(page.locator("[data-testid='start-stop-button']")).toBeVisible();
   });
 
-  test("Gallery and Creator tabs render their panels", async ({ page }) => {
+  test("the left index renders gallery, mood tagging and script designer", async ({ page }) => {
     await launchApp(page);
     await page.locator("[data-testid='main-tab-gallery']").click();
     await expect(page.locator("[data-testid='gallery-panel']")).toBeVisible();
 
-    await page.locator("[data-testid='main-tab-creator']").click();
-    await expect(page.locator("[data-testid='creator-panel']")).toBeVisible();
+    await page.locator("[data-testid='main-tab-tagging']").click();
+    await expect(page.locator("[data-testid='tagging-no-pack']")).toBeVisible();
+
+    await page.locator("[data-testid='main-tab-designer']").click();
+    await expect(page.locator("[data-testid='designer-no-pack']")).toBeVisible();
+
+    // The old combined Creator entry is gone.
+    await expect(page.locator("[data-testid='main-tab-creator']")).toHaveCount(0);
 
     await page.locator("[data-testid='main-tab-status']").click();
     await expect(page.locator("[data-testid='metadata-panel']")).toBeVisible();
+  });
+
+  test("the booru panel is greyed out and marked deprecated", async ({ page }) => {
+    await launchApp(page);
+    await page.locator("[data-testid='main-tab-config']").click();
+    await page.getByRole("tab", { name: "Annoyance / Runtime" }).click();
+    await page.getByRole("tab", { name: "Booru" }).click();
+
+    await expect(page.getByText("requires an API key")).toBeVisible();
+    await expect(page.getByLabel("Booru").getByText("BLOCKED")).toBeVisible();
+    await expect(
+      page.getByLabel("Booru").getByRole("checkbox", { name: /Download Enabled/ })
+    ).toBeDisabled();
   });
 });
 

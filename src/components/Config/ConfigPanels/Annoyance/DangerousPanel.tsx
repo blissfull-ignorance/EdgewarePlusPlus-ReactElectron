@@ -34,7 +34,7 @@ export function DangerousPanel() {
           value={panicDisabled}
           onChange={(val) => setRaw({ panicDisabled: val })}
           danger
-          description="Disable panic hotkey (not recommended)"
+          description="Disable the panic hotkey. Not recommended."
         />
 
         <ConfigToggle
@@ -44,7 +44,7 @@ export function DangerousPanel() {
           danger
           blocked
           disabled
-          description="DANGEROUS: Fill drive with images (FEATURE DROPPED)"
+          description="Feature dropped. This would fill the drive with pack images."
         />
 
         <ConfigToggle
@@ -54,7 +54,7 @@ export function DangerousPanel() {
           danger
           blocked
           disabled
-          description="EXTREME DANGER: Replace system images (FEATURE DROPPED)"
+          description="Feature dropped. This would replace your system images."
         />
 
         <ConfigToggle

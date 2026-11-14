@@ -89,15 +89,13 @@ if (typeof window !== "undefined") {
       refreshAppIcon: vi.fn().mockResolvedValue(undefined),
       getEditableIndex: vi.fn().mockResolvedValue(null),
       setFileTags: vi.fn().mockResolvedValue(null),
+      deleteFile: vi.fn().mockResolvedValue({ ok: true }),
       addMood: vi.fn().mockResolvedValue(null),
       removeMood: vi.fn().mockResolvedValue(null),
       renameMood: vi.fn().mockResolvedValue(null),
       blacklist: vi.fn().mockResolvedValue({ ok: true }),
       loadCorruption: vi.fn().mockResolvedValue(null),
       discord: vi.fn().mockResolvedValue(null),
-    },
-    booru: {
-      fetchImage: vi.fn().mockResolvedValue(null),
     },
     panic: {
       trigger: vi.fn().mockResolvedValue({ ok: true }),
@@ -122,6 +120,9 @@ if (typeof window !== "undefined") {
       closeAll: vi.fn().mockResolvedValue(undefined),
       sizeToMedia: vi.fn().mockResolvedValue({ width: 400, height: 300 }),
       startMoving: vi.fn().mockResolvedValue(true),
+      dragBegin: vi.fn().mockResolvedValue(true),
+      dragMove: vi.fn().mockResolvedValue(true),
+      dragEnd: vi.fn().mockResolvedValue(true),
       onClosed: vi.fn().mockImplementation((callback: (id: string) => void) => {
         (window as unknown as Record<string, unknown>).__onPopupClosed = callback;
         return () => {

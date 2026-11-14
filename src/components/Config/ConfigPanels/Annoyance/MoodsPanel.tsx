@@ -79,8 +79,9 @@ export function MoodsPanel() {
             })}
           </SimpleGrid>
           <Text size="xs" c="dimmed" mt="md">
-            Active moods unlock their images, videos, audio, captions and links for popups.
-            Corruption levels and pack scripts switch moods on and off during a session.
+            Active moods unlock their content for popups. This covers images,
+            videos, audio, captions and links. Corruption levels and pack
+            scripts switch moods on and off during a session.
           </Text>
         </>
       )}

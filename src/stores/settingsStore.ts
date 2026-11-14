@@ -42,6 +42,8 @@ export type SettingsValues = {
   notificationChance: number;
   notificationImageChance: number;
   delay: number;
+  popupScale: number;
+  popupDraggable: number;
   singleMode: number;
   showCaptions: number;
   subliminalsChance: number;
@@ -146,6 +148,8 @@ export const DEFAULT_SETTINGS: SettingsValues = {
   notificationChance: 0,
   notificationImageChance: 50,
   delay: 5000,
+  popupScale: 100,
+  popupDraggable: 0,
   singleMode: 0,
   showCaptions: 0,
   subliminalsChance: 0,
@@ -261,6 +265,8 @@ export interface SettingsStore {
   notificationChance: number;
   notificationImageChance: number;
   delay: number;
+  popupScale: number;
+  popupDraggable: number;
   singleMode: number;
   showCaptions: number;
   subliminalsChance: number;

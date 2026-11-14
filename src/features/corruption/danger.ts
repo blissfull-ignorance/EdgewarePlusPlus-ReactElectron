@@ -88,7 +88,7 @@ export const DANGER_REGISTRY: Record<string, DangerRule> = {
   runOnSaveQuit: {
     level: "MINOR",
     check: isOn,
-    warning: "Edgeware will run on Save & Exit (AKA: when you hit Yes!)",
+    warning: "Edgeware will run when you hit Yes on Save & Exit.",
   },
 };
 

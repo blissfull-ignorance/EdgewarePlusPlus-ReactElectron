@@ -25,6 +25,7 @@ const electronAPI: ElectronAPI = {
     refreshAppIcon: () => ipcRenderer.invoke("pack:refreshAppIcon"),
     getEditableIndex: (packPath) => ipcRenderer.invoke("pack:getEditableIndex", packPath),
     setFileTags: (packPath, file, tags) => ipcRenderer.invoke("pack:setFileTags", packPath, file, tags),
+    deleteFile: (packPath, kind, file) => ipcRenderer.invoke("pack:deleteFile", packPath, kind, file),
     addMood: (packPath, name) => ipcRenderer.invoke("pack:addMood", packPath, name),
     removeMood: (packPath, name) => ipcRenderer.invoke("pack:removeMood", packPath, name),
     renameMood: (packPath, from, to) => ipcRenderer.invoke("pack:renameMood", packPath, from, to),
@@ -67,6 +68,9 @@ const electronAPI: ElectronAPI = {
     sizeToMedia: (id, mediaWidth, mediaHeight, lowkey) =>
       ipcRenderer.invoke("popup:sizeToMedia", id, mediaWidth, mediaHeight, lowkey),
     startMoving: (id) => ipcRenderer.invoke("popup:startMoving", id),
+    dragBegin: (id) => ipcRenderer.invoke("popup:dragBegin", id),
+    dragMove: (id, dx, dy) => ipcRenderer.invoke("popup:dragMove", id, dx, dy),
+    dragEnd: (id) => ipcRenderer.invoke("popup:dragEnd", id),
     onClosed: (callback: (id: string) => void) => {
       const handler = (_event: IpcRendererEvent, id: string) => callback(id);
       ipcRenderer.on("popup:closed", handler);
@@ -138,9 +142,6 @@ const electronAPI: ElectronAPI = {
       ipcRenderer.invoke("system:sendNotification", title, message, attachmentPath),
     openExternal: (url) => ipcRenderer.invoke("system:openExternal", url),
     corruptionLaunches: () => ipcRenderer.invoke("system:corruptionLaunches"),
-  },
-  booru: {
-    fetchImage: (tags) => ipcRenderer.invoke("booru:fetchImage", tags),
   },
   wallpaper: {
     restoreOriginal: () => ipcRenderer.invoke("wallpaper:restoreOriginal"),

@@ -14,7 +14,7 @@ import { pathToFileURL } from "node:url";
 import { logger } from "../utils/logger";
 import { getSettingNumber } from "../utils/configCache";
 import { lowkeyPosition } from "../../src/features/popup/lowkeyPosition";
-import { legacyPopupSize } from "../../src/features/popup/legacySize";
+import { applyPopupScale, legacyPopupSize } from "../../src/features/popup/legacySize";
 import { initialMoveState, stepMove, type MoveState } from "../../src/features/popup/windowMovement";
 
 // Registry of open popup windows, keyed by popup ID
@@ -60,6 +60,14 @@ function ensureMoverLoop(): void {
 
 function stopMoving(id: string): void {
   movers.delete(id);
+}
+
+// Active user drags (Draggable Popups): where each popup's window sat when
+// the grab began; the renderer reports deltas from that point.
+const drags = new Map<string, { startX: number; startY: number }>();
+
+function endDrag(id: string): void {
+  drags.delete(id);
 }
 
 // Main window that requested popups — used to deliver close notifications
@@ -190,6 +198,7 @@ function createPopupWindow(
 
   popupWin.on("closed", () => {
     stopMoving(id);
+    endDrag(id);
     popupWindows.delete(id);
     popupTypes.delete(id);
     notifyPopupClosed(id);
@@ -291,8 +300,10 @@ function registerHandlers(): void {
         const display = screen.getDisplayMatching(win.getBounds());
         const shortSide = Math.min(display.workAreaSize.width, display.workAreaSize.height);
         const target = legacyPopupSize(mediaWidth, mediaHeight, shortSide, Math.random, lowkey === true);
-        const width = Math.max(32, Math.min(target.width, display.workAreaSize.width));
-        const height = Math.max(32, Math.min(target.height, display.workAreaSize.height));
+        // User size scale: percent of the default size (Popup Size Scale).
+        const scaled = applyPopupScale(target, readSetting("popupScale"));
+        const width = Math.max(32, Math.min(scaled.width, display.workAreaSize.width));
+        const height = Math.max(32, Math.min(scaled.height, display.workAreaSize.height));
         win.setContentSize(width, height);
         // The window grows around its top-left corner; pull it back inside
         // the work area so the close button at its bottom-right stays
@@ -309,6 +320,41 @@ function registerHandlers(): void {
       }
     }
   );
+
+  /**
+   * User drag (settings: Draggable Popups): the renderer reports cumulative
+   * pointer deltas from the grab point; the window follows from where the
+   * drag began. Main never trusts absolute coordinates, so a popup can
+   * always be dragged back on-screen.
+   */
+  ipcMain.handle("popup:dragBegin", async (_event, id: string): Promise<boolean> => {
+    const win = popupWindows.get(id);
+    if (!win || win.isDestroyed()) return false;
+    const bounds = win.getBounds();
+    drags.set(id, { startX: bounds.x, startY: bounds.y });
+    return true;
+  });
+  ipcMain.handle(
+    "popup:dragMove",
+    async (_event, id: string, dx: unknown, dy: unknown): Promise<boolean> => {
+      const win = popupWindows.get(id);
+      const start = drags.get(id);
+      if (!win || win.isDestroyed() || !start) return false;
+      const nx = Number(dx);
+      const ny = Number(dy);
+      if (!Number.isFinite(nx) || !Number.isFinite(ny)) return false;
+      try {
+        win.setPosition(Math.round(start.startX + nx), Math.round(start.startY + ny));
+      } catch {
+        return false;
+      }
+      return true;
+    }
+  );
+  ipcMain.handle("popup:dragEnd", async (_event, id: string): Promise<boolean> => {
+    drags.delete(id);
+    return true;
+  });
 
   /**
    * Start moving a popup window across its display (legacy try_move): random

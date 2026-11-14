@@ -1,4 +1,4 @@
-import { SimpleGrid, Stack } from "@mantine/core";
+import { Box, SimpleGrid, Stack } from "@mantine/core";
 import { IconPhoto, IconMovie } from "@tabler/icons-react";
 import { ConfigSlider, ConfigToggle } from "../../../Config";
 import { useSettingsStore } from "../../../../stores";
@@ -18,15 +18,29 @@ export function PopupTypesPanel() {
   const videoVolume = useSettingsStore((s) => s.videoVolume);
   const videoLoopInf = useSettingsStore((s) => s.videoLoopInf);
   const videoLoopCount = useSettingsStore((s) => s.videoLoopCount);
+  const delay = useSettingsStore((s) => s.delay);
 
   return (
     <Stack gap="lg">
     <SectionCard
       icon={<IconPhoto size={16} />}
-      title="Popup Types - Chance Settings"
-      description="Share of each popup type in the rotation."
+      title="Popup Types"
+      description="Spawn timing and the share of each popup type in the rotation."
     >
-      <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="lg" verticalSpacing="lg">
+      <Stack gap="lg">
+        <Box style={{ borderBottom: "1px solid var(--mantine-color-dark-5)", paddingBottom: 16 }}>
+          <ConfigSlider
+            label="Spawn Delay"
+            value={delay}
+            onChange={(val) => setRaw({ delay: val })}
+            min={100}
+            max={60000}
+            step={100}
+            description="Milliseconds between popup rolls. Lower means more popups. Every other popup timing builds on this value."
+            testId="config-spawn-delay"
+          />
+        </Box>
+        <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="lg" verticalSpacing="lg">
         <ConfigSlider
           label="Image Popup Chance"
           value={popupMod}
@@ -108,6 +122,7 @@ export function PopupTypesPanel() {
           description="Percentage chance for system notifications"
         />
       </SimpleGrid>
+      </Stack>
     </SectionCard>
 
       <SectionCard
@@ -139,7 +154,7 @@ export function PopupTypesPanel() {
             min={1}
             max={10}
             disabled={videoLoopInf === 1}
-            description="Times the video plays before the popup closes (used when infinite looping is off)"
+            description="Times the video plays before the popup closes. Used when infinite looping is off."
           />
         </SimpleGrid>
       </SectionCard>

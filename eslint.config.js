@@ -49,6 +49,7 @@ export default [
         HTMLAudioElement: "readonly",
         HTMLImageElement: "readonly",
         HTMLVideoElement: "readonly",
+        HTMLDivElement: "readonly",
         setInterval: "readonly",
         clearInterval: "readonly",
         setTimeout: "readonly",

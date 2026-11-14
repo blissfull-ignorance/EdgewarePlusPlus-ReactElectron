@@ -116,7 +116,7 @@ describe("designFromScript", () => {
   });
 
   it("reports everything it could not represent", () => {
-    expect(report).toContain("redefines built-in API(s): audio");
+    expect(report).toContain("redefines built-in APIs: audio");
     expect(report).toContain("loop(s) dropped");
     expect(report).toContain("multiple_popups() call(s) dropped");
     expect(report).toContain("web(nil)");

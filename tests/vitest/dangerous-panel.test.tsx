@@ -41,15 +41,15 @@ describe("DangerousPanel", () => {
     const textElements = container.querySelectorAll('[class*="Text-root"]');
     const allText = Array.from(textElements).map((e) => e.textContent || "").join("\n");
     expect(allText).toContain("Enable time-based panic lockout");
-    expect(allText).toContain("Disable panic hotkey (not recommended)");
+    expect(allText).toContain("Disable the panic hotkey. Not recommended.");
   });
 
   it("renders feature-dropped descriptions for disabled dangerous toggles", () => {
     const { container } = render(<DangerousPanel />, { wrapper: MANTINE_WRAPPER });
     const textElements = container.querySelectorAll('[class*="Text-root"]');
     const allText = Array.from(textElements).map((e) => e.textContent || "").join("\n");
-    expect(allText).toContain("DANGEROUS: Fill drive with images (FEATURE DROPPED)");
-    expect(allText).toContain("EXTREME DANGER: Replace system images (FEATURE DROPPED)");
+    expect(allText).toContain("Feature dropped. This would fill the drive with pack images.");
+    expect(allText).toContain("Feature dropped. This would replace your system images.");
   });
 
   it("has disabled Fill Drive Enabled toggle", () => {

@@ -157,15 +157,13 @@ export async function launchApp(page: Page, options: LaunchOptions = {}): Promis
           refreshAppIcon: async () => undefined,
           getEditableIndex: async () => null,
           setFileTags: async () => null,
+          deleteFile: async () => ({ ok: false, error: "stub" }),
           addMood: async () => null,
           removeMood: async () => null,
           renameMood: async () => null,
           blacklist: async () => ({ ok: true }),
           loadCorruption: async () => opts.corruption ?? null,
           discord: async () => null,
-        },
-        booru: {
-          fetchImage: async () => null,
         },
         corruption: {
           getCurrentLevel: async () => {
@@ -206,6 +204,9 @@ export async function launchApp(page: Page, options: LaunchOptions = {}): Promis
           closeAll: async () => undefined,
           sizeToMedia: async () => ({ width: 400, height: 300 }),
           startMoving: async () => true,
+          dragBegin: async () => true,
+          dragMove: async () => true,
+          dragEnd: async () => true,
           onClosed: () => () => {},
         },
         hibernate: {

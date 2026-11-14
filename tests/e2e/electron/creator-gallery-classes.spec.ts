@@ -151,7 +151,7 @@ test.describe("Gallery media classes, paging and creator filters", () => {
     await window.locator("[data-testid='gallery-star-g1.png']").click();
     await expect(window.locator("[data-testid='gallery-chip-favourites']")).toContainText("(1)");
 
-    await window.locator("[data-testid='main-tab-creator']").click();
+    await window.locator("[data-testid='main-tab-tagging']").click();
     await expect(window.locator("[data-testid='creator-tagging']")).toBeVisible();
 
     // The creator grid pages too (the round-3 hang fix covers both grids):

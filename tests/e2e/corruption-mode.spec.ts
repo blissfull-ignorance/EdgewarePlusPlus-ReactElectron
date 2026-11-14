@@ -75,7 +75,7 @@ test.describe("Corruption Mode", () => {
     await page.locator("[data-testid='main-tabs']").getByRole("button", { name: "Config" }).click();
     await page.getByRole("tab", { name: "Corruption" }).click();
 
-    await expect(page.getByText("Corruption Mode (Guided Mode)")).toBeVisible();
+    await expect(page.getByText("Corruption Mode", { exact: true })).toBeVisible();
     await expect(page.getByText("Enable Corruption Mode")).toBeVisible();
     await expect(page.getByText("Trigger Type")).toBeVisible();
     await expect(page.getByText("Time Per Level")).toBeVisible();

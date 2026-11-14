@@ -74,7 +74,7 @@ async function picks(n: number): Promise<Set<string>> {
   return new Set(list.filter((f): f is string => !!f));
 }
 
-test.describe("Creator Tools authoring flow", () => {
+test.describe("Pack authoring flow", () => {
   test.beforeAll(async () => {
     ensureElectronBuild();
     state = createTempState();
@@ -99,8 +99,8 @@ test.describe("Creator Tools authoring flow", () => {
 
   test("tagging section shows the pack's moods and files", async () => {
     const { window } = running!;
-    await window.locator("[data-testid='main-tab-creator']").click();
-    await expect(window.locator("[data-testid='creator-panel']")).toBeVisible();
+    await window.locator("[data-testid='main-tab-tagging']").click();
+    await expect(window.locator("[data-testid='creator-tagging']")).toBeVisible();
     await expect(window.locator("[data-testid='creator-mood-starter']")).toBeVisible();
     await expect(window.locator("[data-testid='creator-card-one.png']")).toBeVisible();
     await expect(window.locator("[data-testid='creator-card-two.png']")).toBeVisible();
@@ -155,9 +155,9 @@ test.describe("Creator Tools authoring flow", () => {
 
   test("the script designer writes script.lua and Start runs it", async () => {
     const { window } = running!;
-    await window.locator("[data-testid='main-tab-creator']").click();
-    await expect(window.locator("[data-testid='creator-panel']")).toBeVisible();
-    await window.locator("[data-testid='creator-tab-script']").click();
+    await window.locator("[data-testid='main-tab-tagging']").click();
+    await expect(window.locator("[data-testid='creator-tagging']")).toBeVisible();
+    await window.locator("[data-testid='main-tab-designer']").click();
     // Hand-written editing lives on the designer's code tab.
     await window.locator("[data-testid='designer-mode-toggle']").getByText("Code").click();
     const editor = window.locator("[data-testid='designer-code']");
@@ -199,9 +199,9 @@ test.describe("Creator Tools authoring flow", () => {
   test("edits survive an app restart", async () => {
     await quitApp(running!);
     running = await launchApp(state!, { EDGWARE_STUB_BROWSER: "1" });
-    await running!.window.locator("[data-testid='main-tab-creator']").click();
+    await running!.window.locator("[data-testid='main-tab-tagging']").click();
     await expect(running!.window.locator("[data-testid='creator-card-two.png']")).toBeVisible();
-    await running!.window.locator("[data-testid='creator-tab-script']").click();
+    await running!.window.locator("[data-testid='main-tab-designer']").click();
     await running!.window.locator("[data-testid='designer-mode-toggle']").getByText("Code").click();
     await expect(running!.window.locator("[data-testid='designer-code']")).toContainText(
       "CREATOR-SCRIPT"

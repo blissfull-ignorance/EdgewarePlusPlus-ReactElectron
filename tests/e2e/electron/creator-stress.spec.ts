@@ -31,8 +31,7 @@ function markerPack(packsDir: string, name: string, markerJson: unknown): string
 }
 
 async function openDesigner(window: import("@playwright/test").Page): Promise<void> {
-  await window.locator("[data-testid='main-tab-creator']").click();
-  await window.locator("[data-testid='creator-tab-script']").click();
+  await window.locator("[data-testid='main-tab-designer']").click();
   await expect(window.locator("[data-testid='creator-designer']")).toBeVisible();
 }
 
@@ -122,8 +121,8 @@ test("non-string action fields in a marker are dropped, and the design saves", a
     // The saved marker must re-parse: one level card carrying exactly the two
     // surviving actions after the reload from disk.
     await running.window.locator("[data-testid='main-tab-status']").click();
-    await running.window.locator("[data-testid='main-tab-creator']").click();
-    await running.window.locator("[data-testid='creator-tab-script']").click();
+    await running.window.locator("[data-testid='main-tab-tagging']").click();
+    await running.window.locator("[data-testid='main-tab-designer']").click();
     await expect(running.window.locator("[data-testid='designer-level-0']")).toBeVisible();
     await expect(running.window.locator("[data-testid='designer-level-1']")).toHaveCount(0);
     await expect(running.window.locator("[data-testid='designer-action-0-0']")).toBeVisible();
@@ -190,7 +189,7 @@ test("gallery mood badges re-lock on Stop while the tab stays mounted", async ()
   }
 });
 
-test("an unsaved design survives leaving Creator and coming back", async () => {
+test("an unsaved design survives leaving the designer and coming back", async () => {
   const state: TempState = createTempState();
   const pack = markerPack(state.packsDir, "CT-Draft", {
     version: 1,
@@ -218,10 +217,10 @@ test("an unsaved design survives leaving Creator and coming back", async () => {
 
     // Leave Creator entirely, then return.
     await running.window.locator("[data-testid='main-tab-status']").click();
-    await running.window.locator("[data-testid='main-tab-creator']").click();
-    await running.window.locator("[data-testid='creator-tab-script']").click();
+    await running.window.locator("[data-testid='main-tab-tagging']").click();
+    await running.window.locator("[data-testid='main-tab-designer']").click();
     await expect(running.window.locator("[data-testid='designer-level-0']")).toBeVisible();
-    await expect(running.window.locator("[data-testid='designer-popupmod-0']")).toHaveValue("42");
+    await expect(running.window.locator("[data-testid='designer-popupmod-0']")).toHaveValue("42 %");
     await expect(running.window.locator("[data-testid='designer-unsaved']")).toBeVisible();
 
     // Saving clears the draft marker.
@@ -333,7 +332,7 @@ test("a colliding mood rename changes nothing and claims nothing", async () => {
     EDGWARE_PANIC_SKIP_WALLPAPER: "1",
   });
   try {
-    await running.window.locator("[data-testid='main-tab-creator']").click();
+    await running.window.locator("[data-testid='main-tab-tagging']").click();
     await running.window.locator("[data-testid='creator-mood-rename-alpha']").click();
     await running.window.locator("[data-testid='creator-mood-rename-input-alpha']").fill("beta");
     await running.window.keyboard.press("Enter");
@@ -412,8 +411,8 @@ test("converting stages the design unsaved; saving archives both originals", asy
       );
     }, dir);
     await running.window.reload();
-    await running.window.locator("[data-testid='main-tab-creator']").click();
-    await running.window.locator("[data-testid='creator-tab-script']").click();
+    await running.window.locator("[data-testid='main-tab-tagging']").click();
+    await running.window.locator("[data-testid='main-tab-designer']").click();
     await expect(running.window.locator("[data-testid='designer-import-script']")).toBeVisible();
     await running.window.locator("[data-testid='designer-import-script']").click();
     await running.window.locator("[data-testid='designer-save']").click();

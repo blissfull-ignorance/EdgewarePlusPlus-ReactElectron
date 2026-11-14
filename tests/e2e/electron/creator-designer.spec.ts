@@ -80,7 +80,7 @@ test.describe("No-code corruption designer", () => {
 
   test("coverage shows uncategorised files and the filter narrows the grid", async () => {
     const { window } = running!;
-    await window.locator("[data-testid='main-tab-creator']").click();
+    await window.locator("[data-testid='main-tab-tagging']").click();
     await expect(window.locator("[data-testid='creator-uncategorized-label']")).toContainText("2 of 3");
     await window.locator("[data-testid='creator-uncategorized-label']").click();
     await expect(window.locator("[data-testid='creator-card-one.png']")).toBeVisible();
@@ -105,12 +105,12 @@ test.describe("No-code corruption designer", () => {
 
   test("a designed two-level script runs end to end: audio ends, mood unlocks", async () => {
     const { window } = running!;
-    await window.locator("[data-testid='main-tab-creator']").click();
-    await expect(window.locator("[data-testid='creator-panel']")).toBeVisible();
+    await window.locator("[data-testid='main-tab-tagging']").click();
+    await expect(window.locator("[data-testid='creator-tagging']")).toBeVisible();
     // locked.png is tagged "vault": invisible to the pool before the session.
     expect((await picks(40)).has("locked.png")).toBe(false);
 
-    await window.locator("[data-testid='creator-tab-script']").click();
+    await window.locator("[data-testid='main-tab-designer']").click();
     await window.locator("[data-testid='designer-start-delay']").fill("0");
     await window.locator("[data-testid='designer-add-level']").click();
     await window.locator("[data-testid='designer-add-level']").click();
@@ -159,10 +159,10 @@ test.describe("No-code corruption designer", () => {
 
   test("mood renames reach the designed artifacts; removal warns in the editor", async () => {
     const { window } = running!;
-    await window.locator("[data-testid='main-tab-creator']").click();
-    await expect(window.locator("[data-testid='creator-panel']")).toBeVisible();
+    await window.locator("[data-testid='main-tab-tagging']").click();
+    await expect(window.locator("[data-testid='creator-tagging']")).toBeVisible();
     // Rename vault -> cellar from the tagging view.
-    await window.locator("[data-testid='creator-tab-tagging']").click();
+    await window.locator("[data-testid='main-tab-tagging']").click();
     await window.locator("[data-testid='creator-mood-rename-vault']").click();
     await window.locator("[data-testid='creator-mood-rename-input-vault']").fill("cellar");
     await window.keyboard.press("Enter");
@@ -176,17 +176,17 @@ test.describe("No-code corruption designer", () => {
     expect(readFileSync(path.join(packDir, "script.lua"), "utf-8")).toContain("cellar");
 
     // The designer's level card now offers the renamed mood.
-    await window.locator("[data-testid='creator-tab-script']").click();
+    await window.locator("[data-testid='main-tab-designer']").click();
     await expect(window.locator("[data-testid='designer-add-1-cellar']")).toBeVisible();
 
     // Removing a mood the design still references (with unsaved edits)
     // leaves a visible stale reference, not a silent one.
-    await window.locator("[data-testid='creator-tab-script']").click();
+    await window.locator("[data-testid='main-tab-designer']").click();
     await window.locator("[data-testid='designer-add-level']").click();
-    await window.locator("[data-testid='creator-tab-tagging']").click();
+    await window.locator("[data-testid='main-tab-tagging']").click();
     await window.locator("[data-testid='creator-mood-remove-cellar']").click();
     await expect(window.locator("[data-testid='creator-mood-cellar']")).toHaveCount(0);
-    await window.locator("[data-testid='creator-tab-script']").click();
+    await window.locator("[data-testid='main-tab-designer']").click();
     await expect(window.locator("[data-testid='designer-stale-1-cellar']")).toBeVisible();
     await expect(window.locator("[data-testid='designer-warnings']")).toContainText("cellar");
 
@@ -198,7 +198,7 @@ test.describe("No-code corruption designer", () => {
 
   test("duplicate, per-level intensity and Save & test run", async () => {
     const { window } = running!;
-    await window.locator("[data-testid='creator-tab-script']").click();
+    await window.locator("[data-testid='main-tab-designer']").click();
     await expect(window.locator("[data-testid='designer-level-1']")).toBeVisible();
     await window.locator("[data-testid='designer-level-duplicate-0']").click();
     await expect(window.locator("[data-testid='designer-level-2']")).toBeVisible();
@@ -230,14 +230,14 @@ test.describe("No-code corruption designer", () => {
     const { window } = running!;
     // Real unmount: leave Creator, then come back and reload from disk.
     await window.locator("[data-testid='main-tab-status']").click();
-    await expect(window.locator("[data-testid='creator-panel']")).toHaveCount(0);
-    await window.locator("[data-testid='main-tab-creator']").click();
-    await expect(window.locator("[data-testid='creator-panel']")).toBeVisible();
-    await window.locator("[data-testid='creator-tab-script']").click();
+    await expect(window.locator("[data-testid='creator-tagging']")).toHaveCount(0);
+    await window.locator("[data-testid='main-tab-tagging']").click();
+    await expect(window.locator("[data-testid='creator-tagging']")).toBeVisible();
+    await window.locator("[data-testid='main-tab-designer']").click();
     await expect(window.locator("[data-testid='designer-level-0']")).toBeVisible();
     await expect(window.locator("[data-testid='designer-level-1']")).toBeVisible();
     await expect(window.locator("[data-testid='designer-level-2']")).toBeVisible();
-    await expect(window.locator("[data-testid='designer-popupmod-0']")).toHaveValue("50");
+    await expect(window.locator("[data-testid='designer-popupmod-0']")).toHaveValue("50 %");
   });
 });
 
@@ -279,8 +279,8 @@ test.describe("Designer editing aids: undo, mood progression, pack-root wallpape
     });
     run = await launchApp(st, { EDGWARE_STUB_BROWSER: "1", EDGWARE_PANIC_SKIP_WALLPAPER: "1" });
     const { window } = run;
-    await window.locator("[data-testid='main-tab-creator']").click();
-    await window.locator("[data-testid='creator-tab-script']").click();
+    await window.locator("[data-testid='main-tab-tagging']").click();
+    await window.locator("[data-testid='main-tab-designer']").click();
     await expect(window.locator("[data-testid='creator-designer']")).toBeVisible();
   });
 

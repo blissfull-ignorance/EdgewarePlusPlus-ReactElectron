@@ -17,7 +17,8 @@ export function PopupTweaksPanel() {
   const movingChance = useSettingsStore((s) => s.movingChance);
   const movingSpeed = useSettingsStore((s) => s.movingSpeed);
   const clickthroughPopups = useSettingsStore((s) => s.clickthroughPopups);
-  const delay = useSettingsStore((s) => s.delay);
+  const popupScale = useSettingsStore((s) => s.popupScale);
+  const popupDraggable = useSettingsStore((s) => s.popupDraggable);
 
   return (
     <SectionCard
@@ -34,14 +35,21 @@ export function PopupTweaksPanel() {
         />
 
         <ConfigSlider
-          label="Spawn Delay"
-          value={delay}
-          onChange={(val) => setRaw({ delay: val })}
-          min={100}
-          max={60000}
-          step={100}
-          description="Milliseconds between popup rolls — lower means more popups. At 100% image chance one popup spawns per roll (default 5000)."
-          testId="config-spawn-delay"
+          label="Popup Size Scale"
+          value={popupScale}
+          onChange={(val) => setRaw({ popupScale: val })}
+          min={25}
+          max={300}
+          step={5}
+          description="Scales image and video popups relative to their default size. 100 keeps the default behavior."
+          testId="config-popup-scale"
+        />
+
+        <ConfigToggle
+          label="Draggable Popups"
+          value={popupDraggable}
+          onChange={(val) => setRaw({ popupDraggable: val })}
+          description="Hold the upper edge of a popup to move it like a regular window"
         />
 
         <ConfigSlider
@@ -50,7 +58,7 @@ export function PopupTweaksPanel() {
           onChange={(val) => setRaw({ subliminalsAlpha: val })}
           min={0}
           max={100}
-          description="Opacity for hypno/hypnosis overlays (0-100)"
+          description="Opacity for hypno and hypnosis overlays"
         />
 
         <ConfigToggle

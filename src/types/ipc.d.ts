@@ -97,6 +97,12 @@ export interface ElectronAPI {
     getEditableIndex: (packPath: string) => Promise<Record<string, unknown> | null>;
     /** Creator tools: set a file's exact mood tags; resolves the new index. */
     setFileTags: (packPath: string, file: string, tags: string[]) => Promise<Record<string, unknown> | null>;
+    /** Delete one pack media file and strip its mood tags. */
+    deleteFile: (
+      packPath: string,
+      kind: "image" | "video" | "audio" | "hypno",
+      file: string
+    ) => Promise<{ ok: boolean; error?: string }>;
     /** Creator tools: add a mood to the pack index; resolves the new index. */
     addMood: (packPath: string, name: string) => Promise<Record<string, unknown> | null>;
     /** Creator tools: remove a mood from the pack index; resolves the new index. */
@@ -157,6 +163,11 @@ export interface ElectronAPI {
     ) => Promise<{ width: number; height: number } | null>;
     /** Start moving a popup window across its display, bouncing off edges */
     startMoving: (id: string) => Promise<boolean>;
+    /** Begin a user drag: main records the window position at the grab. */
+    dragBegin: (id: string) => Promise<boolean>;
+    /** Move the window by the pointer delta (px) accumulated since grab. */
+    dragMove: (id: string, dx: number, dy: number) => Promise<boolean>;
+    dragEnd: (id: string) => Promise<boolean>;
     /** Subscribe to popup close events. Returns an unsubscribe function. */
     onClosed: (callback: (id: string) => void) => () => void;
   };
@@ -243,10 +254,6 @@ export interface ElectronAPI {
     openExternal: (url: string) => Promise<boolean>;
     /** Corruption launch counter: returns the count before this launch. */
     corruptionLaunches: () => Promise<number>;
-  };
-  booru: {
-    /** Search + download one Gelbooru image; null on miss/failure (fall back to pack media). */
-    fetchImage: (tags: string) => Promise<string | null>;
   };
   wallpaper: {
     restoreOriginal: () => Promise<boolean>;

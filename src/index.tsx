@@ -48,15 +48,13 @@ if (boot === "stub" && typeof window !== "undefined") {
       refreshAppIcon: async () => undefined,
       getEditableIndex: async () => null,
       setFileTags: async () => null,
+      deleteFile: async () => ({ ok: false, error: "Not available in the browser preview" }),
       addMood: async () => null,
       removeMood: async () => null,
       renameMood: async () => null,
       blacklist: async () => ({ ok: true }),
       loadCorruption: async () => null,
       discord: async () => null,
-    },
-    booru: {
-      fetchImage: async () => null,
     },
     corruption: {
       getCurrentLevel: async () => 0,
@@ -84,6 +82,9 @@ if (boot === "stub" && typeof window !== "undefined") {
       closeAll: async () => undefined,
       sizeToMedia: async (_id: string, _w: number, _h: number, _lowkey?: boolean) => ({ width: 400, height: 300 }),
       startMoving: async () => true,
+      dragBegin: async () => true,
+      dragMove: async () => true,
+      dragEnd: async () => true,
       onClosed: () => () => {},
     },
     hibernate: {

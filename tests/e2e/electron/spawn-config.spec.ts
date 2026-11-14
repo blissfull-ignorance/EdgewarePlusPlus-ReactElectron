@@ -115,16 +115,16 @@ test.describe("Session-scoped pack config + spawn warning", () => {
     await window.locator("[data-testid='start-stop-button']").click();
     await expect(window.locator("[data-testid='spawn-warning-modal']")).toBeVisible();
     await window.locator("[data-testid='spawn-warning-settings']").click();
-    await expect(window.getByRole("tab", { name: "Popup Tweaks" })).toBeVisible();
-    // The deep link lands ON the tweaks panel: the slider is visible now,
-    // not one more click away.
+    await expect(window.getByRole("tab", { name: "Popup Types" })).toBeVisible();
+    // The deep link lands ON the Popup Types panel: the spawn delay slider
+    // is visible now, not one more click away.
     await expect(window.locator("[data-testid='config-spawn-delay']")).toBeVisible();
 
     // The slider is also reachable by hand (not only via the deep link):
-    // Config → Annoyance/Runtime → Popup Tweaks.
+    // Config → Annoyance/Runtime → Popup Types.
     await window.locator("[data-testid='main-tab-config']").click();
     await window.getByRole("tab", { name: "Annoyance / Runtime" }).click();
-    await window.getByRole("tab", { name: "Popup Tweaks" }).click();
+    await window.getByRole("tab", { name: "Popup Types" }).click();
     await expect(window.locator("[data-testid='config-spawn-delay']")).toBeVisible();
 
     // A healthy setup starts without the modal.

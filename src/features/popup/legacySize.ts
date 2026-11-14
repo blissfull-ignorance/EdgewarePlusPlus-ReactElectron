@@ -26,3 +26,19 @@ export function legacyPopupSize(
     height: Math.max(1, Math.round(mediaHeight * scale)),
   };
 }
+
+/**
+ * Apply the user's Popup Size Scale (percent of the default size). Junk or
+ * absent input reads as 100; the factor is clamped to the slider's range so
+ * a hostile config value cannot produce an invisible or giant window.
+ */
+export function applyPopupScale(
+  size: { width: number; height: number },
+  scalePercent: number
+): { width: number; height: number } {
+  const scale = Math.min(300, Math.max(25, scalePercent || 100));
+  return {
+    width: Math.max(1, Math.round((size.width * scale) / 100)),
+    height: Math.max(1, Math.round((size.height * scale) / 100)),
+  };
+}

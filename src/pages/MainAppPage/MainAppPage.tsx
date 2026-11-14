@@ -10,7 +10,8 @@ import { ConfigPage } from "../../components/Config/ConfigPage";
 import { ErrorBoundary } from "../../components/ErrorBoundary";
 import { AppFrame, type MainView } from "../../components/shell/AppFrame";
 import { GalleryPanel } from "../../features/gallery/GalleryPanel";
-import { CreatorPanel } from "../../features/creator/CreatorPanel";
+import { TaggingSection } from "../../features/creator/TaggingSection";
+import { DesignerSection } from "../../features/creator/DesignerSection";
 import { useRoll, duePopups, type PopupType } from "../../hooks/useRoll";
 import { useHibernateScheduler } from "../../features/hibernate/useHibernateScheduler";
 import { usePopupLifecycle } from "../../hooks/usePopupLifecycle";
@@ -76,17 +77,6 @@ export function MainAppPage() {
       const popType = media.mediaType === "audio-only" ? "audio" : media.mediaType;
       // Carries the pack file name, or (for prompt pops) the phrase text itself.
       let ref = media.mediaType === "prompt" ? media.text : media.mediaId;
-      // Legacy booru integration: on image pops the downloader coin-flips a
-      // Gelbooru fetch that replaces the pack image; any failure keeps the
-      // pack media in place.
-      if (popType === "image" && useSettingsStore.getState().downloadEnabled === 1) {
-        try {
-          const booruUrl = await window.api?.booru.fetchImage(useSettingsStore.getState().tagList);
-          if (booruUrl) ref = booruUrl;
-        } catch (err) {
-          logger.error("[MainAppPage] Booru fetch failed, using pack media:", err);
-        }
-      }
       // A spiral overlay may ride on top of an image/video pop, independently rolled
       // so it actually sits over the media rather than competing for a spawn slot.
       // Packs without a hypno/ dir still get the built-in default spiral (legacy behaviour).
@@ -243,7 +233,7 @@ export function MainAppPage() {
   const openPopupSettings = useCallback(() => {
     setSpawnIssues(null);
     setConfigTab("annoyance");
-    setAnnoyanceTab("popupTweaks");
+    setAnnoyanceTab("popupTypes");
     setView("config");
   }, []);
 
@@ -400,9 +390,13 @@ export function MainAppPage() {
         <ErrorBoundary fallbackTitle="Gallery Error">
           <GalleryPanel />
         </ErrorBoundary>
-      ) : view === "creator" ? (
-        <ErrorBoundary fallbackTitle="Creator Error">
-          <CreatorPanel />
+      ) : view === "tagging" ? (
+        <ErrorBoundary fallbackTitle="Mood Tagging Error">
+          <TaggingSection />
+        </ErrorBoundary>
+      ) : view === "designer" ? (
+        <ErrorBoundary fallbackTitle="Script Designer Error">
+          <DesignerSection />
         </ErrorBoundary>
       ) : (
         <ErrorBoundary fallbackTitle="Settings Error">

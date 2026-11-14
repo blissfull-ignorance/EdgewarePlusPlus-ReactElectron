@@ -1,10 +1,10 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { Group, Title, Badge, Text, UnstyledButton } from "@mantine/core";
-import { IconLayoutDashboard, IconSettings, IconPhoto, IconWand } from "@tabler/icons-react";
+import { IconLayoutDashboard, IconSettings, IconPhoto, IconPalette, IconCode } from "@tabler/icons-react";
 import defaultAppIcon from "../../assets/app_icon.png";
 import { useSettingsStore } from "../../stores/settingsStore";
 
-export type MainView = "status" | "config" | "gallery" | "creator";
+export type MainView = "status" | "config" | "gallery" | "tagging" | "designer";
 
 interface NavItemProps {
   active: boolean;
@@ -135,11 +135,18 @@ export function AppFrame({ view, onViewChange, actions, children }: AppFrameProp
             onClick={() => onViewChange("gallery")}
           />
           <NavItem
-            active={view === "creator"}
-            label="Creator"
-            icon={<IconWand size={18} />}
-            testId="main-tab-creator"
-            onClick={() => onViewChange("creator")}
+            active={view === "tagging"}
+            label="Mood tagging"
+            icon={<IconPalette size={18} />}
+            testId="main-tab-tagging"
+            onClick={() => onViewChange("tagging")}
+          />
+          <NavItem
+            active={view === "designer"}
+            label="Script designer"
+            icon={<IconCode size={18} />}
+            testId="main-tab-designer"
+            onClick={() => onViewChange("designer")}
           />
           <div style={{ marginTop: "auto", padding: "0 4px" }}>
             <Text size="xs" c="dimmed">

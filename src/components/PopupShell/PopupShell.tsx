@@ -10,6 +10,24 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { Text } from "@mantine/core";
 import { useCloseLabel } from "../../hooks/useCloseLabel";
+import { useSettingsStore } from "../../stores/settingsStore";
+
+/**
+ * The OS popup route (`#/popup/<type>/<mediaId>/<popupId>`) carries the id
+ * main knows this window by. In-app overlays do not run on that route, so
+ * they get null and never show window-only affordances like the drag strip.
+ */
+function popupIdFromHash(): string | null {
+  const hash = window.location.hash;
+  if (!hash.startsWith("#/popup/")) return null;
+  const seg = hash.slice("#/popup/".length).split("?")[0].split("/")[2];
+  if (!seg) return null;
+  try {
+    return decodeURIComponent(seg);
+  } catch {
+    return seg;
+  }
+}
 
 export interface PopupShellProps {
   opacity?: number;
@@ -155,6 +173,44 @@ export function PopupShell({
     [clicksToClose, remainingClicks, clickthroughEnabled, finishClose]
   );
 
+  // Upper-edge drag (setting: Draggable Popups). The renderer reports the
+  // pointer delta accumulated since the grab; main moves the window from
+  // where the drag began.
+  const [popupRouteId] = useState(popupIdFromHash);
+  const dragSetting = useSettingsStore((s) => s.popupDraggable);
+  const dragEnabled = dragSetting === 1 && popupRouteId !== null && !clickthroughEnabled;
+  const dragOriginRef = useRef<{ x: number; y: number } | null>(null);
+
+  const onDragPointerDown = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      if (!popupRouteId) return;
+      e.currentTarget.setPointerCapture(e.pointerId);
+      dragOriginRef.current = { x: e.clientX, y: e.clientY };
+      void window.api?.popup.dragBegin(popupRouteId).catch(() => undefined);
+    },
+    [popupRouteId]
+  );
+
+  const onDragPointerMove = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      const origin = dragOriginRef.current;
+      if (!origin || !popupRouteId) return;
+      void window.api?.popup.dragMove(popupRouteId, e.clientX - origin.x, e.clientY - origin.y).catch(() => undefined);
+    },
+    [popupRouteId]
+  );
+
+  const onDragPointerUp = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      dragOriginRef.current = null;
+      if (e.currentTarget.hasPointerCapture(e.pointerId)) {
+        e.currentTarget.releasePointerCapture(e.pointerId);
+      }
+      if (popupRouteId) void window.api?.popup.dragEnd(popupRouteId).catch(() => undefined);
+    },
+    [popupRouteId]
+  );
+
   return (
     <div
       data-testid="popup-shell"
@@ -173,6 +229,40 @@ export function PopupShell({
       }}
       onClick={handleContainerClick}
     >
+      {dragEnabled ? (
+        <div
+          data-testid="popup-drag-strip"
+          aria-label="Drag popup"
+          onPointerDown={onDragPointerDown}
+          onPointerMove={onDragPointerMove}
+          onPointerUp={onDragPointerUp}
+          onPointerCancel={onDragPointerUp}
+          onClick={(e) => e.stopPropagation()}
+          style={{
+            position: "absolute",
+            top: 0,
+            left: 0,
+            right: 0,
+            height: 16,
+            zIndex: 20,
+            cursor: "grab",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            background: "linear-gradient(to bottom, rgba(0,0,0,0.35), rgba(0,0,0,0))",
+            touchAction: "none",
+          }}
+        >
+          <div
+            style={{
+              width: 34,
+              height: 4,
+              borderRadius: 999,
+              backgroundColor: "rgba(255,255,255,0.75)",
+            }}
+          />
+        </div>
+      ) : null}
       <div
         style={{
           position: "absolute",

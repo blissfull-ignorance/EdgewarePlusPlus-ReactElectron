@@ -127,7 +127,7 @@ export function StartPanel() {
           value={globalPanicButton}
           onChange={() => {}}
           disabled
-          description="Hotkey to panic (close) the application"
+          description="Hotkey to panic and close the application"
         />
 
         <ConfigDropdown
@@ -173,7 +173,7 @@ export function StartPanel() {
       <SectionCard
         icon={<IconClock size={16} />}
         title="Scheduling"
-        description="Start a session automatically after a delay, optionally repeating. The app must stay running; pair with run-at-startup."
+        description="Start a session automatically after a delay. Repeat it if you like. The app must stay running, so pair it with run-at-startup."
       >
         <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="lg" verticalSpacing="lg">
           <ConfigToggle

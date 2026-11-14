@@ -1,6 +1,6 @@
 /**
- * @file CreatorPanel — in-app pack authoring: assign media files to moods
- * and design the corruption script, writing straight into the pack folder.
+ * @file TaggingSection — in-app mood tagging: assign the pack's media files
+ * to moods, writing straight into the pack folder's index.json.
  */
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
@@ -15,12 +15,13 @@ import {
   Stack,
   Text,
   TextInput,
+  UnstyledButton,
 } from "@mantine/core";
-import { IconPalette, IconCode, IconPlus, IconTrash, IconPencil, IconStarFilled } from "@tabler/icons-react";
-import { DesignerSection } from "./DesignerSection";
+import { IconPlus, IconTrash, IconPencil, IconStarFilled } from "@tabler/icons-react";
 import type { GalleryEntry, GalleryResult } from "../../types/pack";
 import { resolvePackMediaUrl } from "../popup/resolveMediaUrl";
 import { KIND_DIR, favouriteKey } from "../gallery/favouriteKey";
+import { ConfirmFileDelete } from "../../components/ConfirmFileDelete";
 import { useSettingsStore } from "../../stores/settingsStore";
 
 /** Cards render in pages so a 1000+ file pack opens instantly. */
@@ -159,12 +160,13 @@ function TagEditor({
   );
 }
 
-function TaggingSection({ onPackChanged }: { onPackChanged?: () => void }) {
+export function TaggingSection() {
   const packPath = useSettingsStore((s) => s.packPath);
   const [gallery, setGallery] = useState<GalleryResult>({ entries: [], moods: [], activeMoods: [], favourites: [], rootImages: [] });
   const [moods, setMoods] = useState<RawMood[]>([]);
   const [newMood, setNewMood] = useState("");
   const [editing, setEditing] = useState<GalleryEntry | null>(null);
+  const [deleting, setDeleting] = useState<GalleryEntry | null>(null);
   const [onlyUncategorized, setOnlyUncategorized] = useState(false);
   const [renaming, setRenaming] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");
@@ -191,7 +193,6 @@ function TaggingSection({ onPackChanged }: { onPackChanged?: () => void }) {
     if (!index) return;
     setMoods(parseIndex(index));
     setSavedAt(Date.now());
-    onPackChanged?.();
     void reload().catch(() => undefined);
   };
 
@@ -289,7 +290,7 @@ function TaggingSection({ onPackChanged }: { onPackChanged?: () => void }) {
   };
 
   if (!packPath) {
-    return <Text c="dimmed">Select a pack first (Status tab or Pack Management).</Text>;
+    return <Text c="dimmed" data-testid="tagging-no-pack">Select a pack first on the Status tab or in Pack Management.</Text>;
   }
 
   return (
@@ -416,7 +417,20 @@ function TaggingSection({ onPackChanged }: { onPackChanged?: () => void }) {
                   style={{ cursor: "pointer" }}
                   onClick={() => setEditing(entry)}
                 >
-                  <Thumb entry={entry} />
+                  <div style={{ position: "relative" }}>
+                    <Thumb entry={entry} />
+                    <UnstyledButton
+                      aria-label={`Delete ${entry.file}`}
+                      data-testid={`creator-delete-${entry.file}`}
+                      style={{ position: "absolute", top: 4, left: 4, padding: 4, borderRadius: 6, backgroundColor: "rgba(0,0,0,0.45)" }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setDeleting(entry);
+                      }}
+                    >
+                      <IconTrash size={15} color="rgba(255,255,255,0.85)" />
+                    </UnstyledButton>
+                  </div>
                   <Text size="xs" truncate title={entry.file}>
                     {entry.file}
                   </Text>
@@ -454,54 +468,20 @@ function TaggingSection({ onPackChanged }: { onPackChanged?: () => void }) {
       )}
 
       {editing ? <TagEditor entry={editing} moods={moods} onToggle={toggleTag} /> : null}
-    </Stack>
-  );
-}
-
-export function CreatorPanel() {
-  const [section, setSection] = useState<"tagging" | "script">("tagging");
-  // Bumped whenever tagging rewrites the pack, so the designer reloads the
-  // mood list it validates its level cards against.
-  const [packRevision, setPackRevision] = useState(0);
-
-  return (
-    <Stack gap="md" data-testid="creator-panel">
-      <Group justify="space-between" align="center" wrap="wrap">
-        <div>
-          <Text fw={700} size="lg">
-            Creator Tools
-          </Text>
-          <Text size="sm" c="dimmed">
-            Categorize this pack's gallery into moods and design its corruption script.
-          </Text>
-        </div>
-        <Group gap="xs">
-          <Button
-            size="xs"
-            variant={section === "tagging" ? "filled" : "light"}
-            leftSection={<IconPalette size={14} />}
-            onClick={() => setSection("tagging")}
-            data-testid="creator-tab-tagging"
-          >
-            Mood tagging
-          </Button>
-          <Button
-            size="xs"
-            variant={section === "script" ? "filled" : "light"}
-            leftSection={<IconCode size={14} />}
-            onClick={() => setSection("script")}
-            data-testid="creator-tab-script"
-          >
-            Script designer
-          </Button>
-        </Group>
-      </Group>
-      <div style={{ display: section === "tagging" ? "block" : "none" }}>
-        <TaggingSection onPackChanged={() => setPackRevision((r) => r + 1)} />
-      </div>
-      <div style={{ display: section === "script" ? "block" : "none" }}>
-        <DesignerSection packRevision={packRevision} />
-      </div>
+      <ConfirmFileDelete
+        file={deleting?.file ?? null}
+        opened={deleting !== null}
+        onClose={() => setDeleting(null)}
+        onConfirm={() => {
+          const entry = deleting;
+          setDeleting(null);
+          if (!entry || !packPath) return;
+          void window.api?.pack
+            .deleteFile(packPath, entry.kind, entry.file)
+            .then((res) => (res.ok ? reload() : undefined))
+            .catch(() => undefined);
+        }}
+      />
     </Stack>
   );
 }

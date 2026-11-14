@@ -51,6 +51,8 @@ export const CONFIG_KEYS_TO_FIELD: Record<string, string> = {
   globalPanicButton: "globalPanicButton",
   presetsDanger: "presetsDanger",
   delay: "delay",
+  popupScale: "popupScale",
+  popupDraggable: "popupDraggable",
   singleMode: "singleMode",
   popupMod: "popupMod",
   audioMod: "audioMod",
@@ -142,7 +144,7 @@ export const CONFIG_KEYS_TO_FIELD: Record<string, string> = {
 };
 
 export const RUN_ON_SAVE_QUIT_DANGER =
-  "Edgeware will run on Save & Exit (AKA: when you hit Yes!)";
+  "Edgeware will run when you hit Yes on Save & Exit.";
 export const PANIC_LOCKOUT_DANGER =
   "Panic Lockout is enabled! Panic cannot be used until a specific time! Make sure you know your Safeword!";
 export const MITOSIS_MODE_DANGER =
@@ -184,6 +186,8 @@ export const CONFIG_ITEMS: Record<string, z.ZodType> = {
 
   // ── Popup Types (16) ──
   delay: ZodNonNegative.describe("Delay between popups (ms)"),
+  popupScale: z.number().int().min(25).max(300).describe("Popup size scale, percent of default"),
+  popupDraggable: ZodBoolean.describe("Popups can be dragged by their upper edge"),
   singleMode: ZodBoolean.describe("Single popup mode"),
   popupMod: ZodPercentage.describe("Image popup chance (%)"),
   audioMod: ZodPercentage.describe("Audio popup chance (%)"),

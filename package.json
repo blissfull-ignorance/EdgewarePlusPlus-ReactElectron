@@ -20,7 +20,7 @@
     "test:e2e:creator": "playwright test creator mood-script multi-mood",
     "test:e2e:corruption": "playwright test corruption schedule",
     "test:e2e:popup": "playwright test popup real-pack blacklist notification",
-    "test:e2e:pack": "playwright test pack-loading pack-import app-icon splash wallpaper booru theme visual-regression",
+    "test:e2e:pack": "playwright test pack-loading pack-import app-icon splash wallpaper theme visual-regression",
     "test:e2e:runtime": "playwright test runtime-hardening quit panic persistence config edgeware-api self-test smoke error-handling integration warning-box hibernate",
     "test:unit:creator": "vitest run designer pack-edit gallery",
     "test:unit:corruption": "vitest run corruption legacy-config mood",

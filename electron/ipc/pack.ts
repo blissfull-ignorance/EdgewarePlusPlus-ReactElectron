@@ -985,6 +985,54 @@ function registerHandlers(): void {
     }
   );
 
+  /**
+   * Delete one media file from the pack and strip its mood tags, so the
+   * index never keeps a phantom entry for a file that is gone. The name
+   * must be a plain file name inside the kind's media directory.
+   */
+  ipcMain.handle(
+    "pack:deleteFile",
+    async (
+      _event,
+      packPath: unknown,
+      kind: unknown,
+      file: unknown
+    ): Promise<{ ok: boolean; error?: string }> => {
+      const ctx = editableIndex(packPath);
+      if (!ctx) return { ok: false, error: "Not a pack" };
+      const subdir = { image: "img", video: "vid", audio: "aud", hypno: "hypno" }[
+        String(kind) as "image" | "video" | "audio" | "hypno"
+      ];
+      if (!subdir) return { ok: false, error: "Unknown media kind" };
+      if (
+        typeof file !== "string" ||
+        !file ||
+        file !== path.basename(file) ||
+        file.startsWith(".")
+      ) {
+        return { ok: false, error: "Invalid file name" };
+      }
+      const target = path.join(ctx.dir, subdir, file);
+      if (!fs.existsSync(target) || !fs.statSync(target).isFile()) {
+        return { ok: false, error: "File not found" };
+      }
+      try {
+        fs.rmSync(target);
+      } catch (err) {
+        logger.error(`[Pack] Failed to delete ${subdir}/${file}:`, err);
+        return { ok: false, error: "Could not delete the file" };
+      }
+      try {
+        writeIndex(ctx.dir, setFileTags(ctx.index, file, []));
+      } catch (err) {
+        logger.error("[Pack] Deleted file but failed to clean its mood tags:", err);
+      }
+      invalidateGalleryScan();
+      logger.info(`[Pack] Deleted ${subdir}/${file} from the pack`);
+      return { ok: true };
+    }
+  );
+
   ipcMain.handle(
     "pack:addMood",
     async (_event, packPath: unknown, name: unknown): Promise<RawIndexLike | null> => {

@@ -48,17 +48,17 @@ export function ModesPanel() {
           value={popupRenderMode}
           onChange={(val) => setRaw({ popupRenderMode: val as "electron" | "inapp" })}
           data={[
-            { label: "Electron Windows (Topmost)", value: "electron" },
+            { label: "Topmost Electron Windows", value: "electron" },
             { label: "In-App Overlay", value: "inapp" },
           ]}
-          description="How popups are rendered. Electron mode uses separate OS windows; In-App renders within this window."
+          description="How popups are rendered. Electron mode uses separate OS windows. In-App renders within this window."
         />
 
         <ConfigToggle
           label="Lowkey Mode"
           value={lkToggle}
           onChange={(val) => setRaw({ lkToggle: val })}
-          description="Enable lowkey mode (smaller popups in corners)"
+          description="Smaller popups tucked into the screen corners"
         />
 
         <ConfigDropdown
@@ -93,7 +93,7 @@ export function ModesPanel() {
           label="Hibernate Mode"
           value={hibernateMode}
           onChange={(val) => setRaw({ hibernateMode: val })}
-          description="Enable hibernate mode (background popup bursts)"
+          description="Runs background popup bursts"
         />
 
         <ConfigDropdown
@@ -135,7 +135,7 @@ export function ModesPanel() {
           max={1000}
           step={1}
           disabled={!hibernateMode}
-          description="Popups per burst (Original spawns half to this many instantly)"
+          description="The Original type spawns half to this many instantly"
         />
 
         <ConfigSlider
@@ -146,7 +146,7 @@ export function ModesPanel() {
           max={300000}
           step={1000}
           disabled={!hibernateMode}
-          description="Active burst window in ms (Spaced/Glitch/Ramp stop when it closes)"
+          description="The burst window in milliseconds. Spaced, Glitch and Ramp stop when it closes."
         />
 
         <ConfigToggle

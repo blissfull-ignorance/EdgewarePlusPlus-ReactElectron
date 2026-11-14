@@ -20,13 +20,14 @@ import {
   Text,
   UnstyledButton,
 } from "@mantine/core";
-import { IconPhoto, IconVideo, IconMusic, IconSpiral, IconLock, IconStar, IconStarFilled } from "@tabler/icons-react";
+import { IconPhoto, IconVideo, IconMusic, IconSpiral, IconLock, IconStar, IconStarFilled, IconTrash } from "@tabler/icons-react";
 import type { GalleryEntry, GalleryResult } from "../../types/pack";
 import { resolvePackMediaUrl } from "../popup/resolveMediaUrl";
 import { KIND_DIR, favouriteKey } from "./favouriteKey";
 import { useSettingsStore } from "../../stores/settingsStore";
 import { useCorruptionStore } from "../../stores/corruptionStore";
 import { useAppStore } from "../../stores/appStore";
+import { ConfirmFileDelete } from "../../components/ConfirmFileDelete";
 
 const KIND_ICON: Record<GalleryEntry["kind"], React.ReactNode> = {
   image: <IconPhoto size={40} stroke={1.2} />,
@@ -76,6 +77,7 @@ export function GalleryPanel() {
   const [favouritesOnly, setFavouritesOnly] = useState(false);
   const [typeFilter, setTypeFilter] = useState<"all" | GalleryEntry["kind"]>("all");
   const [selected, setSelected] = useState<GalleryEntry | null>(null);
+  const [deleting, setDeleting] = useState<GalleryEntry | null>(null);
   const [shown, setShown] = useState(GRID_PAGE);
 
   useEffect(() => {
@@ -94,6 +96,24 @@ export function GalleryPanel() {
       alive = false;
     };
   }, [packPath, isRunning]);
+
+  const confirmDelete = (): void => {
+    const entry = deleting;
+    setDeleting(null);
+    if (!entry || !packPath) return;
+    void window.api?.pack
+      .deleteFile(packPath, entry.kind, entry.file)
+      .then((res) => {
+        if (!res.ok) return;
+        if (selected?.file === entry.file) setSelected(null);
+        setData((d) => ({
+          ...d,
+          entries: d.entries.filter((e) => !(e.file === entry.file && e.kind === entry.kind)),
+          favourites: d.favourites.filter((k) => k !== favouriteKey(entry)),
+        }));
+      })
+      .catch(() => undefined);
+  };
 
   const sessionMoods = useCorruptionStore((s) => s.activeMoods);
   // Moods are only ever active while a session runs. When stopped, the
@@ -158,10 +178,28 @@ export function GalleryPanel() {
           <Text fw={700} size="lg">
             Pack Gallery
           </Text>
-          <Text size="sm" c="dimmed" data-testid="gallery-count">
-            {data.entries.length} files ({typeCounts.image} images, {typeCounts.video} videos,{" "}
-            {typeCounts.audio} audio, {typeCounts.hypno} hypno) · {data.moods.length} moods ·
-            active moods unlock their content for popups
+          <Group gap={6} wrap="wrap" mt={4} data-testid="gallery-count">
+            <Badge size="xs" variant="light" color="teal">
+              {data.entries.length} files
+            </Badge>
+            <Badge size="xs" variant="dot" color="gray">
+              {typeCounts.image} images
+            </Badge>
+            <Badge size="xs" variant="dot" color="gray">
+              {typeCounts.video} videos
+            </Badge>
+            <Badge size="xs" variant="dot" color="gray">
+              {typeCounts.audio} audio
+            </Badge>
+            <Badge size="xs" variant="dot" color="gray">
+              {typeCounts.hypno} hypno
+            </Badge>
+            <Badge size="xs" variant="light" color="violet">
+              {data.moods.length} moods
+            </Badge>
+          </Group>
+          <Text size="xs" c="dimmed">
+            Active moods unlock their content for popups.
           </Text>
         </div>
         <Group gap="sm" wrap="nowrap">
@@ -219,7 +257,7 @@ export function GalleryPanel() {
             data-testid={`gallery-mood-${mood}`}
           >
             <Group gap={4} wrap="nowrap" data-testid={`gallery-chip-${mood}`}>
-              {mood} ({moodCounts.get(mood) ?? 0})
+              {mood} · {moodCounts.get(mood) ?? 0}
               {active.has(mood) ? (
                 <Badge size="xs" color="teal" variant="light">
                   active
@@ -259,6 +297,17 @@ export function GalleryPanel() {
               >
                 <div style={{ position: "relative" }}>
                   <Thumb entry={entry} />
+                  <UnstyledButton
+                    aria-label={`Delete ${entry.file}`}
+                    data-testid={`gallery-delete-${entry.file}`}
+                    style={{ position: "absolute", top: 4, left: 4, padding: 4, borderRadius: 6, backgroundColor: "rgba(0,0,0,0.45)" }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setDeleting(entry);
+                    }}
+                  >
+                    <IconTrash size={15} color="rgba(255,255,255,0.85)" />
+                  </UnstyledButton>
                   <UnstyledButton
                     aria-label={favouriteKeys.has(favouriteKey(entry)) ? `Unstar ${entry.file}` : `Star ${entry.file}`}
                     data-testid={`gallery-star-${entry.file}`}
@@ -337,6 +386,12 @@ export function GalleryPanel() {
           ) : null}
         </div>
       </Modal>
+      <ConfirmFileDelete
+        file={deleting?.file ?? null}
+        opened={deleting !== null}
+        onClose={() => setDeleting(null)}
+        onConfirm={confirmDelete}
+      />
     </Stack>
   );
 }

@@ -46,7 +46,7 @@ interface RawMood {
 }
 
 /**
- * Unsaved work in progress, keyed by pack. Creator Tools unmount when the
+ * Unsaved work in progress, keyed by pack. The designer unmounts when the
  * user visits another main tab or switches packs; the draft lets a dirty
  * design survive that round trip instead of silently reverting to disk.
  */
@@ -73,7 +73,7 @@ const ACTION_KINDS: { value: DesignerAction["kind"]; label: string }[] = [
   { value: "video", label: "Show video" },
   { value: "audio", label: "Play audio" },
   { value: "notification", label: "Notification" },
-  { value: "prompt", label: "Prompt (text box)" },
+  { value: "prompt", label: "Text prompt" },
   { value: "subliminal", label: "Subliminal text" },
   { value: "web", label: "Open URL" },
   { value: "close_popups", label: "Close popups" },
@@ -275,7 +275,8 @@ function LevelCard({
           w={130}
           min={0}
           max={100}
-          label="Popup rate %"
+          label="Popup rate"
+          suffix=" %"
           placeholder="pack"
           value={level.config?.popupMod ?? ""}
           onChange={(v) =>
@@ -291,7 +292,8 @@ function LevelCard({
           w={130}
           min={0}
           step={500}
-          label="Spawn delay ms"
+          label="Spawn delay"
+          suffix=" ms"
           placeholder="pack"
           value={level.config?.delay ?? ""}
           onChange={(v) =>
@@ -339,7 +341,7 @@ function LevelCard({
               <TextInput
                 size="xs"
                 w={200}
-                placeholder={action.kind === "web" ? "https://url" : "text (optional — pack pool otherwise)"}
+                placeholder={action.kind === "web" ? "https://url" : "optional, else pack pool"}
                 value={action.text ?? ""}
                 onChange={(e) => setAction(i, { ...action, text: e.currentTarget.value })}
                 aria-label={`Action ${i + 1} text`}
@@ -682,7 +684,7 @@ export function DesignerSection({ packRevision = 0 }: { packRevision?: number })
   };
 
   if (!packPath) {
-    return <Text c="dimmed">Select a pack first (Status tab or Pack Management).</Text>;
+    return <Text c="dimmed" data-testid="designer-no-pack">Select a pack first on the Status tab or in Pack Management.</Text>;
   }
 
   const designed = parseDesignerScript(code) !== null || !hasExistingScript;
@@ -769,8 +771,8 @@ export function DesignerSection({ packRevision = 0 }: { packRevision?: number })
 
       {scriptTooLarge ? (
         <Text size="sm" c="orange" data-testid="designer-toolarge-banner">
-          This pack's script.lua is larger than the 200 KB in-app editing limit;
-          saving is disabled so the file cannot be truncated.
+          This pack's script.lua is larger than the 200 KB in-app editing
+          limit. Saving is disabled so the file cannot be truncated.
         </Text>
       ) : null}
 
@@ -778,8 +780,8 @@ export function DesignerSection({ packRevision = 0 }: { packRevision?: number })
         <Group gap="sm" wrap="wrap" data-testid="designer-handwritten-banner">
           <Text size="sm" c="orange">
             This pack ships a hand-written script. Keep editing it on the code
-            tab, or convert it into a designed script: its popup actions
-            become editable levels, and saving archives the originals first.
+            tab or convert it into a designed script. The popup actions become
+            editable levels and saving archives the originals first.
           </Text>
           <Button
             size="xs"
@@ -819,9 +821,9 @@ export function DesignerSection({ packRevision = 0 }: { packRevision?: number })
 
       {convertedPending ? (
         <Text size="xs" c="orange" data-testid="designer-convert-pending">
-          Conversion staged in the editor — nothing saved to the pack yet.
-          Review the report, then press “Save design to pack” (the originals
-          are archived then).
+          Conversion staged in the editor. Nothing is saved to the pack yet.
+          Review the report and press “Save design to pack” when happy.
+          Saving archives the originals first.
         </Text>
       ) : null}
 

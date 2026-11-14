@@ -21,7 +21,7 @@ export function WallpaperPanel() {
           label="Rotate Wallpaper"
           value={rotateWallpaper}
           onChange={(val) => setRaw({ rotateWallpaper: val })}
-          description="Automatically change desktop wallpaper while running (cannot be changed by corruption packs)"
+          description="Automatically change the desktop wallpaper while running. Corruption packs cannot override this."
         />
 
         <ConfigSlider

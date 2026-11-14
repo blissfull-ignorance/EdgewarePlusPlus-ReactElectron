@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { legacyPopupSize } from "../../src/features/popup/legacySize";
+import { applyPopupScale, legacyPopupSize } from "../../src/features/popup/legacySize";
 
 /**
  * Legacy popup sizing (features/popup.py): the media's longest side spans a
@@ -41,5 +41,24 @@ describe("legacyPopupSize", () => {
     expect(legacyPopupSize(0, 0, shortSide)).toEqual({ width: 400, height: 300 });
     expect(legacyPopupSize(800, 600, 0)).toEqual({ width: 400, height: 300 });
     expect(legacyPopupSize(-5, 600, shortSide)).toEqual({ width: 400, height: 300 });
+  });
+});
+
+describe("applyPopupScale (Popup Size Scale setting)", () => {
+  it("scales both sides by the percent of default", () => {
+    expect(applyPopupScale({ width: 400, height: 300 }, 200)).toEqual({ width: 800, height: 600 });
+    expect(applyPopupScale({ width: 400, height: 300 }, 50)).toEqual({ width: 200, height: 150 });
+  });
+
+  it("keeps the default size at 100 and treats absent or junk input as 100", () => {
+    expect(applyPopupScale({ width: 400, height: 300 }, 100)).toEqual({ width: 400, height: 300 });
+    expect(applyPopupScale({ width: 400, height: 300 }, 0)).toEqual({ width: 400, height: 300 });
+    expect(applyPopupScale({ width: 400, height: 300 }, NaN)).toEqual({ width: 400, height: 300 });
+  });
+
+  it("clamps hostile factors to the slider range", () => {
+    expect(applyPopupScale({ width: 100, height: 100 }, 99999)).toEqual({ width: 300, height: 300 });
+    expect(applyPopupScale({ width: 100, height: 100 }, 1)).toEqual({ width: 25, height: 25 });
+    expect(applyPopupScale({ width: 100, height: 100 }, -500)).toEqual({ width: 25, height: 25 });
   });
 });

@@ -9,7 +9,7 @@
  * missing/unreadable files yield 404 rather than a crash so a bad file cannot take
  * down the popup loop.
  */
-import { app, protocol } from "electron";
+import { protocol } from "electron";
 import fs from "node:fs";
 import path from "node:path";
 import { Readable } from "node:stream";
@@ -65,19 +65,8 @@ export function registerPackMediaProtocol(): void {
         return notFound();
       }
 
-      // The booru downloader caches fetched images outside the pack; serve
-      // that host from the cache root instead of the pack directory.
-      let filePath: string | null;
-      let confineRoot: string | null = null;
-      if (url.host === "booru-cache") {
-        const cacheRoot = path.join(app.getPath("userData"), "data", "booru-cache");
-        const candidate = path.join(cacheRoot, rel);
-        filePath = candidate.startsWith(cacheRoot + path.sep) ? candidate : null;
-        confineRoot = cacheRoot;
-      } else {
-        filePath = resolvePackMediaPath(packRoot, url.host, rel);
-        confineRoot = path.join(path.resolve(packRoot), url.host);
-      }
+      let filePath = resolvePackMediaPath(packRoot, url.host, rel);
+      const confineRoot = path.join(path.resolve(packRoot), url.host);
       if (!filePath || !confineRoot) return notFound();
 
       // Symlink-aware confinement: a pack (or cache) file that resolves

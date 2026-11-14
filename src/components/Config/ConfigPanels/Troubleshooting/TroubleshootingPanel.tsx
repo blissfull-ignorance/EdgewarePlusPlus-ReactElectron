@@ -22,7 +22,7 @@ export function TroubleshootingPanel() {
     >
       <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="lg" verticalSpacing="lg">
         <ConfigToggle
-          label="Hibernate Skip (Tray)"
+          label="Hibernate Skip via Tray"
           value={toggleHibSkip}
           onChange={(val) => setRaw({ toggleHibSkip: val })}
           disabled
@@ -38,7 +38,7 @@ export function TroubleshootingPanel() {
         />
 
         <ConfigToggle
-          label="Internet (GitHub Check)"
+          label="Internet Check via GitHub"
           value={toggleInternet}
           onChange={(val) => setRaw({ toggleInternet: val })}
           disabled
@@ -65,7 +65,7 @@ export function TroubleshootingPanel() {
           value={panicButton}
           onChange={(val) => setRaw({ panicButton: val })}
           disabled
-          description="Hotkey to panic (close) application"
+          description="Hotkey to panic and close the application"
         />
       </SimpleGrid>
 
@@ -128,7 +128,7 @@ function LuaSelfTestCard() {
       <Text size="xs" c="dimmed">
         Exercises every edgeware_v0 scripting function with visible popups, a
         notification and two corruption transitions. Start the runtime first to
-        see the transitions; this restarts the pack script session.
+        see the transitions. Note that this restarts the pack script session.
       </Text>
     </Stack>
   );
