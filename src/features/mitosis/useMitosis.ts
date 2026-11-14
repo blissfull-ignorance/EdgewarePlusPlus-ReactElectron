@@ -42,12 +42,15 @@ export interface UseMitosisOptions {
 }
 
 /**
- * React hook that watches popupsCount and triggers mitosis spawning
- * when count reaches zero and mitosisMode is active.
+ * React hook that seeds the first mitosis popup when a mitosis session
+ * starts (legacy handle_mitosis_mode) and re-spawns when the screen empties
+ * (legacy popup_number observer). The roll loop zeroes image/video under
+ * mitosis, so this seed is the session's only media-popup origin.
  */
 export function useMitosis(options: UseMitosisOptions = {}) {
   const { onSpawn } = options;
 
+  const isRunning = useAppStore((s) => s.isRunning);
   const popupsCount = useAppStore((s) => s.popupsCount);
   const mitosisMode = useSettingsStore((s) => s.mitosisMode);
   const mitosisStrength = useSettingsStore((s) => s.mitosisStrength);
@@ -55,6 +58,7 @@ export function useMitosis(options: UseMitosisOptions = {}) {
   const prevCountRef = useRef(0);
   const seedRef = useRef(0);
   const spawningRef = useRef(false);
+  const seededRef = useRef(false);
 
   const triggerMitosis = useCallback(() => {
     if (!mitosisMode || mitosisStrength <= 0 || spawningRef.current) return;
@@ -70,6 +74,18 @@ export function useMitosis(options: UseMitosisOptions = {}) {
 
     spawningRef.current = false;
   }, [mitosisMode, mitosisStrength, onSpawn]);
+
+  useEffect(() => {
+    if (!isRunning) {
+      seededRef.current = false;
+      return;
+    }
+    if (mitosisMode === 1 && mitosisStrength > 0 && !seededRef.current) {
+      seededRef.current = true;
+      seedRef.current += 1;
+      onSpawn?.([{ type: weightedPopupRoll(seedRef.current) }]);
+    }
+  }, [isRunning, mitosisMode, mitosisStrength, onSpawn]);
 
   useEffect(() => {
     if (

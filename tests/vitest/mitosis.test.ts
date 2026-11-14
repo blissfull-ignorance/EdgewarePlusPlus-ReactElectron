@@ -103,6 +103,20 @@ describe("useMitosis hook (the real trigger)", () => {
     expect(onSpawn.mock.calls[0][0]).toHaveLength(3);
   });
 
+  it("seeds exactly one popup when a mitosis session starts (legacy handle_mitosis_mode)", () => {
+    const { onSpawn, rerender } = renderMitosis();
+    expect(onSpawn).not.toHaveBeenCalled();
+
+    act(() => useAppStore.setState({ isRunning: true }));
+    rerender();
+    expect(onSpawn).toHaveBeenCalledTimes(1);
+    expect(onSpawn.mock.calls[0][0]).toHaveLength(1);
+
+    // The seed fires once per session, not on every render.
+    act(() => rerender());
+    expect(onSpawn).toHaveBeenCalledTimes(1);
+  });
+
   it("stays silent when mitosisMode is off", () => {
     useSettingsStore.setState({ mitosisMode: 0 });
     const { onSpawn, rerender } = renderMitosis();

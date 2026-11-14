@@ -345,7 +345,7 @@ describe("MainAppPage popup spawning", () => {
 describe("mitosis spawning", () => {
   beforeEach(resetStores);
 
-  it("mitosis trigger spawns N popups (N = mitosisStrength)", async () => {
+  it("mitosis seeds one popup at start, then refills N on empty (N = strength)", async () => {
     useSettingsStore.setState({
       popupRenderMode: "inapp",
       mitosisMode: 1,
@@ -355,10 +355,19 @@ describe("mitosis spawning", () => {
 
     act(() => {
       useAppStore.getState().start();
-      useAppStore.getState().incrementPopups();
     });
 
+    // Legacy handle_mitosis_mode: the session seeds exactly one popup.
+    await waitFor(
+      () => {
+        expect(usePopupOverlayStore.getState().popups).toHaveLength(1);
+      },
+      { timeout: 3000 }
+    );
+
+    // The last popup closes: the observer refills with strength-many.
     act(() => {
+      usePopupOverlayStore.getState().clearAll();
       useAppStore.getState().decrementPopups();
     });
 
