@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  activeMoodsByLevel,
   emptyDesign,
   generateCorruptionJson,
   generateLua,
@@ -9,6 +10,7 @@ import {
   renameMoodInCorruption,
   renameMoodInDesign,
   replaceDesignInScript,
+  wallpaperRefResolves,
   type DesignerScript,
 } from "../../src/features/creator/designerModel";
 import { parseCorruptionData } from "../../src/features/corruption/corruptionEngine";
@@ -272,5 +274,55 @@ describe("designerModel", () => {
     const lua = generateLua(emptyDesign());
     expect(lua).toContain("No levels designed yet");
     expect(parseDesignerScript(lua)).toEqual(emptyDesign());
+  });
+});
+
+describe("activeMoodsByLevel (per-level mood progression)", () => {
+  it("accumulates add/remove across levels in order", () => {
+    const d: DesignerScript = {
+      version: 1,
+      startDelaySeconds: 2,
+      levels: [
+        { addMoods: ["vanilla"], removeMoods: [], wallpaper: null, actions: [], advance: { mode: "time", seconds: 1 }, config: {} },
+        { addMoods: ["goon"], removeMoods: [], wallpaper: null, actions: [], advance: { mode: "time", seconds: 1 }, config: {} },
+        { addMoods: [], removeMoods: ["vanilla"], wallpaper: null, actions: [], advance: { mode: "end" }, config: {} },
+      ],
+    };
+    expect(activeMoodsByLevel(d)).toEqual([["vanilla"], ["vanilla", "goon"], ["goon"]]);
+  });
+
+  it("is empty for a design with no levels", () => {
+    expect(activeMoodsByLevel(emptyDesign())).toEqual([]);
+  });
+});
+
+describe("wallpaperRefResolves (pack-root-relative wallpaper check)", () => {
+  const img = ["one.png", "two.png"];
+  const root = ["wallpapergood.png", "wallpaperevil.png"];
+
+  it("accepts a bare name that exists in img/", () => {
+    expect(wallpaperRefResolves("one.png", img, root)).toBe(true);
+  });
+
+  it("accepts a ./name that exists at the pack root (legacy convention)", () => {
+    expect(wallpaperRefResolves("./wallpapergood.png", img, root)).toBe(true);
+    expect(wallpaperRefResolves("./wallpaperevil.png", img, root)).toBe(true);
+  });
+
+  it("rejects a ./name that is not at the pack root", () => {
+    expect(wallpaperRefResolves("./missing.png", img, root)).toBe(false);
+  });
+
+  it("accepts an explicit img/ path present in img/", () => {
+    expect(wallpaperRefResolves("img/two.png", img, root)).toBe(true);
+    expect(wallpaperRefResolves("img/nope.png", img, root)).toBe(false);
+  });
+
+  it("trusts an explicit path in another pack directory", () => {
+    expect(wallpaperRefResolves("resource/bg.jpg", img, root)).toBe(true);
+  });
+
+  it("rejects a bare name absent from img/ and the root", () => {
+    expect(wallpaperRefResolves("ghost.png", img, root)).toBe(false);
   });
 });

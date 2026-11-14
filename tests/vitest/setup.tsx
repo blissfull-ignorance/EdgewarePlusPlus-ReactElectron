@@ -84,7 +84,7 @@ if (typeof window !== "undefined") {
       loadPackConfig: vi.fn().mockResolvedValue(null),
       hasScript: vi.fn().mockResolvedValue(false),
       setRuntimePack: vi.fn().mockResolvedValue(undefined),
-      listGallery: vi.fn().mockResolvedValue({ entries: [], moods: [], activeMoods: [] }),
+      listGallery: vi.fn().mockResolvedValue({ entries: [], moods: [], activeMoods: [], favourites: [], rootImages: [] }),
       setFavourite: vi.fn().mockResolvedValue([]),
       refreshAppIcon: vi.fn().mockResolvedValue(undefined),
       getEditableIndex: vi.fn().mockResolvedValue(null),
@@ -141,7 +141,7 @@ if (typeof window !== "undefined") {
       convertScript: vi.fn().mockResolvedValue(null),
       readScript: vi.fn().mockResolvedValue(null),
       writeScript: vi.fn().mockResolvedValue(false),
-      writePackDesign: vi.fn().mockResolvedValue(false),
+      writePackDesign: vi.fn().mockResolvedValue({ ok: false, backups: [] }),
       injectCorruptionLevel: vi.fn().mockResolvedValue(false),
     },
     system: {

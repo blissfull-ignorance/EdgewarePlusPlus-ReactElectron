@@ -88,7 +88,7 @@ describe("designFromScript", () => {
     const l1 = design.levels[0].actions;
     expect(l1).toContainEqual({ kind: "image", file: "intro.png" });
     expect(l1).toContainEqual({ kind: "video", file: "bonus.mp4", chance: 40 });
-    expect(l1).toContainEqual({ kind: "audio", file: "Voice 1.mp3" });
+    expect(l1).toContainEqual({ kind: "audio", file: "Voice 1.mp3", delayMs: 1000 });
     expect(report).toContain("before the first corrupt()");
   });
 
@@ -200,5 +200,44 @@ describe("designFromScript", () => {
     const { design: empty } = designFromScript("", {});
     expect(empty.levels).toHaveLength(1);
     expect(empty.levels[0].actions).toEqual([]);
+  });
+});
+
+describe("conversion preserves intra-level stagger", () => {
+  const STAGGER = `require("edgeware_v0")
+corrupt()
+image("a.png")
+after(1500, function() image("b.png") end)
+after(3000, function()
+  if roll(50) then
+    video("c.mp4")
+  end
+end)
+`;
+  const { design, notes } = designFromScript(STAGGER, {});
+  const actions = design.levels[0].actions;
+
+  it("captures after(ms, function() api end) offsets on the actions", () => {
+    expect(actions).toContainEqual({ kind: "image", file: "a.png" });
+    expect(actions).toContainEqual({ kind: "image", file: "b.png", delayMs: 1500 });
+    expect(actions).toContainEqual({ kind: "video", file: "c.mp4", chance: 50, delayMs: 3000 });
+    expect(notes.join(" ")).toContain("kept their original after(ms) delay");
+  });
+
+  it("re-emits the delays as after() wrappers instead of synchronous calls", () => {
+    const lua = generateLua(design);
+    expect(lua).toContain('  image("a.png")');
+    expect(lua).toContain("after(1500, function()");
+    expect(lua).toMatch(/after\(1500, function\(\)\n\s+image\("b\.png"\)\n\s+end\)/);
+    expect(lua).toMatch(/after\(3000, function\(\)\n\s+if roll\(50\) then\n\s+video\("c\.mp4"\)/);
+  });
+
+  it("round-trips delays through the designer marker", () => {
+    const reparsed = parseDesignerScript(generateLua(design));
+    expect(reparsed?.levels[0].actions).toContainEqual({
+      kind: "image",
+      file: "b.png",
+      delayMs: 1500,
+    });
   });
 });

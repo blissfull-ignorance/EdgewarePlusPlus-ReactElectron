@@ -218,6 +218,16 @@ function stopScripting(): void {
   }
 }
 
+/** Next free archive name for `base`: .bak, .bak-2 … .bak-9, then timestamped. */
+function archiveCandidate(dir: string, base: string): string | undefined {
+  const candidates = [
+    `${base}.bak`,
+    ...Array.from({ length: 8 }, (_, i) => `${base}.bak-${i + 2}`),
+    `${base}.bak-${Date.now()}`,
+  ];
+  return candidates.find((name) => !fs.existsSync(path.join(dir, name)));
+}
+
 function registerHandlers(): void {
   onPopupClosed((id) => {
     getLuaVM()?.handlePopupClosed(id);
@@ -309,19 +319,19 @@ function registerHandlers(): void {
    * in-app designer can edit it. Paths stay inside the pack directory.
    */
   /**
-   * Creator tools: turn the pack's hand-written script.lua into a designed
-   * script. The original is archived (script.lua.bak, then .bak-2 … .bak-9,
-   * then a timestamped name), its literal popup actions and the corruption
-   * tables are converted into a design, and the generated script plus its
-   * corruption.json replace the hand-written pair. Unrepresentable control
-   * flow is reported, never guessed.
+   * Creator tools: convert the pack's hand-written script.lua plus its
+   * corruption tables into designed artifacts IN MEMORY — nothing is
+   * written. The renderer stages the result as an unsaved design and only
+   * an explicit save (writePackDesign, which archives the originals)
+   * touches the pack, so a failed or wrong conversion never needs backup
+   * surgery. Unrepresentable control flow is reported, never guessed.
    */
   ipcMain.handle(
     "scripting:convertScript",
     async (
       _event,
       packPath: unknown
-    ): Promise<{ backupName: string; notes: string[]; levelCount: number } | null> => {
+    ): Promise<{ lua: string; corruptionJson: string; notes: string[]; levelCount: number } | null> => {
       if (typeof packPath !== "string" || !packPath) return null;
       const dir = path.resolve(packPath.replace(/^~/, process.env.HOME ?? packPath));
       if (!looksLikePack(dir)) return null;
@@ -350,24 +360,15 @@ function registerHandlers(): void {
           }
         }
         const { design, notes } = designFromScript(lua, corruption);
-        let backupName = "";
-        if (fs.existsSync(script)) {
-          const candidates = [
-            "script.lua.bak",
-            ...Array.from({ length: 8 }, (_, i) => `script.lua.bak-${i + 2}`),
-            `script.lua.bak-${Date.now()}`,
-          ];
-          const target = candidates.find((name) => !fs.existsSync(path.join(dir, name)));
-          if (!target) return null;
-          fs.copyFileSync(script, path.join(dir, target));
-          backupName = target;
-        }
-        writeAtomic(script, generateLua(design));
-        writeAtomic(corruptionFile, generateCorruptionJson(design));
         logger.info(
-          `[Scripting] Hand-written script converted to design (${design.levels.length} level(s), backup ${backupName || "none"})`
+          `[Scripting] Hand-written script converted in memory (${design.levels.length} level(s)); awaiting explicit save`
         );
-        return { backupName, notes, levelCount: design.levels.length };
+        return {
+          lua: generateLua(design),
+          corruptionJson: generateCorruptionJson(design),
+          notes,
+          levelCount: design.levels.length,
+        };
       } catch (err) {
         logger.error("[Scripting] Failed to convert pack script:", err);
         return null;
@@ -408,7 +409,12 @@ function registerHandlers(): void {
    */
   ipcMain.handle(
     "scripting:writePackDesign",
-    async (_event, packPath: unknown, lua: unknown, corruptionJson: unknown): Promise<boolean> => {
+    async (
+      _event,
+      packPath: unknown,
+      lua: unknown,
+      corruptionJson: unknown
+    ): Promise<{ ok: boolean; backups: string[] }> => {
       if (
         typeof packPath !== "string" ||
         !packPath ||
@@ -417,7 +423,7 @@ function registerHandlers(): void {
         !(corruptionJson === null || typeof corruptionJson === "string") ||
         (typeof corruptionJson === "string" && corruptionJson.length > 200_000)
       ) {
-        return false;
+        return { ok: false, backups: [] };
       }
       // null means "no level tables to write"; the pack's corruption.json
       // (possibly hand-authored) stays untouched.
@@ -426,28 +432,31 @@ function registerHandlers(): void {
         try {
           parsed = JSON.parse(corruptionJson);
         } catch {
-          return false;
+          return { ok: false, backups: [] };
         }
-        if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return false;
+        if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return { ok: false, backups: [] };
       }
       const dir = path.resolve(packPath.replace(/^~/, process.env.HOME ?? packPath));
-      if (!looksLikePack(dir)) return false;
+      if (!looksLikePack(dir)) return { ok: false, backups: [] };
       try {
         const script = path.join(dir, "script.lua");
         // A designed script replacing a hand-written one must archive the
-        // original first — the designer's banner promises exactly that.
+        // originals first — both files, because a converted design can
+        // reshape the whole level progression in corruption.json too.
+        const backups: string[] = [];
         if (fs.existsSync(script) && lua.startsWith(DESIGNER_MARKER)) {
           const existing = fs.readFileSync(script, "utf-8");
           if (!existing.includes(DESIGNER_MARKER)) {
-            const candidates = [
-              "script.lua.bak",
-              ...Array.from({ length: 8 }, (_, i) => `script.lua.bak-${i + 2}`),
-              `script.lua.bak-${Date.now()}`,
-            ];
-            const target = candidates.find((name) => !fs.existsSync(path.join(dir, name)));
-            if (!target) return false;
-            fs.copyFileSync(script, path.join(dir, target));
-            logger.info(`[Scripting] Hand-written script archived as ${target} before a design save`);
+            for (const base of parsed ? ["script.lua", "corruption.json"] : ["script.lua"]) {
+              if (!fs.existsSync(path.join(dir, base))) continue;
+              const target = archiveCandidate(dir, base);
+              if (!target) return { ok: false, backups: [] };
+              fs.copyFileSync(path.join(dir, base), path.join(dir, target));
+              backups.push(target);
+            }
+            logger.info(
+              `[Scripting] Hand-written pack files archived before a design save: ${backups.join(", ") || "none"}`
+            );
           }
         }
         writeAtomic(script, lua);
@@ -456,10 +465,10 @@ function registerHandlers(): void {
         }
         invalidateGalleryScan();
         logger.info("[Scripting] Pack design saved");
-        return true;
+        return { ok: true, backups };
       } catch (err) {
         logger.error("[Scripting] Failed to save pack design:", err);
-        return false;
+        return { ok: false, backups: [] };
       }
     }
   );

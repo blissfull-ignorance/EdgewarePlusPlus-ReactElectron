@@ -72,7 +72,7 @@ describe("GalleryPanel", () => {
   });
 
   it("shows the empty state for a pack without media", async () => {
-    api().listGallery.mockResolvedValue({ entries: [], moods: [], activeMoods: [], favourites: [] });
+    api().listGallery.mockResolvedValue({ entries: [], moods: [], activeMoods: [], favourites: [], rootImages: [] });
     renderWithMantine(<GalleryPanel />);
     await waitFor(() =>
       expect(screen.getByText("The active pack ships no media files.")).toBeInTheDocument()

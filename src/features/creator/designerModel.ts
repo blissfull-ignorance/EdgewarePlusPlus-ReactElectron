@@ -36,6 +36,12 @@ export interface DesignerAction {
   text?: string;
   /** When set (1-99), the action only fires with this percent chance. */
   chance?: number;
+  /**
+   * When set, the action fires this many ms after the level starts instead
+   * of immediately — how converted scripts keep the original's staggered
+   * `after(ms, function() … end)` sequencing.
+   */
+  delayMs?: number;
 }
 
 export interface DesignerLevel {
@@ -122,10 +128,21 @@ function actionCall(action: DesignerLevel["actions"][number]): string | null {
 function actionLine(action: DesignerLevel["actions"][number]): string | null {
   const call = actionCall(action);
   if (!call) return null;
-  if (action.chance !== undefined && action.chance >= 1 && action.chance <= 99) {
-    return `  if roll(${Math.round(action.chance)}) then\n    ${call}\n  end`;
+  const guarded =
+    action.chance !== undefined && action.chance >= 1 && action.chance <= 99
+      ? `if roll(${Math.round(action.chance)}) then\n    ${call}\n  end`
+      : call;
+  // A delayed action keeps the original script's staggered timing: it fires
+  // inside after(ms, …) instead of synchronously at level entry. The chance
+  // roll happens when it fires, not when it is scheduled.
+  if (action.delayMs !== undefined && action.delayMs > 0) {
+    const body = guarded
+      .split("\n")
+      .map((l) => `    ${l}`)
+      .join("\n");
+    return `  after(${clampMs(action.delayMs)}, function()\n${body}\n  end)`;
   }
-  return `  ${call}`;
+  return `  ${guarded}`;
 }
 
 export function generateLua(design: DesignerScript): string {
@@ -178,6 +195,39 @@ export function normalizeDesign(design: DesignerScript): DesignerScript {
     i === design.levels.length - 1 ? { ...l, advance: { mode: "end" as const } } : l
   );
   return { ...design, levels };
+}
+
+/**
+ * The mood set active at each level, applying add/remove in level order
+ * (a session starts from no moods). Index-aligned with design.levels;
+ * surfaces where a mood is active without the designer re-stating it.
+ */
+export function activeMoodsByLevel(design: DesignerScript): string[][] {
+  const active = new Set<string>();
+  return design.levels.map((level) => {
+    for (const mood of level.addMoods) active.add(mood);
+    for (const mood of level.removeMoods) active.delete(mood);
+    return [...active];
+  });
+}
+
+/**
+ * Whether a wallpaper reference resolves inside the pack, mirroring the
+ * runtime's pack-root-relative resolution: a bare name lives in img/, a
+ * "./name" is a pack-root file, an explicit "img/..." names the img/ dir;
+ * any other directory is a deliberate pack path the gallery cannot see.
+ */
+export function wallpaperRefResolves(
+  ref: string,
+  imgFiles: string[],
+  rootFiles: string[]
+): boolean {
+  const img = new Set(imgFiles);
+  const root = new Set(rootFiles);
+  if (ref.startsWith("./")) return root.has(ref.slice(2));
+  if (ref.startsWith("img/")) return img.has(ref.slice(4));
+  if (ref.includes("/")) return true;
+  return img.has(ref);
 }
 
 export function generateCorruptionJson(design: DesignerScript): string {
@@ -334,6 +384,11 @@ function sanitizeDesign(design: DesignerScript): DesignerScript {
             if (typeof a.file === "string" && a.file) clean.file = a.file;
             if (typeof a.text === "string" && a.text) clean.text = a.text;
             if (a.chance !== undefined && chance !== undefined) clean.chance = chance;
+            const delayMs =
+              typeof a.delayMs === "number" && Number.isFinite(a.delayMs) && a.delayMs > 0
+                ? Math.min(MAX_LUA_DELAY_MS, Math.round(a.delayMs))
+                : undefined;
+            if (delayMs !== undefined) clean.delayMs = delayMs;
             return clean;
           }),
         advance:
@@ -523,6 +578,8 @@ interface ScannedCall {
   /** True when the call passes a second argument (callback/chaining). */
   chained: boolean;
   chance?: number;
+  /** Offset from level start when wrapped in after(ms, …). */
+  delayMs?: number;
   /** Position in the comment-blanked source. */
   pos: number;
 }
@@ -622,6 +679,10 @@ export function designFromScript(lua: string, corruption: unknown): ConversionRe
 
   const helperApi = new Map<string, DesignerActionKind>();
   const helperLiteral = new Map<string, string | null>();
+  // Helpers whose single API call is wrapped in after(<param>, …) take their
+  // delay from the call-site argument bound to that parameter
+  // (delayed_audio(1000, "Voice.mp3", cb) → audio delayed by 1000 ms).
+  const helperDelayArg = new Map<string, number>();
   const complexHelpers = new Set<string>();
   for (const name of definedFns) {
     if ((API_CALL_NAMES as readonly string[]).includes(name) || name === "corrupt") continue;
@@ -637,6 +698,15 @@ export function designFromScript(lua: string, corruption: unknown): ConversionRe
     if (kinds.size === 1 && span) {
       helperApi.set(name, API_KIND_BY_NAME[inner[0][1]]);
       helperLiteral.set(name, firstLiteral(body));
+      const params = /^function\s+\w+\s*\(([^)]*)\)/.exec(body)?.[1];
+      const afterParam = /\bafter\(\s*([A-Za-z_]\w*)\s*,/.exec(body)?.[1];
+      if (params && afterParam) {
+        const idx = params
+          .split(",")
+          .map((p) => p.trim())
+          .indexOf(afterParam);
+        if (idx >= 0) helperDelayArg.set(name, idx);
+      }
       definitionSpans.push(span);
     } else if (kinds.size > 1 && span) {
       // A parameterized wrapper around SEVERAL APIs (bulk spawners) has no
@@ -649,10 +719,44 @@ export function designFromScript(lua: string, corruption: unknown): ConversionRe
   const insideDefinition = (pos: number): boolean =>
     definitionSpans.some((d) => pos >= d.start && pos < d.end);
 
-  const calls: ScannedCall[] = [];
+  // Spans of after(<ms>, …) calls with a literal delay: API calls inside
+  // them fire at that offset from the enclosing scope, and the design keeps
+  // the stagger by carrying the delay on the action.
   // Deeply nested calls make the balanced-paren scan quadratic; a hostile
   // 200 KB script must not freeze the main process.
   const SCAN_WORK_BUDGET = 4_000_000;
+  interface AfterSpan {
+    ms: number;
+    start: number;
+    end: number;
+  }
+  const afterSpans: AfterSpan[] = [];
+  {
+    const afterScanRe = /\bafter\s*\(/g;
+    let aspm: RegExpExecArray | null;
+    let spanWork = 0;
+    while ((aspm = afterScanRe.exec(code))) {
+      const openIdx = aspm.index + aspm[0].length - 1;
+      const scanned = scanCallArgs(code, openIdx);
+      if (!scanned) continue;
+      spanWork += scanned.end - openIdx;
+      if (spanWork > SCAN_WORK_BUDGET) break;
+      const first = (splitArgs(scanned.args)[0] ?? "").trim();
+      if (!/^\d+$/.test(first)) continue;
+      afterSpans.push({ ms: Number(first), start: aspm.index, end: scanned.end });
+    }
+  }
+  const delayForPos = (pos: number): number | undefined => {
+    let best: AfterSpan | undefined;
+    for (const s of afterSpans) {
+      if (pos >= s.start && pos < s.end && (!best || s.end - s.start < best.end - best.start)) {
+        best = s;
+      }
+    }
+    return best?.ms;
+  };
+
+  const calls: ScannedCall[] = [];
   let scanWork = 0;
   let scanBudgetHit = false;
   let droppedRandomWeb = 0;
@@ -660,6 +764,7 @@ export function designFromScript(lua: string, corruption: unknown): ConversionRe
   let droppedHelpers = 0;
   let chainedCalls = 0;
   let computedRolls = 0;
+  let delayedActions = 0;
 
   const callRe = /\b([A-Za-z_]\w*)\s*\(/g;
   let callm: RegExpExecArray | null;
@@ -727,7 +832,17 @@ export function designFromScript(lua: string, corruption: unknown): ConversionRe
       }
     }
 
-    calls.push({ kind, literal, chained, chance, pos: callm.index });
+    // Intra-level stagger: an enclosing after(ms, …) span, or a helper whose
+    // single API is wrapped in after(<param>, …) with a literal call argument.
+    let delayMs: number | undefined;
+    if (helperApi.has(name)) {
+      const dIdx = helperDelayArg.get(name);
+      const raw = dIdx === undefined ? "" : (parts[dIdx] ?? "").trim();
+      if (/^\d+$/.test(raw)) delayMs = Number(raw);
+    }
+    if (delayMs === undefined) delayMs = delayForPos(callm.index);
+
+    calls.push({ kind, literal, chained, chance, delayMs, pos: callm.index });
   }
 
   // Call sites only: a script-local definition of the spawner is not a call.
@@ -796,6 +911,10 @@ export function designFromScript(lua: string, corruption: unknown): ConversionRe
       if (call.literal) action.text = call.literal;
     }
     if (call.chance !== undefined) action.chance = Math.min(99, Math.max(1, call.chance));
+    if (call.delayMs !== undefined && call.delayMs > 0) {
+      action.delayMs = Math.min(MAX_LUA_DELAY_MS, Math.round(call.delayMs));
+      delayedActions++;
+    }
     target.actions.push(action);
 
     // Advance hint: an audio with a callback carries the chain onward.
@@ -847,6 +966,11 @@ export function designFromScript(lua: string, corruption: unknown): ConversionRe
   }
   if (chainedCalls > 0) {
     notes.push("Callback chains were flattened into level order — check each level's Advance setting.");
+  }
+  if (delayedActions > 0) {
+    notes.push(
+      `${delayedActions} action(s) kept their original after(ms) delay — they fire staggered within the level, not all at once.`
+    );
   }
   const totalActions = levels.reduce((sum, l) => sum + l.actions.length, 0);
   notes.unshift(

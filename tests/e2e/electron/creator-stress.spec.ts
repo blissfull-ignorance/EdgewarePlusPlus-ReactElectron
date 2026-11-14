@@ -347,7 +347,7 @@ test("a colliding mood rename changes nothing and claims nothing", async () => {
   }
 });
 
-test("importing a hand-written script archives it and installs a designed one", async () => {
+test("converting stages the design unsaved; saving archives both originals", async () => {
   const state: TempState = createTempState();
   const dir = path.join(state.packsDir, "CT-Import");
   mkdirSync(path.join(dir, "img"), { recursive: true });
@@ -359,6 +359,8 @@ test("importing a hand-written script archives it and installs a designed one", 
   writeFileSync(path.join(dir, "index.json"), JSON.stringify({ default: {}, moods: [] }));
   const handwritten = 'require("edgeware_v0")\n-- ancient hand-written magic\ncorrupt()\n';
   writeFileSync(path.join(dir, "script.lua"), handwritten);
+  const handwrittenTables = JSON.stringify({ moods: { "1": { add: ["ancient"] } } });
+  writeFileSync(path.join(dir, "corruption.json"), handwrittenTables);
   seedConfig(state, {
     packPath: dir,
     popupRenderMode: "electron",
@@ -376,19 +378,29 @@ test("importing a hand-written script archives it and installs a designed one", 
     await openDesigner(running.window);
     await expect(running.window.locator("[data-testid='designer-handwritten-banner']")).toBeVisible();
     await running.window.locator("[data-testid='designer-import-script']").click();
-    await expect(running.window.locator("[data-testid='designer-imported-note']")).toContainText(
-      "script.lua.bak"
-    );
-    // The original survives on disk; the live script is now designer-owned.
-    expect(readFileSync(path.join(dir, "script.lua.bak"), "utf-8")).toBe(handwritten);
-    const installed = readFileSync(path.join(dir, "script.lua"), "utf-8");
-    expect(installed).toContain("EDGWARE-DESIGNER");
-    // The banner is gone and the visual editor owns the (empty) design.
-    await expect(running.window.locator("[data-testid='designer-handwritten-banner']")).toHaveCount(0);
-    await running.window.locator("[data-testid='designer-add-level']").click();
+
+    // The conversion is staged in the editor: the pack on disk is untouched
+    // and NO backup exists yet — a failed or unwanted conversion needs no
+    // restoring because nothing was ever written.
+    await expect(running.window.locator("[data-testid='designer-convert-pending']")).toBeVisible();
+    expect(readFileSync(path.join(dir, "script.lua"), "utf-8")).toBe(handwritten);
+    expect(existsSync(path.join(dir, "script.lua.bak"))).toBe(false);
+    expect(existsSync(path.join(dir, "corruption.json.bak"))).toBe(false);
+
+    // Saving installs the design and archives BOTH originals.
     await running.window.locator("[data-testid='designer-save']").click();
     await expect(running.window.locator("[data-testid='designer-status']")).toContainText("Saved");
-    // A second import archives again without clobbering the first backup.
+    const note = running.window.locator("[data-testid='designer-imported-note']");
+    await expect(note).toContainText("script.lua.bak");
+    await expect(note).toContainText("corruption.json.bak");
+    expect(readFileSync(path.join(dir, "script.lua.bak"), "utf-8")).toBe(handwritten);
+    expect(readFileSync(path.join(dir, "corruption.json.bak"), "utf-8")).toBe(handwrittenTables);
+    const installed = readFileSync(path.join(dir, "script.lua"), "utf-8");
+    expect(installed).toContain("EDGWARE-DESIGNER");
+    // The banner is gone and the visual editor owns the design.
+    await expect(running.window.locator("[data-testid='designer-handwritten-banner']")).toHaveCount(0);
+
+    // A second hand edit + convert + save archives again without clobbering.
     await running.window.evaluate((lua) => {
       (
         window as unknown as {
@@ -396,7 +408,7 @@ test("importing a hand-written script archives it and installs a designed one", 
         }
       ).api.scripting.writeScript(
         lua,
-        'require("edgeware_v0")\n-- second hand edit\n'
+        'require("edgeware_v0")\n-- second hand edit\ncorrupt()\n'
       );
     }, dir);
     await running.window.reload();
@@ -404,10 +416,9 @@ test("importing a hand-written script archives it and installs a designed one", 
     await running.window.locator("[data-testid='creator-tab-script']").click();
     await expect(running.window.locator("[data-testid='designer-import-script']")).toBeVisible();
     await running.window.locator("[data-testid='designer-import-script']").click();
-    await expect(running.window.locator("[data-testid='designer-imported-note']")).toContainText(
-      "script.lua.bak-2"
-    );
-    expect(existsSync(path.join(dir, "script.lua.bak"))).toBe(true);
+    await running.window.locator("[data-testid='designer-save']").click();
+    await expect(running.window.locator("[data-testid='designer-status']")).toContainText("Saved");
+    await expect(note).toContainText("script.lua.bak-2");
     expect(readFileSync(path.join(dir, "script.lua.bak"), "utf-8")).toBe(handwritten);
   } finally {
     await quitApp(running);
@@ -549,20 +560,14 @@ test("converting a hand-written script yields editable levels and an honest repo
   try {
     await openDesigner(running.window);
     await running.window.locator("[data-testid='designer-import-script']").click();
-    await expect(running.window.locator("[data-testid='designer-imported-note']")).toContainText(
-      "script.lua.bak"
-    );
+    // Staged, not saved: the pack on disk is still the hand-written pair.
+    await expect(running.window.locator("[data-testid='designer-convert-pending']")).toBeVisible();
+    expect(readFileSync(path.join(dir, "script.lua"), "utf-8")).toBe(handwritten);
     // The report names what could not be represented.
     await expect(running.window.locator("[data-testid='designer-convert-report']")).toContainText(
       "multiple_popups() call(s) dropped"
     );
-    // Original archived verbatim; the live script is designer-owned.
-    expect(readFileSync(path.join(dir, "script.lua.bak"), "utf-8")).toBe(handwritten);
-    expect(readFileSync(path.join(dir, "script.lua"), "utf-8")).toContain("EDGWARE-DESIGNER");
-    // The corruption tables survive the conversion (mood add kept).
-    const tables = JSON.parse(readFileSync(path.join(dir, "corruption.json"), "utf-8"));
-    expect(tables.moods["1"].add).toEqual(["cool"]);
-    // The converted level is editable: all three actions show on the card.
+    // The converted level is editable BEFORE saving: all three actions show.
     await expect(running.window.locator("[data-testid='designer-level-0']")).toBeVisible();
     for (const i of [0, 1, 2]) {
       await expect(running.window.locator(`[data-testid='designer-action-0-${i}']`)).toBeVisible();
@@ -570,6 +575,18 @@ test("converting a hand-written script yields editable levels and an honest repo
     await expect(running.window.getByRole("textbox", { name: "Action 1 file" })).toHaveValue("one.png");
     await expect(running.window.getByRole("textbox", { name: "Action 2 file" })).toHaveValue("a.mp3");
     await expect(running.window.getByRole("textbox", { name: "Action 3 text" })).toHaveValue("done");
+
+    // Saving archives the originals and installs the designed pair.
+    await running.window.locator("[data-testid='designer-save']").click();
+    await expect(running.window.locator("[data-testid='designer-status']")).toContainText("Saved");
+    await expect(running.window.locator("[data-testid='designer-imported-note']")).toContainText(
+      "script.lua.bak"
+    );
+    expect(readFileSync(path.join(dir, "script.lua.bak"), "utf-8")).toBe(handwritten);
+    expect(readFileSync(path.join(dir, "script.lua"), "utf-8")).toContain("EDGWARE-DESIGNER");
+    // The corruption tables survive the conversion (mood add kept).
+    const tables = JSON.parse(readFileSync(path.join(dir, "corruption.json"), "utf-8"));
+    expect(tables.moods["1"].add).toEqual(["cool"]);
   } finally {
     await quitApp(running);
     cleanupTempState(state);
@@ -596,7 +613,11 @@ test("creator write channels refuse directories that are not packs", async () =>
                 readScript: (p: string) => Promise<unknown>;
                 writeScript: (p: string, c: string) => Promise<boolean>;
                 convertScript: (p: string) => Promise<unknown>;
-                writePackDesign: (p: string, lua: string, json: string) => Promise<boolean>;
+                writePackDesign: (
+                  p: string,
+                  lua: string,
+                  json: string
+                ) => Promise<{ ok: boolean; backups: string[] }>;
               };
               pack: {
                 getEditableIndex: (p: string) => Promise<unknown>;
@@ -620,7 +641,7 @@ test("creator write channels refuse directories that are not packs", async () =>
       read: null,
       write: false,
       convert: null,
-      design: false,
+      design: { ok: false, backups: [] },
       index: null,
       tags: null,
     });
@@ -690,6 +711,77 @@ test("converting refuses a malformed corruption.json and preserves every byte", 
     expect(readFileSync(path.join(dir, "script.lua"), "utf-8")).toBe(lua);
     expect(readFileSync(path.join(dir, "corruption.json"), "utf-8")).toBe(broken);
     expect(existsSync(path.join(dir, "script.lua.bak"))).toBe(false);
+  } finally {
+    await quitApp(running);
+    cleanupTempState(state);
+  }
+});
+
+test("a converted script runs its level's events sequentially, not all at once", async () => {
+  ensureElectronBuild();
+  const state: TempState = createTempState({ kind: "media" });
+  const dir = state.seedPath;
+  // Hand-written script with three image events staggered by after(ms, …):
+  // the exact pattern the converter used to flatten into one burst.
+  const handwritten = [
+    'require("edgeware_v0")',
+    'image("applelw.png")',
+    'after(1500, function() image("globelw.png") end)',
+    'after(3200, function() image("applelw.png") end)',
+  ].join("\n");
+  writeFileSync(path.join(dir, "script.lua"), handwritten);
+  seedConfig(state, {
+    packPath: dir,
+    popupRenderMode: "electron",
+    popupMod: 0,
+    vidMod: 0,
+    audioMod: 0,
+    promptMod: 0,
+    webMod: 0,
+    capPopChance: 0,
+    timeoutPopups: 0,
+    corruptionMode: 0,
+    corruptionTrigger: "Script",
+    delay: 60000,
+  });
+  const running = await launchApp(state, {
+    EDGWARE_STUB_BROWSER: "1",
+    EDGWARE_PANIC_SKIP_WALLPAPER: "1",
+  });
+  try {
+    await openDesigner(running.window);
+    await running.window.locator("[data-testid='designer-import-script']").click();
+    await expect(running.window.locator("[data-testid='designer-convert-pending']")).toBeVisible();
+
+    // Watch every new window from creation: poll ITS route (not a shared
+    // slow sweep) so the recorded spawn times keep ~25ms resolution.
+    const seen = new Map<string, number>();
+    const t0 = Date.now();
+    running.app.on("window", (w) => {
+      const watch = setInterval(() => {
+        try {
+          const m = w.url().match(/#\/popup\/image\/[^/]+\/(popup-[^?/]+)/);
+          if (m && !seen.has(m[1])) {
+            seen.set(m[1], Date.now() - t0);
+            clearInterval(watch);
+          }
+        } catch {
+          clearInterval(watch); // window gone
+        }
+      }, 25);
+      setTimeout(() => clearInterval(watch), 30000).unref?.();
+    });
+
+    await running.window.locator("[data-testid='designer-test-run']").click();
+    await expect.poll(() => seen.size, { timeout: 30000 }).toBe(3);
+
+    const times = [...seen.values()].sort((a, b) => a - b);
+    // Sequential, not simultaneous: the 1.5s event must not arrive early
+    // and the 3.2s event must trail it (margins absorb window-boot jitter).
+    expect(times[1] - times[0]).toBeGreaterThanOrEqual(1200);
+    expect(times[2] - times[0]).toBeGreaterThanOrEqual(2800);
+
+    await running.window.locator("[data-testid='start-stop-button']").click();
   } finally {
     await quitApp(running);
     cleanupTempState(state);

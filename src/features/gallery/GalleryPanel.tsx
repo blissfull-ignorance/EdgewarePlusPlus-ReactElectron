@@ -69,7 +69,7 @@ function Thumb({ entry }: { entry: GalleryEntry }) {
 
 export function GalleryPanel() {
   const packPath = useSettingsStore((s) => s.packPath);
-  const [data, setData] = useState<GalleryResult>({ entries: [], moods: [], activeMoods: [], favourites: [] });
+  const [data, setData] = useState<GalleryResult>({ entries: [], moods: [], activeMoods: [], favourites: [], rootImages: [] });
   const [loading, setLoading] = useState(true);
   const isRunning = useAppStore((s) => s.isRunning);
   const [moodFilter, setMoodFilter] = useState<string | null>(null);

@@ -161,7 +161,7 @@ function TagEditor({
 
 function TaggingSection({ onPackChanged }: { onPackChanged?: () => void }) {
   const packPath = useSettingsStore((s) => s.packPath);
-  const [gallery, setGallery] = useState<GalleryResult>({ entries: [], moods: [], activeMoods: [], favourites: [] });
+  const [gallery, setGallery] = useState<GalleryResult>({ entries: [], moods: [], activeMoods: [], favourites: [], rootImages: [] });
   const [moods, setMoods] = useState<RawMood[]>([]);
   const [newMood, setNewMood] = useState("");
   const [editing, setEditing] = useState<GalleryEntry | null>(null);

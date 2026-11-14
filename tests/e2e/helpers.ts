@@ -152,7 +152,7 @@ export async function launchApp(page: Page, options: LaunchOptions = {}): Promis
           loadPackConfig: async () => null,
           hasScript: async () => false,
           setRuntimePack: async () => undefined,
-          listGallery: async () => ({ entries: [], moods: [], activeMoods: [], favourites: [] }),
+          listGallery: async () => ({ entries: [], moods: [], activeMoods: [], favourites: [], rootImages: [] }),
           setFavourite: async () => [],
           refreshAppIcon: async () => undefined,
           getEditableIndex: async () => null,
@@ -220,7 +220,7 @@ export async function launchApp(page: Page, options: LaunchOptions = {}): Promis
           convertScript: async () => null,
           readScript: async () => null,
           writeScript: async () => false,
-          writePackDesign: async () => false,
+          writePackDesign: async () => ({ ok: false, backups: [] }),
           injectCorruptionLevel: async () => false,
         },
         system: {

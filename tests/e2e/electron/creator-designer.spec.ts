@@ -240,3 +240,100 @@ test.describe("No-code corruption designer", () => {
     await expect(window.locator("[data-testid='designer-popupmod-0']")).toHaveValue("50");
   });
 });
+
+test.describe("Designer editing aids: undo, mood progression, pack-root wallpapers", () => {
+  let st: TempState | null = null;
+  let run: RunningApp | null = null;
+
+  test.beforeAll(async () => {
+    ensureElectronBuild();
+    st = createTempState();
+    const dir = path.join(st.packsDir, "Aids Pack");
+    mkdirSync(path.join(dir, "img"), { recursive: true });
+    copyFileSync(path.join(IMG_DIR, "applelw.png"), path.join(dir, "img", "one.png"));
+    // A wallpaper at the pack ROOT — the legacy convention that used to
+    // warn as "not in the pack" despite resolving fine at runtime.
+    copyFileSync(path.join(IMG_DIR, "globelw.png"), path.join(dir, "wallpapergood.png"));
+    writeFileSync(
+      path.join(dir, "info.json"),
+      JSON.stringify({ name: "Aids Pack", id: "aids", creator: "e2e", version: "1", description: "d" })
+    );
+    writeFileSync(
+      path.join(dir, "index.json"),
+      JSON.stringify({
+        default: { maxClicks: 1, captions: ["c"], denial: [], subliminals: [], notifications: [], prompts: [], popupClose: "Close" },
+        moods: [
+          { mood: "alpha", captions: [], web: [], webArgs: [], media: [] },
+          { mood: "beta", captions: [], web: [], webArgs: [], media: [] },
+        ],
+      })
+    );
+    seedConfig(st, {
+      packPath: dir,
+      popupRenderMode: "electron",
+      popupMod: 0,
+      showLoadingFlair: 0,
+      corruptionMode: 0,
+      corruptionTrigger: "Script",
+      delay: 60000,
+    });
+    run = await launchApp(st, { EDGWARE_STUB_BROWSER: "1", EDGWARE_PANIC_SKIP_WALLPAPER: "1" });
+    const { window } = run;
+    await window.locator("[data-testid='main-tab-creator']").click();
+    await window.locator("[data-testid='creator-tab-script']").click();
+    await expect(window.locator("[data-testid='creator-designer']")).toBeVisible();
+  });
+
+  test.afterAll(async () => {
+    if (run) await quitApp(run);
+    cleanupTempState(st);
+  });
+
+  test("undo steps back through level edits", async () => {
+    const { window } = run!;
+    await expect(window.locator("[data-testid='designer-undo']")).toBeDisabled();
+    await window.locator("[data-testid='designer-add-level']").click();
+    await expect(window.locator("[data-testid='designer-level-0']")).toBeVisible();
+    await window.locator("[data-testid='designer-undo']").click();
+    await expect(window.locator("[data-testid='designer-level-0']")).toHaveCount(0);
+    await expect(window.locator("[data-testid='designer-undo']")).toBeDisabled();
+  });
+
+  test("each level shows the cumulative moods active after it", async () => {
+    const { window } = run!;
+    await window.locator("[data-testid='designer-add-level']").click();
+    await window.locator("[data-testid='designer-add-level']").click();
+    await window.locator("[data-testid='designer-add-0-alpha']").click();
+    await window.locator("[data-testid='designer-add-1-beta']").click();
+    await window.locator("[data-testid='designer-remove-1-alpha']").click();
+
+    const l0 = window.locator("[data-testid='designer-active-moods-0']");
+    await expect(l0).toContainText("alpha");
+    await expect(l0).not.toContainText("beta");
+    const l1 = window.locator("[data-testid='designer-active-moods-1']");
+    await expect(l1).toContainText("beta");
+    await expect(l1).not.toContainText("alpha");
+
+    // Undo the last chip toggle: beta alone remains active at level 2.
+    await window.locator("[data-testid='designer-undo']").click();
+    await expect(l1).toContainText("alpha");
+    await expect(l1).toContainText("beta");
+  });
+
+  test("a pack-root wallpaper is accepted without a false warning", async () => {
+    const { window } = run!;
+    await window.locator("[data-testid='designer-wallpaper-0']").click();
+    // Both level cards mount a wallpaper dropdown; only the open one shows.
+    await window
+      .locator("[role='option']:visible", { hasText: "wallpapergood.png (pack root)" })
+      .click();
+    await expect(window.locator("[data-testid='designer-warnings']")).toHaveCount(0);
+    // The stored reference keeps the legacy "./" root convention.
+    await window.locator("[data-testid='designer-save']").click();
+    await expect(window.locator("[data-testid='designer-status']")).toContainText("Saved");
+    const corruption = JSON.parse(readFileSync(path.join(st!.packsDir, "Aids Pack", "corruption.json"), "utf-8")) as {
+      moods: Record<string, { wallpaper?: string }>;
+    };
+    expect(corruption.moods["1"].wallpaper).toBe("./wallpapergood.png");
+  });
+});

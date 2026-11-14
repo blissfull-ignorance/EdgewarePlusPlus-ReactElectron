@@ -37,7 +37,13 @@ if (boot === "stub" && typeof window !== "undefined") {
       loadPackConfig: async () => null,
       hasScript: async () => false,
       setRuntimePack: async () => undefined,
-      listGallery: async () => ({ entries: [], moods: [], activeMoods: [], favourites: [] }),
+      listGallery: async () => ({
+        entries: [],
+        moods: [],
+        activeMoods: [],
+        favourites: [],
+        rootImages: [],
+      }),
       setFavourite: async () => [],
       refreshAppIcon: async () => undefined,
       getEditableIndex: async () => null,
@@ -91,7 +97,7 @@ if (boot === "stub" && typeof window !== "undefined") {
       convertScript: async () => null,
       readScript: async () => null,
       writeScript: async () => false,
-      writePackDesign: async () => false,
+      writePackDesign: async () => ({ ok: false, backups: [] }),
       injectCorruptionLevel: async () => false,
     },
     system: {

@@ -816,12 +816,19 @@ function registerHandlers(): void {
     // The directory scan is memoized per pack: switching to the Gallery or
   // Creator tab repeatedly must not re-walk thousands of files. Creator
   // writes bump the revision; a pack-path change misses the key naturally.
-  let galleryScan: { key: string; entries: GalleryEntry[]; moods: string[] } | null = null;
+  let galleryScan: {
+    key: string;
+    entries: GalleryEntry[];
+    moods: string[];
+    rootImages: string[];
+  } | null = null;
 
 /**
    * Every media file the active pack ships, tagged with its moods, for the
    * gallery browser. Untagged files are default content; the mood list and
-   * currently-active moods let the UI group and badge entries.
+   * currently-active moods let the UI group and badge entries. Image files at
+   * the pack root are reported separately (rootImages): they are legacy
+   * wallpapers, not popup content, so they never join the gallery entries.
    */
   ipcMain.handle("pack:listGallery", async (_event, packPathArg?: unknown): Promise<GalleryResult> => {
     // The renderer passes the store's packPath: switching packs is visible
@@ -832,7 +839,7 @@ function registerHandlers(): void {
     const activeMoods = [...getActiveMoods()];
     const favourites = readFavouritesList();
     if (!packDir || !fs.existsSync(packDir) || !looksLikePack(packDir)) {
-      return { entries: [], moods: [], activeMoods, favourites };
+      return { entries: [], moods: [], activeMoods, favourites, rootImages: [] };
     }
     try {
       if (!galleryScan || galleryScan.key !== `${packDir}#${galleryRevision}`) {
@@ -858,18 +865,31 @@ function registerHandlers(): void {
             entries.push({ file, kind, moods: kind === "hypno" ? [] : fileMoods[file] ?? [] });
           }
         }
+        const rootImages = fs
+          .readdirSync(packDir, { withFileTypes: true })
+          .filter(
+            (e) => e.isFile() && !e.name.startsWith(".") && /\.(png|jpg|jpeg|gif|webp)$/i.test(e.name)
+          )
+          .map((e) => e.name);
         galleryScan = {
           key: `${packDir}#${galleryRevision}`,
           entries,
           moods: [...new Set(entries.flatMap((e) => e.moods))].sort(),
+          rootImages,
         };
       }
-      const { entries, moods } = galleryScan;
+      const { entries, moods, rootImages } = galleryScan;
       const keys = new Set(entries.map(favouriteKey));
-      return { entries, moods, activeMoods, favourites: favourites.filter((k) => keys.has(k)) };
+      return {
+        entries,
+        moods,
+        activeMoods,
+        favourites: favourites.filter((k) => keys.has(k)),
+        rootImages,
+      };
     } catch (err) {
       logger.error("[Pack] Failed to list gallery:", err);
-      return { entries: [], moods: [], activeMoods, favourites: [] };
+      return { entries: [], moods: [], activeMoods, favourites: [], rootImages: [] };
     }
   });
 

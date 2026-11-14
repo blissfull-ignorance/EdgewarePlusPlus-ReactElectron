@@ -22,16 +22,18 @@ import {
   Text,
   TextInput,
 } from "@mantine/core";
-import { IconArrowDown, IconArrowUp, IconCopy, IconPlus, IconTrash } from "@tabler/icons-react";
+import { IconArrowDown, IconArrowUp, IconCopy, IconPlus, IconTrash, IconArrowBackUp } from "@tabler/icons-react";
 import type { GalleryEntry, GalleryResult } from "../../types/pack";
 import { useSettingsStore } from "../../stores/settingsStore";
 import { useAppStore } from "../../stores/appStore";
 import {
+  activeMoodsByLevel,
   emptyDesign,
   generateCorruptionJson,
   generateLua,
   normalizeDesign,
   parseDesignerScript,
+  wallpaperRefResolves,
   type DesignerAction,
   type DesignerLevel,
   type DesignerScript,
@@ -109,6 +111,8 @@ function LevelCard({
   images,
   videos,
   audios,
+  rootImages,
+  activeMoodsHere,
   onChange,
   onMove,
   onRemove,
@@ -121,6 +125,8 @@ function LevelCard({
   images: string[];
   videos: string[];
   audios: string[];
+  rootImages: string[];
+  activeMoodsHere: string[];
   onChange: (next: DesignerLevel) => void;
   onMove: (dir: -1 | 1) => void;
   onRemove: () => void;
@@ -174,6 +180,24 @@ function LevelCard({
             <IconTrash size={14} />
           </Button>
         </Group>
+      </Group>
+
+      {/* Cumulative mood state after this level's add/remove are applied. */}
+      <Group gap={4} wrap="wrap" data-testid={`designer-active-moods-${index}`}>
+        <Text size="xs" c="dimmed">
+          Active after this level:
+        </Text>
+        {activeMoodsHere.length === 0 ? (
+          <Text size="xs" c="dimmed" fs="italic">
+            none
+          </Text>
+        ) : (
+          activeMoodsHere.map((mood) => (
+            <Badge key={mood} size="xs" variant="light" color="violet">
+              {mood}
+            </Badge>
+          ))
+        )}
       </Group>
 
       <Group gap="xs" wrap="wrap">
@@ -231,7 +255,12 @@ function LevelCard({
           data={[
             { value: "", label: "— none —" },
             ...images.map((f) => ({ value: f, label: f })),
-            ...(level.wallpaper && !images.includes(level.wallpaper)
+            // Legacy packs keep wallpapers at the pack root; "./name" is the
+            // designer's convention for those (runtime resolves root-relative).
+            ...rootImages.map((f) => ({ value: `./${f}`, label: `${f} (pack root)` })),
+            ...(level.wallpaper &&
+            !images.includes(level.wallpaper) &&
+            !rootImages.includes(level.wallpaper.replace(/^\.\//, ""))
               ? [{ value: level.wallpaper, label: `${level.wallpaper} (pack file)` }]
               : []),
           ]}
@@ -333,6 +362,23 @@ function LevelCard({
                 aria-label={`Action ${i + 1} chance percent`}
               />
             ) : null}
+            <NumberInput
+              size="xs"
+              w={120}
+              min={0}
+              step={500}
+              suffix=" ms"
+              placeholder="now"
+              value={action.delayMs ?? ""}
+              onChange={(v) =>
+                setAction(i, {
+                  ...action,
+                  delayMs: typeof v === "number" && v > 0 ? Math.round(v) : undefined,
+                })
+              }
+              aria-label={`Action ${i + 1} delay milliseconds`}
+              data-testid={`designer-action-delay-${index}-${i}`}
+            />
             <Button size="xs" variant="subtle" color="red" aria-label="Remove action" onClick={() => removeAction(i)}>
               <IconTrash size={12} />
             </Button>
@@ -408,7 +454,7 @@ function LevelCard({
 
 export function DesignerSection({ packRevision = 0 }: { packRevision?: number }) {
   const packPath = useSettingsStore((s) => s.packPath);
-  const [gallery, setGallery] = useState<GalleryResult>({ entries: [], moods: [], activeMoods: [], favourites: [] });
+  const [gallery, setGallery] = useState<GalleryResult>({ entries: [], moods: [], activeMoods: [], favourites: [], rootImages: [] });
   const [moodNames, setMoodNames] = useState<string[]>([]);
   const [design, setDesign] = useState<DesignerScript>(emptyDesign());
   const [sourceMode, setSourceMode] = useState<"visual" | "code">("visual");
@@ -422,6 +468,30 @@ export function DesignerSection({ packRevision = 0 }: { packRevision?: number })
   const [scriptTooLarge, setScriptTooLarge] = useState(false);
   const [importedBackup, setImportedBackup] = useState<string | null>(null);
   const [convertNotes, setConvertNotes] = useState<string[] | null>(null);
+  // A conversion staged in the editor but not yet written to the pack.
+  const [convertedPending, setConvertedPending] = useState(false);
+  // Undo history for visual design edits (the code tab keeps native undo).
+  const historyRef = useRef<DesignerScript[]>([]);
+  const [historyDepth, setHistoryDepth] = useState(0);
+  const designRef = useRef(design);
+  designRef.current = design;
+  const pushHistory = useCallback(() => {
+    historyRef.current = [...historyRef.current, designRef.current].slice(-50);
+    setHistoryDepth(historyRef.current.length);
+  }, []);
+  const undo = useCallback(() => {
+    const prev = historyRef.current.pop();
+    setHistoryDepth(historyRef.current.length);
+    if (!prev) return;
+    setDesign(prev);
+    setDesignDirty(true);
+    setSourceMode("visual");
+    setStatus("idle");
+  }, []);
+  useEffect(() => {
+    historyRef.current = [];
+    setHistoryDepth(0);
+  }, [packPath]);
   // The pack whose design/code the current state describes; draft writes
   // before the first load (or mid pack-switch) would corrupt another pack's
   // draft, so they are skipped until a load completes for this pack.
@@ -502,7 +572,10 @@ export function DesignerSection({ packRevision = 0 }: { packRevision?: number })
           issues.push(`Level ${i + 1}: mood "${mood}" no longer exists in the pack`);
         }
       }
-      if (level.wallpaper && !imageSet.has(level.wallpaper)) {
+      if (
+        level.wallpaper &&
+        !wallpaperRefResolves(level.wallpaper, images, gallery.rootImages)
+      ) {
         issues.push(`Level ${i + 1}: wallpaper "${level.wallpaper}" is not in the pack`);
       }
       if (level.advance.mode === "audio" && !audioSet.has(level.advance.file)) {
@@ -518,14 +591,18 @@ export function DesignerSection({ packRevision = 0 }: { packRevision?: number })
       });
     });
     return issues;
-  }, [design, moodNames, images, videos, audios]);
+  }, [design, moodNames, images, videos, audios, gallery.rootImages]);
+
+  const activeByLevel = useMemo(() => activeMoodsByLevel(design), [design]);
 
   const setLevel = (i: number, next: DesignerLevel): void => {
+    pushHistory();
     setDesignDirty(true);
     setDesign((d) => ({ ...d, levels: d.levels.map((l, idx) => (idx === i ? next : l)) }));
   };
 
   const moveLevel = (i: number, dir: -1 | 1): void => {
+    pushHistory();
     setDesignDirty(true);
     setDesign((d) => {
       const levels = [...d.levels];
@@ -537,17 +614,25 @@ export function DesignerSection({ packRevision = 0 }: { packRevision?: number })
   };
 
   const removeLevel = (i: number): void => {
+    pushHistory();
     setDesignDirty(true);
     setDesign((d) => ({ ...d, levels: d.levels.filter((_, idx) => idx !== i) }));
   };
 
   const duplicateLevel = (i: number): void => {
+    pushHistory();
     setDesignDirty(true);
     setDesign((d) => {
       const levels = [...d.levels];
       levels.splice(i + 1, 0, JSON.parse(JSON.stringify(levels[i])) as DesignerLevel);
       return { ...d, levels };
     });
+  };
+
+  const addLevel = (): void => {
+    pushHistory();
+    setDesignDirty(true);
+    setDesign((d) => ({ ...d, levels: [...d.levels, newLevel()] }));
   };
 
   const save = (andRun = false): void => {
@@ -565,13 +650,15 @@ export function DesignerSection({ packRevision = 0 }: { packRevision?: number })
       effective.levels.length > 0 ? generateCorruptionJson(effective) : null;
     void window.api?.scripting
       .writePackDesign(packPath, lua, corruptionJson)
-      .then((ok) => {
-        setStatus(ok ? "saved" : "failed");
-        if (!ok) return;
+      .then((result) => {
+        setStatus(result.ok ? "saved" : "failed");
+        if (!result.ok) return;
         setCode(lua);
         setDesign(effective);
         setDesignDirty(false);
         setCodeDirty(false);
+        setConvertedPending(false);
+        if (result.backups.length > 0) setImportedBackup(result.backups.join(" + "));
         if (andRun) useAppStore.getState().requestStart();
         void reload().catch(() => undefined);
       })
@@ -596,6 +683,7 @@ export function DesignerSection({ packRevision = 0 }: { packRevision?: number })
             suffix=" s"
             value={design.startDelaySeconds}
             onChange={(v) => {
+              pushHistory();
               setDesignDirty(true);
               setDesign((d) => ({ ...d, startDelaySeconds: typeof v === "number" && v >= 0 ? v : 2 }));
             }}
@@ -624,6 +712,16 @@ export function DesignerSection({ packRevision = 0 }: { packRevision?: number })
           />
         </Group>
         <Group gap="sm">
+          <Button
+            size="xs"
+            variant="default"
+            leftSection={<IconArrowBackUp size={12} />}
+            onClick={undo}
+            disabled={historyDepth === 0}
+            data-testid="designer-undo"
+          >
+            Undo
+          </Button>
           <Button size="xs" onClick={() => save()} disabled={scriptTooLarge} data-testid="designer-save">
             Save design to pack
           </Button>
@@ -664,8 +762,8 @@ export function DesignerSection({ packRevision = 0 }: { packRevision?: number })
         <Group gap="sm" wrap="wrap" data-testid="designer-handwritten-banner">
           <Text size="sm" c="orange">
             This pack ships a hand-written script. Keep editing it on the code
-            tab, or convert it into a designed script: the original is
-            archived and its popup actions become editable levels.
+            tab, or convert it into a designed script: its popup actions
+            become editable levels, and saving archives the originals first.
           </Text>
           <Button
             size="xs"
@@ -681,10 +779,18 @@ export function DesignerSection({ packRevision = 0 }: { packRevision?: number })
                     setStatus("failed");
                     return;
                   }
-                  setImportedBackup(result.backupName || null);
+                  // Stage the conversion as an unsaved design: the pack on
+                  // disk stays untouched until an explicit Save.
+                  pushHistory();
+                  const parsed = parseDesignerScript(result.lua);
+                  if (parsed) setDesign(parsed);
+                  setCode(result.lua);
+                  setDesignDirty(true);
+                  setCodeDirty(true);
+                  setSourceMode("visual");
                   setConvertNotes(result.notes);
-                  setStatus("saved");
-                  void reload().catch(() => undefined);
+                  setConvertedPending(true);
+                  setStatus("idle");
                 })
                 .catch(() => setStatus("failed"));
             }}
@@ -695,10 +801,17 @@ export function DesignerSection({ packRevision = 0 }: { packRevision?: number })
         </Group>
       ) : null}
 
+      {convertedPending ? (
+        <Text size="xs" c="orange" data-testid="designer-convert-pending">
+          Conversion staged in the editor — nothing saved to the pack yet.
+          Review the report, then press “Save design to pack” (the originals
+          are archived then).
+        </Text>
+      ) : null}
+
       {importedBackup ? (
         <Text size="xs" c="teal" data-testid="designer-imported-note">
-          Original script archived as {importedBackup}. Review the conversion
-          report, then edit the levels and save them to the pack.
+          Original archived as {importedBackup}.
         </Text>
       ) : null}
 
@@ -767,6 +880,8 @@ export function DesignerSection({ packRevision = 0 }: { packRevision?: number })
                   images={images}
                   videos={videos}
                   audios={audios}
+                  rootImages={gallery.rootImages}
+                  activeMoodsHere={activeByLevel[i] ?? []}
                   onChange={(next) => setLevel(i, next)}
                   onMove={(dir) => moveLevel(i, dir)}
                   onRemove={() => removeLevel(i)}
@@ -779,10 +894,7 @@ export function DesignerSection({ packRevision = 0 }: { packRevision?: number })
             <Button
               size="xs"
               leftSection={<IconPlus size={14} />}
-              onClick={() => {
-                setDesignDirty(true);
-                setDesign((d) => ({ ...d, levels: [...d.levels, newLevel()] }));
-              }}
+              onClick={addLevel}
               data-testid="designer-add-level"
             >
               Add level

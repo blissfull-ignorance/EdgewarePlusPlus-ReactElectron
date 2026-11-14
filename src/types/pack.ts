@@ -152,6 +152,8 @@ export interface GalleryResult {
   activeMoods: string[];
   /** Files the user starred, as "<dir>/<file>" keys. */
   favourites: string[];
+  /** Image files sitting at the pack root (legacy wallpaper convention). */
+  rootImages: string[];
 }
 
 /**

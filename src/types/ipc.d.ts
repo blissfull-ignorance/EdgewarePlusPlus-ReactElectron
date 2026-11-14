@@ -173,16 +173,28 @@ export interface ElectronAPI {
     stop: () => Promise<boolean>;
     /** Advance the corruption level by one (same path as Lua corrupt()). */
     advanceLevel: () => Promise<number>;
-    /** Archive script.lua as script.lua.bak* and install the designed one. */
+    /**
+     * Convert the pack's hand-written script in memory: the generated
+     * artifacts are returned for the editor to stage as an unsaved design;
+     * nothing is written until an explicit save.
+     */
     convertScript: (
       packPath: string
-    ) => Promise<{ backupName: string; notes: string[]; levelCount: number } | null>;
+    ) => Promise<{ lua: string; corruptionJson: string; notes: string[]; levelCount: number } | null>;
     /** Creator tools: the pack's script.lua content (starter text if absent) */
     readScript: (packPath: string) => Promise<{ content: string; exists: boolean; tooLarge?: boolean } | null>;
     /** Creator tools: save the pack's script.lua */
     writeScript: (packPath: string, content: string) => Promise<boolean>;
-    /** Creator tools: save script.lua and (unless null) corruption.json as one design */
-    writePackDesign: (packPath: string, lua: string, corruptionJson: string | null) => Promise<boolean>;
+    /**
+     * Creator tools: save script.lua and (unless null) corruption.json as
+     * one design. Replacing a hand-written script archives both originals
+     * first; their backup file names come back in `backups`.
+     */
+    writePackDesign: (
+      packPath: string,
+      lua: string,
+      corruptionJson: string | null
+    ) => Promise<{ ok: boolean; backups: string[] }>;
     /** Inject a corruption level into the running Lua VM (fires transition callbacks) */
     injectCorruptionLevel: (level: number) => Promise<boolean>;
   };
