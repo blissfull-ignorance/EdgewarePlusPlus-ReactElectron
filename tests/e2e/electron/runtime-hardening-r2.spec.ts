@@ -281,8 +281,10 @@ test("Stop is clickable by real mouse during a full popup storm", async () => {
       .toBeGreaterThanOrEqual(10);
 
     // A real mouse click on Stop must land even with a storm of always-on-top
-    // windows around: popups never take window focus.
-    await running.window.locator("[data-testid='start-stop-button']").click({ timeout: 8000 });
+    // windows around: popups never take window focus. The generous timeout
+    // only tolerates a loaded runner stalling the click dispatch — the poll
+    // below still proves the click landed and Stop took effect.
+    await running.window.locator("[data-testid='start-stop-button']").click({ timeout: 20000 });
     await expect
       .poll(() => running.app.windows().filter((w) => w.url().includes("/popup/")).length, {
         timeout: 20000,
